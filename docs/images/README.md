@@ -8,10 +8,13 @@ Screenshots and images for Cinephage documentation.
 |------|-------------|
 | `dashboard.png` | Main dashboard with stats, recent content, activity feed |
 | `discover.png` | Discover page with trending and popular content |
-| `library-movies.png` | Movies library grid view |
-| `library-tv.png` | TV Shows library grid view |
-| `movie-details.png` | Movie detail page with metadata and cast |
-| `tv-show-details.png` | TV show detail page with episodes and seasons |
+| `discover-filters.png` | Discover page with filters panel (genres, providers, year) |
+| `movie-details.png` | Movie detail page from discover (metadata, cast, trailer) |
+| `tv-discover-details.png` | TV show detail page from discover (seasons, cast) |
+| `library-movies.png` | Movies library grid view (993 movies) |
+| `library-tv.png` | TV Shows library grid view (13 shows) |
+| `library-movie-details.png` | Movie in library with file info, quality, storage |
+| `library-tv-details.png` | TV show in library with episodes, seasons, status |
 
 ## Naming Convention
 
@@ -19,7 +22,7 @@ Use descriptive, lowercase names with hyphens:
 
 - `feature-view.png` - General pattern
 - `settings-indexers.png` - Settings page example
-- `search-results.png` - Search results example
+- `queue-downloads.png` - Queue page example
 
 ## Usage in Docs
 
