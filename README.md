@@ -7,8 +7,8 @@
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node.js Version"></a>
-  <a href="https://github.com/MoldyTaint/cinephage/issues"><img src="https://img.shields.io/github/issues/MoldyTaint/cinephage" alt="GitHub Issues"></a>
-  <a href="https://github.com/MoldyTaint/cinephage"><img src="https://img.shields.io/github/last-commit/MoldyTaint/cinephage" alt="Last Commit"></a>
+  <a href="https://github.com/MoldyTaint/Cinephage/issues"><img src="https://img.shields.io/github/issues/MoldyTaint/Cinephage" alt="GitHub Issues"></a>
+  <a href="https://github.com/MoldyTaint/Cinephage"><img src="https://img.shields.io/github/last-commit/MoldyTaint/Cinephage" alt="Last Commit"></a>
 </p>
 
 <p align="center">
