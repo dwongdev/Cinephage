@@ -806,13 +806,13 @@ Note: GitHub Issues are for bugs and feature requests. For general questions, pl
 
 Inspired by and learned from:
 
-- **[EncDec Endpoints](https://github.com/AzartX47/EncDecEndpoints)** - Primary inspiration for streaming functionality, API toolkit for encryption/decryption
-- **[Radarr](https://github.com/Radarr/Radarr)** (GPLv3) - Download management, monitoring, quality logic
-- **[Sonarr](https://github.com/Sonarr/Sonarr)** (GPLv3) - TV handling, episode monitoring, season packs
-- **[Prowlarr](https://github.com/Prowlarr/Prowlarr)** (GPLv3) - Indexer system, Cardigann format, health tracking
-- **[Bazarr](https://github.com/morpheus65535/bazarr)** (GPLv3) - Subtitle provider architecture
-- **[Seerr](https://github.com/seerr-team/seerr)** (MIT) - Modern UI patterns
-- **[FlareSolverr](https://github.com/FlareSolverr/FlareSolverr)** (MIT) - Cloudflare handling
+- **[EncDec Endpoints](https://github.com/AzartX47/EncDecEndpoints)** - Primary inspiration for streaming functionality
+- **[Radarr](https://github.com/Radarr/Radarr)** - Download management, monitoring, quality logic
+- **[Sonarr](https://github.com/Sonarr/Sonarr)** - TV handling, episode monitoring, season packs
+- **[Prowlarr](https://github.com/Prowlarr/Prowlarr)** - Indexer system, Cardigann format, health tracking
+- **[Bazarr](https://github.com/morpheus65535/bazarr)** - Subtitle provider architecture
+- **[Seerr](https://github.com/seerr-team/seerr)** - Modern UI patterns
+- **[FlareSolverr](https://github.com/FlareSolverr/FlareSolverr)** - Cloudflare handling
 - **[Flyx](https://github.com/Vynx-Velvet/Flyx-main)** - Movie/TV discovery inspiration
 - **[Dictionarry](https://github.com/Dictionarry-Hub/database)** - Quality scoring database
 
