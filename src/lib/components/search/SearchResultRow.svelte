@@ -15,6 +15,7 @@
 		indexerName: string;
 		protocol: string;
 		commentsUrl?: string;
+		sourceIndexers?: string[];
 		// Enhanced fields
 		parsed?: {
 			resolution?: string;
@@ -111,7 +112,13 @@
 						? 'Stream'
 						: 'Usenet'}
 			</span>
-			<span class="text-sm">{release.indexerName}</span>
+			{#if release.sourceIndexers && release.sourceIndexers.length > 1}
+				<span class="text-sm" title="Available from: {release.sourceIndexers.join(', ')}">
+					{release.sourceIndexers.join(', ')}
+				</span>
+			{:else}
+				<span class="text-sm">{release.indexerName}</span>
+			{/if}
 		</div>
 	</td>
 

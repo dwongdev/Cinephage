@@ -71,6 +71,10 @@ export interface ReleaseResult {
 	/** @deprecated Use usenet.group */
 	group?: string;
 
+	// Deduplication metadata
+	/** All indexers that returned this release (tracked during deduplication) */
+	sourceIndexers?: string[];
+
 	// Metadata (if indexer provides it)
 	/** IMDB ID if known */
 	imdbId?: string;

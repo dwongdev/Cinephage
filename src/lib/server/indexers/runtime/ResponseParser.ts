@@ -129,15 +129,38 @@ export class ResponseParser {
 		// 'multiple' can be a string selector (e.g., "torrents") or true (deprecated)
 		const multipleSelector = typeof search.rows.multiple === 'string' ? search.rows.multiple : null;
 
+		if (multipleSelector) {
+			logger.info('[ResponseParser] Parsing JSON with multiple directive', {
+				indexer: context.indexerName,
+				rowCount: filteredRows.length,
+				multipleSelector
+			});
+		}
+
 		for (const row of filteredRows) {
 			try {
 				if (multipleSelector && typeof row === 'object' && row !== null) {
 					// Extract nested array and create release for each item
 					const nestedItems = this.selectorEngine.selectJsonAll(row, multipleSelector);
+					logger.info('[ResponseParser] Processing multiple directive', {
+						indexer: context.indexerName,
+						nestedItemCount: nestedItems.length
+					});
 					for (const nestedItem of nestedItems) {
 						// Pass parent row for accessing parent fields (title, imdb_code, etc.)
 						const release = this.extractReleaseFromJson(nestedItem, row, context);
-						if (release) releases.push(release);
+						if (release) {
+							releases.push(release);
+							logger.info('[ResponseParser] Extracted release from nested item', {
+								indexer: context.indexerName,
+								title: release.title
+							});
+						} else {
+							logger.info('[ResponseParser] Failed to extract release from nested item', {
+								indexer: context.indexerName,
+								nestedItem: JSON.stringify(nestedItem).slice(0, 200)
+							});
+						}
 					}
 				} else {
 					const release = this.extractReleaseFromJson(row, null, context);

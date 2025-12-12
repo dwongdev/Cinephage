@@ -1,4 +1,5 @@
 import type { ReleaseResult } from '../types';
+import { logger } from '$lib/logging';
 
 /**
  * Result of deduplication operation.
@@ -36,6 +37,7 @@ export class ReleaseDeduplicator {
 	private normalizeCache: Map<string, string> = new Map();
 	/**
 	 * Deduplicates releases, preferring those with more seeders.
+	 * Tracks all source indexers that returned the same release (by infoHash).
 	 */
 	deduplicate(releases: ReleaseResult[]): DeduplicationResult {
 		const seen = new Map<string, ReleaseResult>();
@@ -44,13 +46,52 @@ export class ReleaseDeduplicator {
 			const key = this.getDedupeKey(release);
 			const existing = seen.get(key);
 
-			if (!existing || this.shouldPrefer(release, existing)) {
-				seen.set(key, release);
+			if (!existing) {
+				// First time seeing this release - initialize sourceIndexers
+				const releaseWithSources = {
+					...release,
+					sourceIndexers: [release.indexerName]
+				};
+				seen.set(key, releaseWithSources);
+			} else {
+				// Duplicate found - track this indexer as another source
+				const currentSources = existing.sourceIndexers ?? [existing.indexerName];
+				if (!currentSources.includes(release.indexerName)) {
+					currentSources.push(release.indexerName);
+				}
+
+				if (this.shouldPrefer(release, existing)) {
+					// Prefer the new release but keep all source indexers
+					const releaseWithSources = {
+						...release,
+						sourceIndexers: currentSources
+					};
+					seen.set(key, releaseWithSources);
+				} else {
+					// Keep existing but update its sourceIndexers
+					existing.sourceIndexers = currentSources;
+				}
 			}
 		}
 
+		const result = Array.from(seen.values());
+
+		// Log multi-source releases for debugging
+		const multiSourceReleases = result.filter(
+			(r) => r.sourceIndexers && r.sourceIndexers.length > 1
+		);
+		if (multiSourceReleases.length > 0) {
+			logger.debug('[Deduplicator] Releases from multiple indexers', {
+				count: multiSourceReleases.length,
+				samples: multiSourceReleases.slice(0, 5).map((r) => ({
+					title: r.title,
+					sources: r.sourceIndexers
+				}))
+			});
+		}
+
 		return {
-			releases: Array.from(seen.values()),
+			releases: result,
 			removed: releases.length - seen.size
 		};
 	}

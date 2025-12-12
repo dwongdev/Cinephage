@@ -111,7 +111,7 @@ DHT search engines and multi-tracker aggregators.
 | BTDig            | DHT search     | In Progress | Converting to YAML           |
 | BitSearch        | Aggregator     | In Progress | Converting to YAML           |
 | Solidtorrents    | DHT aggregator | In Progress | Converting to YAML           |
-| Knaben           | Aggregator     | In Progress | Converting to YAML           |
+| Knaben           | Aggregator     | **Supported** | Multi-tracker aggregator    |
 | TorrentsCSV      | DHT database   | In Progress | Converting to YAML           |
 | Torrent Paradise | DHT search     | Planned     | Decentralized                |
 | BT4G             | Meta-search    | Planned     | 91M+ results                 |
@@ -369,6 +369,35 @@ Monitor indexer health in **Settings > Integrations > Indexers**:
 - **Last Success**: Time of last successful search
 - **Failure Count**: Consecutive failures
 - **Response Time**: Average latency
+
+---
+
+## Search Result Deduplication
+
+When searching across multiple indexers, Cinephage automatically deduplicates results to avoid showing the same torrent multiple times.
+
+### How Deduplication Works
+
+1. **Primary key**: Info hash (for torrents) - identical hashes mean identical content
+2. **Fallback**: Normalized title comparison when no hash is available
+3. **Preference**: When duplicates are found, the version with more seeders is kept
+
+### Multi-Source Attribution
+
+When the same torrent appears on multiple indexers (common with aggregators like Knaben that index other trackers), Cinephage tracks all sources via the `sourceIndexers` field.
+
+**Example**: A YTS torrent that also appears on Knaben will show:
+- `indexerName: "Knaben"` (the version with more seeders was kept)
+- `sourceIndexers: ["YTS", "Knaben"]` (both indexers had it)
+
+In the search results UI, releases from multiple indexers display all sources (e.g., "YTS, Knaben") so you can see which indexers found that release.
+
+### Why This Matters
+
+- **Aggregators** like Knaben index torrents from other trackers (YTS, 1337x, etc.)
+- The **same torrent** (identical info hash) may appear from multiple sources
+- Deduplication keeps the **best version** (most seeders) while crediting all sources
+- This prevents duplicate results cluttering your search
 
 ---
 

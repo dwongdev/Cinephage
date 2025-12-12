@@ -39,7 +39,7 @@ search:
     - path: /api/v2/list_movies.json
       method: get
       inputs:
-        query_term: '{{ if .Query.IMDBID }}{{ .Query.IMDBID }}{{ else }}{{ .Keywords }}{{ end }}'
+        query_term: '{{ or .Query.IMDBID .Keywords }}'
         limit: '50'
         sort_by: seeds
 

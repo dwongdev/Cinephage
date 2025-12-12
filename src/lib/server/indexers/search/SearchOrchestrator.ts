@@ -287,6 +287,15 @@ export class SearchOrchestrator {
 		// Deduplicate
 		const { releases: deduped } = this.deduplicator.deduplicate(allReleases);
 
+		// Debug: log YTS releases after deduplication
+		const ytsAfterDedup = deduped.filter((r) => r.indexerName === 'YTS');
+		logger.info('[SearchOrchestrator] After deduplication', {
+			totalDeduped: deduped.length,
+			ytsCount: ytsAfterDedup.length,
+			ytsTitles: ytsAfterDedup.slice(0, 5).map((r) => r.title),
+			sampleIndexers: deduped.slice(0, 10).map((r) => r.indexerName)
+		});
+
 		// Filter by season/episode if specified
 		const filtered = this.filterBySeasonEpisode(deduped, enrichedCriteria);
 
@@ -323,6 +332,17 @@ export class SearchOrchestrator {
 		};
 
 		const enrichResult = await releaseEnricher.enrich(filtered, enrichmentOpts);
+
+		// Debug: log YTS releases after enrichment
+		const ytsAfterEnrich = enrichResult.releases.filter((r) => r.indexerName === 'YTS');
+		if (ytsAfterEnrich.length > 0 || ytsAfterDedup.length > 0) {
+			logger.info('[SearchOrchestrator] YTS releases after enrichment', {
+				countBefore: ytsAfterDedup.length,
+				countAfter: ytsAfterEnrich.length,
+				titles: ytsAfterEnrich.map((r) => r.title),
+				rejected: ytsAfterEnrich.filter((r) => r.rejected).length
+			});
+		}
 
 		// Apply limit (enricher already sorts by totalScore)
 		const limited = enrichResult.releases.slice(0, enrichedCriteria.limit ?? 100);
@@ -495,6 +515,12 @@ export class SearchOrchestrator {
 	): Promise<ReleaseResult[]> {
 		const allReleases: ReleaseResult[] = [];
 
+		logger.info('[executeSearches] Starting', {
+			indexerCount: indexers.length,
+			criteria: { type: criteria.searchType, query: criteria.query },
+			concurrency: options.concurrency
+		});
+
 		// Process in batches for concurrency control
 		for (let i = 0; i < indexers.length; i += options.concurrency) {
 			const batch = indexers.slice(i, i + options.concurrency);
@@ -506,10 +532,20 @@ export class SearchOrchestrator {
 			);
 
 			for (const result of batchResults) {
+				logger.info('[executeSearches] Indexer result', {
+					indexer: result.indexerName,
+					resultCount: result.results.length,
+					timeMs: result.searchTimeMs,
+					error: result.error
+				});
 				results.push(result);
 				allReleases.push(...result.results);
 			}
 		}
+
+		logger.info('[executeSearches] Completed', {
+			totalReleases: allReleases.length
+		});
 
 		return allReleases;
 	}

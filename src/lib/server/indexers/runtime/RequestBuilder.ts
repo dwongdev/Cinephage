@@ -12,6 +12,7 @@ import type { SearchCriteria } from '../types';
 import { isMovieSearch, isTvSearch } from '../types';
 import { TemplateEngine } from '../engine/TemplateEngine';
 import { FilterEngine } from '../engine/FilterEngine';
+import { logger } from '$lib/logging';
 
 /**
  * HTTP request representation.
@@ -474,20 +475,36 @@ export class RequestBuilder {
 			return { url, method, headers, searchPath: path };
 		} else {
 			// POST - inputs go in body
-			const body = new URLSearchParams();
-			for (const [key, value] of Object.entries(filteredInputs)) {
-				if (key === '$raw') {
-					const rawParts = value.split('&');
-					for (const part of rawParts) {
-						const [k, v] = part.split('=');
-						if (k) body.append(k, v ?? '');
-					}
-				} else {
-					body.append(key, value);
-				}
-			}
+			const contentType = headers['Content-Type'] || headers['content-type'] || '';
 
-			return { url, method, headers, body, searchPath: path };
+			if (contentType.includes('application/json')) {
+				// JSON body - serialize inputs as JSON object
+				const jsonBody: Record<string, unknown> = {};
+				for (const [key, value] of Object.entries(filteredInputs)) {
+					// Try to parse JSON values (arrays, numbers, booleans)
+					try {
+						jsonBody[key] = JSON.parse(value);
+					} catch {
+						jsonBody[key] = value;
+					}
+				}
+				return { url, method, headers, body: JSON.stringify(jsonBody), searchPath: path };
+			} else {
+				// Form-encoded body (default)
+				const body = new URLSearchParams();
+				for (const [key, value] of Object.entries(filteredInputs)) {
+					if (key === '$raw') {
+						const rawParts = value.split('&');
+						for (const part of rawParts) {
+							const [k, v] = part.split('=');
+							if (k) body.append(k, v ?? '');
+						}
+					} else {
+						body.append(key, value);
+					}
+				}
+				return { url, method, headers, body, searchPath: path };
+			}
 		}
 	}
 
@@ -500,7 +517,10 @@ export class RequestBuilder {
 		mode: string
 	): Record<string, string> {
 		const supported = this.supportedParams.get(mode);
-		console.log(`[RequestBuilder] filterBySupportedParams mode=${mode}, supportedParams=${supported?.join(',') ?? 'NONE'}`);
+		logger.debug('[RequestBuilder] filterBySupportedParams', {
+			mode,
+			supportedParams: supported ?? []
+		});
 		if (!supported || supported.length === 0) {
 			// No filtering configured for this mode
 			return inputs;
