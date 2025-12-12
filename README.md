@@ -40,7 +40,7 @@ Cinephage consolidates four separate applications into one streamlined experienc
 | Library Management | Stable       | File watching, scanning, TMDB matching               |
 | Quality Scoring    | In Progress  | 4 built-in profiles work; custom profiles incomplete |
 | Download Client    | Stable       | qBittorrent + SABnzbd                                |
-| Indexers           | In Progress  | 2 public indexers + Torznab/Newznab templates        |
+| Indexers           | In Progress  | 4 public indexers + Torznab/Newznab templates        |
 | Subtitles          | Stable       | 8 providers, 80+ languages                           |
 | Monitoring         | Experimental | 5 tasks coded, may have bugs                         |
 | Live TV/IPTV       | Not Started  | Planned for future                                   |
@@ -58,7 +58,7 @@ Cinephage consolidates four separate applications into one streamlined experienc
 Browse TMDB for movies and TV shows, view trending content, full metadata, trailers, and watch providers.
 
 **Multi-Indexer Search**<br>
-YAML-based indexers (EZTV, YTS), Torznab/Newznab templates for external integrations, parallel search with automatic deduplication.
+YAML-based indexers (BitSearch, EZTV, Knaben, YTS), Torznab/Newznab templates for external integrations, parallel search with automatic deduplication.
 
 **Quality Scoring**<br>
 4 built-in profiles (Best, Efficient, Micro, Streaming) that score resolution, audio codecs, HDR formats, and release groups. See [Quality Profiles](docs/QUALITY-PROFILES.md) for details.

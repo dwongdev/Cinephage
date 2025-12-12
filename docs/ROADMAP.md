@@ -78,7 +78,7 @@ Continue expanding built-in indexer support:
 - Tokyo Toshokan
 - AnimeTosho
 
-**Context**: More indexer coverage means better search results and content availability. Many anime indexers have already been added (SubsPlease, Anidex, Nyaa).
+**Context**: More indexer coverage means better search results and content availability. Priority targets include anime indexers (SubsPlease, Anidex, Nyaa).
 
 ---
 

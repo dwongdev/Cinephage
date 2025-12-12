@@ -1,6 +1,6 @@
 # Indexers
 
-Cinephage uses a YAML-based indexer engine with Cardigann-compatible definitions. Currently, two public indexers are fully supported (EZTV and YTS), with more being added. For indexers not yet built in, use Torznab or Newznab integration with [Prowlarr](https://prowlarr.com/) or [Jackett](https://github.com/Jackett/Jackett).
+Cinephage uses a YAML-based indexer engine with Cardigann-compatible definitions. Currently, four public indexers are fully supported (BitSearch, EZTV, Knaben, and YTS), with more being added. For indexers not yet built in, use Torznab or Newznab integration with [Prowlarr](https://prowlarr.com/) or [Jackett](https://github.com/Jackett/Jackett).
 
 > **Note**: The indexer system was recently overhauled to a unified YAML-only architecture. Many previously supported native indexers are being converted to YAML definitions.
 
@@ -109,8 +109,7 @@ DHT search engines and multi-tracker aggregators.
 | Indexer          | Type           | Status        | Notes                     |
 | ---------------- | -------------- | ------------- | ------------------------- |
 | BTDig            | DHT search     | In Progress   | Converting to YAML        |
-| BitSearch        | Aggregator     | In Progress   | Converting to YAML        |
-| Solidtorrents    | DHT aggregator | In Progress   | Converting to YAML        |
+| BitSearch        | DHT search     | **Supported** | Formerly SolidTorrents    |
 | Knaben           | Aggregator     | **Supported** | Multi-tracker aggregator  |
 | TorrentsCSV      | DHT database   | In Progress   | Converting to YAML        |
 | Torrent Paradise | DHT search     | Planned       | Decentralized             |
@@ -229,7 +228,7 @@ Cinephage now supports Newznab-compatible usenet indexers via the built-in Newzn
 
 1. Navigate to **Settings > Integrations > Indexers**
 2. Click **Add Indexer**
-3. Select from available indexers (EZTV, YTS, or templates)
+3. Select from available indexers (BitSearch, EZTV, Knaben, YTS, or templates)
 4. Configure settings as needed
 5. Test the indexer to verify connectivity
 
