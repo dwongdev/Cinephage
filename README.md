@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node.js Version"></a>
-  <a href="#"><img src="https://img.shields.io/badge/status-Work%20in%20Progress-yellow" alt="Status: Work in Progress"></a>
+  <a href="#"><img src="https://img.shields.io/badge/status-Alpha%20·%20Active%20Development-orange" alt="Status: Alpha - Active Development"></a>
   <a href="https://github.com/MoldyTaint/Cinephage/issues"><img src="https://img.shields.io/github/issues/MoldyTaint/Cinephage" alt="GitHub Issues"></a>
   <a href="https://github.com/MoldyTaint/Cinephage"><img src="https://img.shields.io/github/last-commit/MoldyTaint/Cinephage" alt="Last Commit"></a>
 </p>
@@ -16,6 +16,9 @@
   Search torrents, grab downloads, organize your library, fetch subtitles — all in one app.<br>
   Think Radarr + Sonarr + Prowlarr + Bazarr, but built from scratch as a single application.
 </p>
+
+> [!CAUTION]
+> **This project is under active development.** Features may be incomplete, APIs may change, and bugs are expected. This is a passion project by a solo developer — your patience and feedback are appreciated. Please report issues on GitHub, but understand that breaking changes may occur between updates.
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Cinephage Dashboard" width="800">
@@ -33,6 +36,8 @@ Cinephage consolidates four separate applications into one streamlined experienc
 - **Simple Setup** — Works out of the box with SQLite. No complex infrastructure required to get started
 
 ## Project Status
+
+> **Early adopters welcome, but expect rough edges.** This project is evolving rapidly. Some features work well, others are experimental. Check the table below for current status, and see the [Roadmap](docs/ROADMAP.md) for what's planned.
 
 | Feature            | Status       | Notes                                                |
 | ------------------ | ------------ | ---------------------------------------------------- |
