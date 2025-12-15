@@ -141,7 +141,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			movie: row.movieId ? movieMap.get(row.movieId) || null : null,
 			series: row.seriesId ? seriesMap.get(row.seriesId) || null : null,
 			downloadClient: clientMap.get(row.downloadClientId) || null
-		}))
+		}));
 
 		// Get stats
 		const stats = await downloadMonitor.getStats();

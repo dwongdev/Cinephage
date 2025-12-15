@@ -71,9 +71,7 @@ export async function validateRootFolder(
 /**
  * Get the effective scoring profile ID (provided or default)
  */
-export async function getEffectiveScoringProfileId(
-	providedProfileId?: string
-): Promise<string> {
+export async function getEffectiveScoringProfileId(providedProfileId?: string): Promise<string> {
 	if (providedProfileId) {
 		return providedProfileId;
 	}

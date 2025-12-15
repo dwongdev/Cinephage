@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 	import Toasts from '$lib/components/ui/Toasts.svelte';
 	import { layoutState } from '$lib/layout.svelte';
@@ -55,7 +54,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" type="image/png" href="/logo.png" />
 </svelte:head>
 
 <div class="drawer lg:drawer-open">
@@ -68,7 +67,8 @@
 					<Menu class="h-6 w-6" />
 				</label>
 			</div>
-			<div class="mx-2 flex-1 px-2">
+			<div class="mx-2 flex flex-1 items-center gap-2 px-2">
+				<img src="/logo.png" alt="" class="h-7 w-7" />
 				<span class="text-xl font-bold">Cinephage</span>
 			</div>
 			<div class="flex-none">
@@ -96,7 +96,12 @@
 				class:justify-center={!layoutState.isSidebarExpanded}
 			>
 				{#if layoutState.isSidebarExpanded}
-					<span class="truncate text-xl font-bold">Cinephage</span>
+					<div class="flex items-center gap-2">
+						<img src="/logo.png" alt="" class="h-7 w-7" />
+						<span class="truncate text-xl font-bold">Cinephage</span>
+					</div>
+				{:else}
+					<img src="/logo.png" alt="Cinephage" class="h-8 w-8" />
 				{/if}
 				<button
 					class="btn hidden btn-square btn-ghost btn-sm lg:flex"

@@ -35,11 +35,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	const manager = await getIndexerManager();
 
 	// Get existing indexer to compare settings (for detecting baseUrl changes)
-	const existingIndexer = assertFound(
-		await manager.getIndexer(params.id),
-		'Indexer',
-		params.id
-	);
+	const existingIndexer = assertFound(await manager.getIndexer(params.id), 'Indexer', params.id);
 
 	// Check if this is the streaming indexer and capture old baseUrl
 	const isStreamingIndexer = existingIndexer.definitionId === CINEPHAGE_STREAM_DEFINITION_ID;

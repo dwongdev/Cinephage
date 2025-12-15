@@ -7,7 +7,10 @@ import { getLibraryScheduler, librarySchedulerService } from '$lib/server/librar
 import { isFFprobeAvailable, getFFprobeVersion } from '$lib/server/library/ffprobe.js';
 import { getDownloadMonitor, downloadMonitor } from '$lib/server/downloadClients/monitoring';
 import { importService } from '$lib/server/downloadClients/import';
-import { getMonitoringScheduler, monitoringScheduler } from '$lib/server/monitoring/MonitoringScheduler.js';
+import {
+	getMonitoringScheduler,
+	monitoringScheduler
+} from '$lib/server/monitoring/MonitoringScheduler.js';
 import { taskHistoryService } from '$lib/server/tasks/TaskHistoryService.js';
 import { getExternalIdService } from '$lib/server/services/ExternalIdService.js';
 import { qualityFilter } from '$lib/server/quality';

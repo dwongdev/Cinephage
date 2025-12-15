@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="CinephageLogo.png" alt="Cinephage" width="200">
+</p>
+
 <h1 align="center">Cinephage</h1>
 
 <p align="center">
