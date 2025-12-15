@@ -9,6 +9,7 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node.js Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/status-Alpha%20·%20Active%20Development-orange" alt="Status: Alpha - Active Development"></a>
   <a href="https://github.com/MoldyTaint/Cinephage/issues"><img src="https://img.shields.io/github/issues/MoldyTaint/Cinephage" alt="GitHub Issues"></a>
+  <a href="https://discord.gg/scGCBTSWEt"><img src="https://img.shields.io/discord/1318813922776248370?color=5865F2&logo=discord&logoColor=white&label=Discord" alt="Discord"></a>
 </p>
 
 <p align="center">
@@ -176,6 +177,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## Support
 
+- [Discord](https://discord.gg/scGCBTSWEt) — Community chat and support
 - [GitHub Issues](https://github.com/MoldyTaint/cinephage/issues) — Bug reports and feature requests
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — Common issues and solutions
 - [Contributing](CONTRIBUTING.md) — Development guidelines and workflow
