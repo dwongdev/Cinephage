@@ -28,25 +28,27 @@ FROM node:22-alpine3.21 AS runner
 WORKDIR /app
 
 # Install runtime dependencies
-# ffmpeg is required for ffprobe media analysis
-RUN apk add --no-cache ffmpeg
+# - ffmpeg: required for ffprobe media analysis
+# - shadow: for usermod/groupmod to change UID/GID
+# - su-exec: for dropping privileges (lighter than gosu)
+RUN apk add --no-cache ffmpeg shadow su-exec
 
-# Create necessary directories for data and logs with correct permissions
-RUN mkdir -p data logs && chown -R node:node /app
+# Create necessary directories
+RUN mkdir -p data logs
 
 # Copy production dependencies and built artifacts from builder
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/build ./build
-COPY --from=builder --chown=node:node /app/package.json ./package.json
-COPY --from=builder --chown=node:node /app/drizzle ./drizzle
-COPY --from=builder --chown=node:node /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder --chown=node:node /app/src ./src
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/src ./src
 
 # Copy bundled indexers to separate location (not shadowed by volume mount)
-COPY --from=builder --chown=node:node /app/data/indexers ./bundled-indexers
+COPY --from=builder /app/data/indexers ./bundled-indexers
 
 # Copy and set up entrypoint script
-COPY --chown=node:node docker-entrypoint.sh ./docker-entrypoint.sh
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
 # Set environment variables
@@ -56,8 +58,9 @@ ENV PORT=3000
 ENV FFPROBE_PATH=/usr/bin/ffprobe
 ENV BROWSER_SOLVER_ENABLED=false
 
-# Switch to non-root user
-USER node
+# Default PUID/PGID (can be overridden at runtime)
+ENV PUID=1000
+ENV PGID=1000
 
 # Expose the application port
 EXPOSE 3000
@@ -66,6 +69,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Start the application
+# Start the application (entrypoint handles user switching)
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "build/index.js"]

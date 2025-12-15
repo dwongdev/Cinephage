@@ -16,6 +16,9 @@ services:
       # Mount your media library (adjust the host path on the left)
       - /path/to/your/media:/media
     environment:
+      # User/Group ID - set these to match your host user (run 'id' to find yours)
+      - PUID=1000
+      - PGID=1000
       # REQUIRED: Set this to your server's access URL for CSRF protection
       # Examples: http://localhost:3000, https://cinephage.yourdomain.com
       - ORIGIN=http://localhost:3000
