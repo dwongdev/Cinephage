@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import type { FormatCategory } from '$lib/types/format';
 	import {
 		FORMAT_CATEGORY_LABELS,
@@ -34,11 +35,11 @@
 
 	// UI state
 	let searchQuery = $state('');
-	let expandedCategories = $state<Set<FormatCategory>>(new Set());
+	const expandedCategories = new SvelteSet<FormatCategory>();
 
 	// Filter scores by search
 	const filteredScores = $derived(() => {
-		const result = new Map<FormatCategory, FormatScoreEntry[]>();
+		const result = new SvelteMap<FormatCategory, FormatScoreEntry[]>();
 		for (const [category, scores] of formatScores) {
 			const filtered = filterFormatScores(scores, searchQuery);
 			if (filtered.length > 0) {
@@ -49,21 +50,22 @@
 	});
 
 	function toggleCategory(category: FormatCategory) {
-		const newSet = new Set(expandedCategories);
-		if (newSet.has(category)) {
-			newSet.delete(category);
+		if (expandedCategories.has(category)) {
+			expandedCategories.delete(category);
 		} else {
-			newSet.add(category);
+			expandedCategories.add(category);
 		}
-		expandedCategories = newSet;
 	}
 
 	function expandAll() {
-		expandedCategories = new Set(FORMAT_CATEGORY_ORDER);
+		expandedCategories.clear();
+		for (const cat of FORMAT_CATEGORY_ORDER) {
+			expandedCategories.add(cat);
+		}
 	}
 
 	function collapseAll() {
-		expandedCategories = new Set();
+		expandedCategories.clear();
 	}
 
 	function handleScoreInput(formatId: string, value: string) {

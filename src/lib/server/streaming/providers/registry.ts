@@ -12,8 +12,7 @@ import type {
 	IStreamProvider,
 	StreamingProviderId,
 	ProviderCapabilities,
-	SearchParams,
-	ProviderHealth
+	SearchParams
 } from '../types';
 import { getHealthTracker } from './health';
 import { getCircuitBreakerManager } from './circuitBreaker';
@@ -310,7 +309,7 @@ export class ProviderRegistry {
 	// Private Methods
 	// --------------------------------------------------------------------------
 
-	private calculateLanguageScore(provider: IStreamProvider, preferredLanguages: string[]): number {
+	private calculateLanguageScore(provider: IStreamProvider, _preferredLanguages: string[]): number {
 		// Basic language scoring - can be enhanced per-provider
 		// For now, just check if provider supports languages
 		const caps = provider.config.capabilities;

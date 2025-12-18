@@ -408,7 +408,7 @@
 									disabled={loadingPresets}
 								>
 									<option value="">Select a custom preset...</option>
-									{#each customPresets as preset}
+									{#each customPresets as preset (preset.id)}
 										<option value={preset.id}>{preset.name}</option>
 									{/each}
 								</select>

@@ -203,7 +203,7 @@
 		}
 	}
 
-	function confirmFormatDelete(format: UICustomFormat) {
+	function _confirmFormatDelete(format: UICustomFormat) {
 		formatDeleteTarget = format;
 		formatDeleteConfirmOpen = true;
 	}

@@ -8,7 +8,7 @@
  */
 
 import { logger } from '$lib/logging';
-import type { StreamSource, StreamValidation, ExtractionResult } from '../types';
+import type { StreamValidation, ExtractionResult } from '../types';
 
 const streamLog = { logCategory: 'streams' as const };
 

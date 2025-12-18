@@ -14,7 +14,7 @@ import {
 	subtitleHistory,
 	monitoringHistory
 } from '$lib/server/db/schema.js';
-import { eq, and, isNotNull, lt } from 'drizzle-orm';
+import { eq, and, isNotNull } from 'drizzle-orm';
 import { getSubtitleSearchService } from '$lib/server/subtitles/services/SubtitleSearchService.js';
 import { getSubtitleDownloadService } from '$lib/server/subtitles/services/SubtitleDownloadService.js';
 import { LanguageProfileService } from '$lib/server/subtitles/services/LanguageProfileService.js';

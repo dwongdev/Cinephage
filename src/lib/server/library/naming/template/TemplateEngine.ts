@@ -25,7 +25,7 @@ export class TemplateEngine {
 
 		// Find conditional blocks: {prefix{Token}suffix}
 		const conditionalPattern = /\{([^{}]*)\{([A-Za-z:0-9]+)\}([^{}]*)\}/g;
-		let conditionalMatches = format.matchAll(conditionalPattern);
+		const conditionalMatches = format.matchAll(conditionalPattern);
 
 		for (const match of conditionalMatches) {
 			const [fullMatch, , token] = match;
@@ -62,7 +62,7 @@ export class TemplateEngine {
 
 		// Find simple tokens: {Token} or {Token:00}
 		const tokenPattern = /\{([A-Za-z:0-9]+)\}/g;
-		let tokenMatches = format.matchAll(tokenPattern);
+		const tokenMatches = format.matchAll(tokenPattern);
 
 		for (const match of tokenMatches) {
 			const [fullMatch, token] = match;

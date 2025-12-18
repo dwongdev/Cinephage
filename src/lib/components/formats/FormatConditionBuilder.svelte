@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteMap } from 'svelte/reactivity';
 	import type { FormatCondition, ConditionType } from '$lib/types/format';
 	import {
 		CONDITION_TYPE_LABELS,
@@ -119,7 +120,7 @@
 	}
 
 	// Track regex validation per condition index
-	let regexErrors = $state<Map<number, string>>(new Map());
+	const regexErrors = new SvelteMap<number, string>();
 
 	function handlePatternChange(index: number, pattern: string) {
 		const result = validateRegex(pattern);
@@ -128,7 +129,6 @@
 		} else {
 			regexErrors.delete(index);
 		}
-		regexErrors = new Map(regexErrors);
 		updateCondition(index, { pattern });
 	}
 </script>

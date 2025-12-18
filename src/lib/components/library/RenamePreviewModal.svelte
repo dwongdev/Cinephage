@@ -1,9 +1,7 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import { X, RefreshCw, CheckCircle, AlertTriangle, ArrowRight, Film, Tv } from 'lucide-svelte';
-	import type {
-		RenamePreviewResult,
-		RenamePreviewItem
-	} from '$lib/server/library/naming/RenamePreviewService';
+	import type { RenamePreviewResult } from '$lib/server/library/naming/RenamePreviewService';
 
 	interface Props {
 		open: boolean;
@@ -22,7 +20,7 @@
 	let error = $state<string | null>(null);
 	let success = $state<string | null>(null);
 	let preview = $state<RenamePreviewResult | null>(null);
-	let selectedIds = $state<Set<string>>(new Set());
+	const selectedIds = new SvelteSet<string>();
 
 	// Load preview when modal opens
 	$effect(() => {
@@ -31,7 +29,7 @@
 		} else {
 			// Reset state when closed
 			preview = null;
-			selectedIds = new Set();
+			selectedIds.clear();
 			error = null;
 			success = null;
 		}
@@ -57,7 +55,10 @@
 			preview = await response.json();
 
 			// Auto-select all "will change" items
-			selectedIds = new Set(preview?.willChange.map((item) => item.fileId) || []);
+			selectedIds.clear();
+			for (const item of preview?.willChange || []) {
+				selectedIds.add(item.fileId);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load preview';
 		} finally {
@@ -118,13 +119,11 @@
 	}
 
 	function toggleSelect(fileId: string) {
-		const newSet = new Set(selectedIds);
-		if (newSet.has(fileId)) {
-			newSet.delete(fileId);
+		if (selectedIds.has(fileId)) {
+			selectedIds.delete(fileId);
 		} else {
-			newSet.add(fileId);
+			selectedIds.add(fileId);
 		}
-		selectedIds = newSet;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {

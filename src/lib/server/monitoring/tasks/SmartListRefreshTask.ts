@@ -9,7 +9,7 @@ import { getSmartListService } from '$lib/server/smartlists/index.js';
 import { logger } from '$lib/logging';
 import type { TaskResult } from '../MonitoringScheduler.js';
 
-export async function executeSmartListRefreshTask(taskHistoryId?: string): Promise<TaskResult> {
+export async function executeSmartListRefreshTask(_taskHistoryId?: string): Promise<TaskResult> {
 	logger.info('[SmartListRefreshTask] Starting smart list refresh task');
 
 	const service = getSmartListService();

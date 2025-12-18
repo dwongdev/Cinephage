@@ -9,13 +9,7 @@
 
 import { logger } from '$lib/logging';
 import { fetchWithTimeout, type FetchOptions } from '../utils/http';
-import {
-	validatePlaylist,
-	sanitizePlaylist,
-	parseHLSMaster,
-	isHLSPlaylist,
-	type HLSVariant
-} from '../hls';
+import { validatePlaylist, sanitizePlaylist, parseHLSMaster, isHLSPlaylist } from '../hls';
 import type {
 	StreamSource,
 	StreamValidation,
@@ -23,7 +17,6 @@ import type {
 	ValidationOptions,
 	PlaylistValidationResult
 } from '../types';
-import { StreamValidationError, PlaylistParseError } from '../errors';
 
 const streamLog = { logCategory: 'streams' as const };
 
@@ -218,7 +211,7 @@ export class StreamValidator {
 				'application/mp4'
 			];
 
-			const isValidType =
+			const _isValidType =
 				!contentType ||
 				validContentTypes.some((t) => contentType.includes(t)) ||
 				url.endsWith('.ts') ||

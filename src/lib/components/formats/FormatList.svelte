@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { UICustomFormat, FormatCategory } from '$lib/types/format';
 	import { FORMAT_CATEGORY_LABELS, FORMAT_CATEGORY_ORDER } from '$lib/types/format';
 	import {
@@ -36,7 +37,7 @@
 	let searchQuery = $state('');
 	let filterType = $state<'all' | 'builtin' | 'custom'>('all');
 	let filterCategory = $state<FormatCategory | 'all'>('all');
-	let expandedCategories = $state<Set<FormatCategory>>(new Set(FORMAT_CATEGORY_ORDER));
+	const expandedCategories = new SvelteSet<FormatCategory>(FORMAT_CATEGORY_ORDER);
 
 	// Filtered formats
 	const filteredFormats = $derived(() => {
@@ -98,13 +99,11 @@
 	});
 
 	function toggleCategory(category: FormatCategory) {
-		const newSet = new Set(expandedCategories);
-		if (newSet.has(category)) {
-			newSet.delete(category);
+		if (expandedCategories.has(category)) {
+			expandedCategories.delete(category);
 		} else {
-			newSet.add(category);
+			expandedCategories.add(category);
 		}
-		expandedCategories = newSet;
 	}
 </script>
 

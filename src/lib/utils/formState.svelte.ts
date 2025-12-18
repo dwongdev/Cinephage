@@ -38,7 +38,7 @@ export function createFormState<T extends Record<string, unknown>>(options: {
 	const { defaults, source, trigger } = options;
 
 	// Create reactive state initialized with defaults
-	let state = $state<T>({ ...defaults });
+	const state = $state<T>({ ...defaults });
 	let initialState = $state<T>({ ...defaults });
 
 	// Sync state when trigger changes to true

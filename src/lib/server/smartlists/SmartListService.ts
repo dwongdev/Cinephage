@@ -18,7 +18,7 @@ import {
 	type SmartListRecord,
 	type SmartListItemRecord
 } from '$lib/server/db/schema.js';
-import { eq, and, inArray, desc, asc, sql, isNull, isNotNull, lt } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, lt } from 'drizzle-orm';
 import { tmdb, type DiscoverParams, type DiscoverItem } from '$lib/server/tmdb.js';
 import { logger } from '$lib/logging';
 import {
@@ -535,7 +535,7 @@ export class SmartListService {
 	async addItemToLibrary(
 		smartListId: string,
 		itemId: string,
-		searchOnAdd = false
+		_searchOnAdd = false
 	): Promise<{ success: boolean; error?: string }> {
 		const item = await db.query.smartListItems.findFirst({
 			where: eq(smartListItems.id, itemId)

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 	import type { PersonCastCredit, PersonCrewCredit } from '$lib/types/tmdb';
 	import PersonHero from '$lib/components/tmdb/PersonHero.svelte';
@@ -37,7 +38,7 @@
 
 	// Deduplicate credits by ID (actor may have multiple roles in same media)
 	function dedupeById<T extends { id: number }>(items: T[]): T[] {
-		const seen = new Set<number>();
+		const seen = new SvelteSet<number>();
 		return items.filter((item) => {
 			if (seen.has(item.id)) return false;
 			seen.add(item.id);

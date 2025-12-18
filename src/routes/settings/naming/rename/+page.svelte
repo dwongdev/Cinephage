@@ -1,21 +1,17 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { SvelteSet } from 'svelte/reactivity';
 	import {
 		RefreshCw,
 		CheckCircle,
 		AlertTriangle,
 		FileWarning,
 		File,
-		ArrowRight,
-		Check,
-		X,
 		ChevronLeft,
 		Film,
 		Tv
 	} from 'lucide-svelte';
 	import type {
 		RenamePreviewResult,
-		RenamePreviewItem,
 		RenameExecuteResult
 	} from '$lib/server/library/naming/RenamePreviewService';
 
@@ -28,7 +24,7 @@
 	let executeResult = $state<RenameExecuteResult | null>(null);
 
 	// Selected items
-	let selectedIds = $state<Set<string>>(new Set());
+	const selectedIds = new SvelteSet<string>();
 
 	// Filter state
 	let activeTab = $state<'willChange' | 'alreadyCorrect' | 'collisions' | 'errors'>('willChange');
@@ -55,7 +51,10 @@
 			preview = await response.json();
 
 			// Auto-select all "will change" items
-			selectedIds = new Set(preview?.willChange.map((item) => item.fileId) || []);
+			selectedIds.clear();
+			for (const item of preview?.willChange || []) {
+				selectedIds.add(item.fileId);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load preview';
 		} finally {
@@ -115,21 +114,22 @@
 	}
 
 	function toggleSelect(fileId: string) {
-		const newSet = new Set(selectedIds);
-		if (newSet.has(fileId)) {
-			newSet.delete(fileId);
+		if (selectedIds.has(fileId)) {
+			selectedIds.delete(fileId);
 		} else {
-			newSet.add(fileId);
+			selectedIds.add(fileId);
 		}
-		selectedIds = newSet;
 	}
 
 	function selectAll() {
-		selectedIds = new Set(preview?.willChange.map((item) => item.fileId) || []);
+		selectedIds.clear();
+		for (const item of preview?.willChange || []) {
+			selectedIds.add(item.fileId);
+		}
 	}
 
 	function selectNone() {
-		selectedIds = new Set();
+		selectedIds.clear();
 	}
 
 	// Get current tab items

@@ -43,7 +43,7 @@
 									{/if}
 									{#if folder.readOnly}
 										<span
-											class="badge badge-outline badge-sm gap-1"
+											class="badge gap-1 badge-outline badge-sm"
 											title="Read-only folder (catalog only)"
 										>
 											<Eye class="h-3 w-3" />

@@ -9,7 +9,7 @@ import {
 	rootFolders,
 	subtitles
 } from '$lib/server/db/schema.js';
-import { eq, inArray, and, isNotNull } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 import { unlink, rmdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from '$lib/logging';

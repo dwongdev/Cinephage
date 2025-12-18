@@ -14,7 +14,7 @@ import {
 	episodeFiles,
 	rootFolders
 } from '$lib/server/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { extname, join, dirname, basename } from 'path';
 import { logger } from '$lib/logging';
 import { NamingService, type MediaNamingInfo } from './NamingService';
@@ -704,7 +704,7 @@ export class RenamePreviewService {
 
 			// Episode files may include season folder in relative path
 			// e.g., "Season 01/Episode.mkv" or just "Episode.mkv"
-			const currentDir = dirname(file.relativePath);
+			const _currentDir = dirname(file.relativePath);
 
 			// Determine if we should use season folders
 			const useSeasonFolders = show.seasonFolder ?? true;

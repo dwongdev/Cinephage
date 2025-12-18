@@ -252,7 +252,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// For Usenet, skip torrent resolution - just pass URL directly to client
 		// For torrents, resolve the download URL to get a magnet link or torrent file
-		let resolved: { success: boolean; magnetUrl?: string; torrentFile?: Buffer; infoHash?: string; error?: string };
+		let resolved: {
+			success: boolean;
+			magnetUrl?: string;
+			torrentFile?: Buffer;
+			infoHash?: string;
+			error?: string;
+		};
 
 		if (protocol === 'usenet') {
 			// Usenet doesn't need resolution - the NZB URL is passed directly to the client

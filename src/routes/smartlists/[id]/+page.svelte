@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { invalidateAll } from '$app/navigation';
 	import { goto } from '$app/navigation';
 	import {
@@ -10,9 +11,7 @@
 		Ban,
 		Check,
 		Loader2,
-		Calendar,
 		Star,
-		TrendingUp,
 		Library
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
@@ -104,7 +103,7 @@
 	}
 
 	function applyFilters() {
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 		if (filterInLibrary === 'in') params.set('inLibrary', 'true');
 		else if (filterInLibrary === 'out') params.set('inLibrary', 'false');
 		if (showExcluded) params.set('includeExcluded', 'true');
@@ -116,7 +115,7 @@
 	}
 
 	function goToPage(page: number) {
-		const params = new URLSearchParams(window.location.search);
+		const params = new SvelteURLSearchParams(window.location.search);
 		params.set('page', String(page));
 		goto(`/smartlists/${data.list.id}?${params.toString()}`, { invalidateAll: true });
 	}

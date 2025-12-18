@@ -847,7 +847,7 @@ export function syncSchema(sqlite: Database.Database): void {
 
 	// Check if this is an existing database from the migration era
 	const hasDrizzleMigrations = tableExists(sqlite, '__drizzle_migrations');
-	const hasSettingsTable = tableExists(sqlite, 'settings');
+	const _hasSettingsTable = tableExists(sqlite, 'settings');
 
 	if (hasDrizzleMigrations && currentVersion === 0) {
 		// This is an existing database that was using migrations

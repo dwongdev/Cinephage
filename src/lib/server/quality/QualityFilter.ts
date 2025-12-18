@@ -798,7 +798,7 @@ export class QualityFilter {
 	 */
 	private mapDbToProfile(row: typeof scoringProfiles.$inferSelect): ScoringProfile {
 		// If this ID matches a built-in profile and DB has no formatScores, use built-in scores
-		let builtInProfile = getProfile(row.id);
+		const builtInProfile = getProfile(row.id);
 
 		return {
 			id: row.id,

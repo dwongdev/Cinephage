@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import {
 		CheckCircle,
 		XCircle,
@@ -115,7 +116,7 @@
 
 		// Add embedded subtitles from file mediaInfo (if not already covered by external)
 		const embeddedLangs = episode.file?.mediaInfo?.subtitleLanguages ?? [];
-		const externalLangSet = new Set(external.map((s) => s.language));
+		const externalLangSet = new SvelteSet(external.map((s) => s.language));
 
 		for (const lang of embeddedLangs) {
 			const normalized = normalizeLanguageCode(lang);

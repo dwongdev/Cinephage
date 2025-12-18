@@ -20,7 +20,7 @@ import {
 	ServiceUnavailable,
 	ParseResponseError
 } from '../../errors/ProviderErrors';
-import { SUBF2M_LANGUAGES, SUBF2M_LANGUAGE_REVERSE } from './types';
+import { SUBF2M_LANGUAGES } from './types';
 
 const BASE_URL = 'https://subf2m.co';
 

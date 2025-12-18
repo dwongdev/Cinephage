@@ -7,9 +7,6 @@ import { DEFAULT_PROFILES, DEFAULT_RESOLUTION_ORDER, ALL_FORMATS } from '$lib/se
 // Built-in profile IDs - derived from DEFAULT_PROFILES for single source of truth
 const BUILT_IN_PROFILE_IDS = DEFAULT_PROFILES.map((p) => p.id);
 
-// Built-in format IDs
-const BUILT_IN_FORMAT_IDS = new Set(ALL_FORMATS.map((f) => f.id));
-
 export const load: PageServerLoad = async ({ url }) => {
 	// Get active tab from URL params (default to profiles)
 	const activeTab = url.searchParams.get('tab') || 'profiles';

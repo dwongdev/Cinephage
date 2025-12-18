@@ -239,7 +239,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Safety net for unhandled promise rejections - prevents crashes from missed error handling
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
 	logger.error('Unhandled Promise Rejection (safety net caught)', {
 		reason: reason instanceof Error ? reason.message : String(reason),
 		stack: reason instanceof Error ? reason.stack : undefined

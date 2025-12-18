@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { MovieFile } from '$lib/types/library';
 	import QualityBadge from './QualityBadge.svelte';
 	import MediaInfoPopover from './MediaInfoPopover.svelte';
@@ -39,7 +40,7 @@
 
 		// Add embedded subtitles from mediaInfo (if not already covered by external)
 		const embeddedLangs = file.mediaInfo?.subtitleLanguages ?? [];
-		const externalLangSet = new Set(subtitles.map((s) => s.language));
+		const externalLangSet = new SvelteSet(subtitles.map((s) => s.language));
 
 		for (const lang of embeddedLangs) {
 			const normalized = normalizeLanguageCode(lang);
