@@ -142,7 +142,9 @@ describe('Subtitle System Integration', () => {
 			expect(health).toBeInstanceOf(Array);
 
 			if (testProviderId) {
-				const testHealth = health.find((h: { providerId: string }) => h.providerId === testProviderId);
+				const testHealth = health.find(
+					(h: { providerId: string }) => h.providerId === testProviderId
+				);
 				expect(testHealth).toBeDefined();
 				expect(testHealth!.isHealthy).toBe(true);
 				expect(testHealth!.consecutiveFailures).toBe(0);
