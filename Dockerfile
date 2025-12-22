@@ -37,6 +37,7 @@ RUN mkdir -p data logs && chown -R node:node data logs
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/server.js ./server.js
 COPY --from=builder --chown=node:node /app/src ./src
 
 # Copy bundled indexers to separate location (not shadowed by volume mount)
@@ -65,4 +66,4 @@ USER node
 
 # Start the application
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "build/index.js"]
+CMD ["node", "server.js"]
