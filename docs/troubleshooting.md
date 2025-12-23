@@ -429,14 +429,26 @@ This guide covers common issues and their solutions when using Cinephage.
 
 ### STRM files not working
 
-**Symptoms**: External player can't play .strm files
+**Symptoms**: External player can't play .strm files, returns "Not found" error
 
 **Solutions**:
 
-1. Ensure the player supports STRM format (Kodi, Jellyfin, etc.)
-2. Verify Cinephage is accessible from the player's network
-3. Check the stream URL is valid by opening it directly
-4. Regenerate the STRM file from the media details page
+1. **Check External URL configuration** (most common issue):
+   - Go to Settings > Indexers > Cinephage Library
+   - Set External URL to your server's IP and port (e.g., `http://192.168.1.100:3000`)
+   - **Important**: Include the port number if not using default HTTP (80) or HTTPS (443)
+   - Wrong: `http://192.168.1.100` (missing port)
+   - Correct: `http://192.168.1.100:3001` (includes port)
+
+2. **Update existing .strm files** after changing the External URL:
+   - Go to Settings > Tasks and run "Update .strm URLs"
+   - Or via API: `curl -X POST http://localhost:3000/api/streaming/strm/update`
+
+3. Ensure the player supports STRM format (Kodi, Jellyfin, VLC, etc.)
+
+4. Verify Cinephage is accessible from the player's network
+
+5. Check the stream URL is valid by opening it directly in a browser
 
 ---
 
