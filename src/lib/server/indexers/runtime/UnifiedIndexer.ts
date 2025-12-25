@@ -187,7 +187,9 @@ export class UnifiedIndexer implements IIndexer {
 			indexerId: this.id,
 			indexerName: this.name,
 			baseUrl: this.baseUrl,
-			alternateUrls: record.alternateUrls?.length ? record.alternateUrls : definition.links.slice(1),
+			alternateUrls: record.alternateUrls?.length
+				? record.alternateUrls
+				: definition.links.slice(1),
 			userAgent: 'Cinephage/1.0',
 			rateLimit: rateLimit ?? { requests: 30, periodMs: 60_000 }
 		});

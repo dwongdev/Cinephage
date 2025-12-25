@@ -255,8 +255,7 @@ export class IndexerManager {
 		if (updates.name !== undefined) updateData.name = updates.name;
 		if (updates.enabled !== undefined) updateData.enabled = updates.enabled ? 1 : 0;
 		if (updates.baseUrl !== undefined) updateData.baseUrl = updates.baseUrl;
-		if (updates.alternateUrls !== undefined)
-			updateData.alternateUrls = updates.alternateUrls;
+		if (updates.alternateUrls !== undefined) updateData.alternateUrls = updates.alternateUrls;
 		if (updates.priority !== undefined) updateData.priority = updates.priority;
 		if (updates.settings !== undefined) updateData.settings = updates.settings;
 

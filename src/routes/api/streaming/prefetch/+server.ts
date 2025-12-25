@@ -21,7 +21,7 @@ const streamLog = { logCategory: 'streams' as const };
  *
  * Returns prefetch results
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request: _request }) => {
 	const prefetchService = getStreamPrefetchService();
 
 	if (prefetchService.running) {

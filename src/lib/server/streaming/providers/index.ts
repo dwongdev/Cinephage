@@ -563,35 +563,37 @@ async function doParallelExtraction(
 	let hasWinner = false;
 
 	// Start all extractions in parallel
-	const extractionPromises = parallelProviders.map(async (providerId): Promise<ExtractionOutcome> => {
-		const startTime = Date.now();
+	const extractionPromises = parallelProviders.map(
+		async (providerId): Promise<ExtractionOutcome> => {
+			const startTime = Date.now();
 
-		try {
-			const { result, durationMs } = await extractFromProvider(providerId, options);
+			try {
+				const { result, durationMs } = await extractFromProvider(providerId, options);
 
-			if (result.success && result.streams.length > 0) {
-				recordSuccess(providerId, durationMs);
-				return { providerId, result, durationMs, success: true };
+				if (result.success && result.streams.length > 0) {
+					recordSuccess(providerId, durationMs);
+					return { providerId, result, durationMs, success: true };
+				}
+
+				recordFailure(providerId, durationMs);
+				return { providerId, result, durationMs, success: false };
+			} catch (error) {
+				const durationMs = Date.now() - startTime;
+				recordFailure(providerId, durationMs);
+				return {
+					providerId,
+					result: {
+						success: false,
+						streams: [],
+						provider: providerId,
+						error: error instanceof Error ? error.message : String(error)
+					},
+					durationMs,
+					success: false
+				};
 			}
-
-			recordFailure(providerId, durationMs);
-			return { providerId, result, durationMs, success: false };
-		} catch (error) {
-			const durationMs = Date.now() - startTime;
-			recordFailure(providerId, durationMs);
-			return {
-				providerId,
-				result: {
-					success: false,
-					streams: [],
-					provider: providerId,
-					error: error instanceof Error ? error.message : String(error)
-				},
-				durationMs,
-				success: false
-			};
 		}
-	});
+	);
 
 	// Create a promise that resolves with the first successful extraction
 	// or null if all fail

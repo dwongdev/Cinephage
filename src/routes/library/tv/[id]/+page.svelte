@@ -25,9 +25,12 @@
 			const firstSeason = data.seasons.find((s) => s.seasonNumber > 0 && s.episodes?.length > 0);
 			if (firstSeason && firstSeason.episodes?.[0]) {
 				const ep = firstSeason.episodes[0];
-				fetch(`/api/streaming/resolve/tv/${data.series.tmdbId}/${ep.seasonNumber}/${ep.episodeNumber}`, {
-					signal: AbortSignal.timeout(5000)
-				}).catch(() => {});
+				fetch(
+					`/api/streaming/resolve/tv/${data.series.tmdbId}/${ep.seasonNumber}/${ep.episodeNumber}`,
+					{
+						signal: AbortSignal.timeout(5000)
+					}
+				).catch(() => {});
 			}
 		}
 	});

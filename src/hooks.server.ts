@@ -171,9 +171,7 @@ setImmediate(async () => {
 		await initializeDatabase();
 
 		// 1b. Warm the stream cache from database (fast, improves first playback)
-		initPersistentStreamCache().catch((e) =>
-			logger.error('Stream cache warming failed', e)
-		);
+		initPersistentStreamCache().catch((e) => logger.error('Stream cache warming failed', e));
 
 		// 2. Register all services with ServiceManager for centralized lifecycle management
 		const serviceManager = getServiceManager();

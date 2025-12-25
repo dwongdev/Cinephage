@@ -12,8 +12,8 @@
  */
 
 import { db } from '$lib/server/db';
-import { movies, series, episodes, seasons } from '$lib/server/db/schema';
-import { desc, eq, and, isNotNull } from 'drizzle-orm';
+import { movies, series, episodes } from '$lib/server/db/schema';
+import { desc, eq, and } from 'drizzle-orm';
 import { logger } from '$lib/logging';
 import { getStreamCache } from '../cache';
 import { MultiLevelStreamCache } from '../cache/StreamCache';
@@ -146,12 +146,7 @@ export class StreamPrefetchService {
 		};
 
 		// Check if already cached (skip if so)
-		const cacheKey = MultiLevelStreamCache.streamKey(
-			tmdbId.toString(),
-			mediaType,
-			season,
-			episode
-		);
+		const cacheKey = MultiLevelStreamCache.streamKey(tmdbId.toString(), mediaType, season, episode);
 
 		const streamCache = getStreamCache();
 		if (streamCache.getStream(cacheKey)) {
@@ -245,8 +240,7 @@ export class StreamPrefetchService {
 				movieResults.filter((r) => r.success).length +
 				episodeResults.filter((r) => r.success).length;
 			const totalCached =
-				movieResults.filter((r) => r.cached).length +
-				episodeResults.filter((r) => r.cached).length;
+				movieResults.filter((r) => r.cached).length + episodeResults.filter((r) => r.cached).length;
 
 			logger.info('Stream prefetch cycle completed', {
 				moviesProcessed: movieResults.length,

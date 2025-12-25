@@ -178,7 +178,9 @@ export class YamlIndexer implements IIndexer {
 			indexerId: this.id,
 			indexerName: this.name,
 			baseUrl: this.baseUrl,
-			alternateUrls: config.alternateUrls?.length ? config.alternateUrls : definition.links.slice(1),
+			alternateUrls: config.alternateUrls?.length
+				? config.alternateUrls
+				: definition.links.slice(1),
 			userAgent: 'Cinephage/1.0',
 			rateLimit: rateLimit ?? { requests: 30, periodMs: 60_000 }
 		});

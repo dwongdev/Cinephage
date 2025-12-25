@@ -12,10 +12,8 @@
 
 import { logger } from '$lib/logging';
 import { streamCache } from './cache';
-import { getBestQualityStreamUrl } from './hls';
 import { getAvailableProviders } from './providers';
 import { filterStreamsByLanguage } from './providers/language-utils';
-import type { MetadataRequirements } from './types/provider';
 import type { StreamSource, StreamSubtitle } from './types/stream';
 import { fetchAndRewritePlaylist } from './utils';
 
@@ -90,10 +88,7 @@ function computeMetadataNeeds(): MetadataNeeds {
 /**
  * Fetch TMDB metadata for a movie
  */
-async function fetchMovieMetadata(
-	tmdbId: number,
-	needs: MetadataNeeds
-): Promise<TmdbMetadata> {
+async function fetchMovieMetadata(tmdbId: number, needs: MetadataNeeds): Promise<TmdbMetadata> {
 	const metadata: TmdbMetadata = {};
 
 	// Skip if we don't need any metadata
@@ -109,20 +104,30 @@ async function fetchMovieMetadata(
 
 		if (needs.imdbId) {
 			promises.push(
-				tmdb.getMovieExternalIds(tmdbId).then((externalIds) => {
-					metadata.imdbId = externalIds.imdb_id || undefined;
-				}).catch(() => { /* ignore */ })
+				tmdb
+					.getMovieExternalIds(tmdbId)
+					.then((externalIds) => {
+						metadata.imdbId = externalIds.imdb_id || undefined;
+					})
+					.catch(() => {
+						/* ignore */
+					})
 			);
 		}
 
 		if (needs.title || needs.year) {
 			promises.push(
-				tmdb.getMovie(tmdbId).then((movieDetails) => {
-					metadata.title = movieDetails.title;
-					metadata.year = movieDetails.release_date
-						? parseInt(movieDetails.release_date.substring(0, 4), 10)
-						: undefined;
-				}).catch(() => { /* ignore */ })
+				tmdb
+					.getMovie(tmdbId)
+					.then((movieDetails) => {
+						metadata.title = movieDetails.title;
+						metadata.year = movieDetails.release_date
+							? parseInt(movieDetails.release_date.substring(0, 4), 10)
+							: undefined;
+					})
+					.catch(() => {
+						/* ignore */
+					})
 			);
 		}
 
@@ -137,10 +142,7 @@ async function fetchMovieMetadata(
 /**
  * Fetch TMDB metadata for a TV show
  */
-async function fetchTvMetadata(
-	tmdbId: number,
-	needs: MetadataNeeds
-): Promise<TmdbMetadata> {
+async function fetchTvMetadata(tmdbId: number, needs: MetadataNeeds): Promise<TmdbMetadata> {
 	const metadata: TmdbMetadata = {};
 
 	// Skip if we don't need any metadata
@@ -156,25 +158,39 @@ async function fetchTvMetadata(
 
 		if (needs.imdbId) {
 			promises.push(
-				tmdb.getTvExternalIds(tmdbId).then((externalIds) => {
-					metadata.imdbId = externalIds.imdb_id || undefined;
-				}).catch(() => { /* ignore */ })
+				tmdb
+					.getTvExternalIds(tmdbId)
+					.then((externalIds) => {
+						metadata.imdbId = externalIds.imdb_id || undefined;
+					})
+					.catch(() => {
+						/* ignore */
+					})
 			);
 		}
 
 		if (needs.title || needs.year || needs.alternativeTitles) {
 			promises.push(
-				tmdb.getTVShow(tmdbId).then((showDetails) => {
-					metadata.title = showDetails.name;
-					metadata.year = showDetails.first_air_date
-						? parseInt(showDetails.first_air_date.substring(0, 4), 10)
-						: undefined;
+				tmdb
+					.getTVShow(tmdbId)
+					.then((showDetails) => {
+						metadata.title = showDetails.name;
+						metadata.year = showDetails.first_air_date
+							? parseInt(showDetails.first_air_date.substring(0, 4), 10)
+							: undefined;
 
-					// Use original name as alternative title if different
-					if (needs.alternativeTitles && showDetails.original_name && showDetails.original_name !== showDetails.name) {
-						metadata.alternativeTitles = [showDetails.original_name];
-					}
-				}).catch(() => { /* ignore */ })
+						// Use original name as alternative title if different
+						if (
+							needs.alternativeTitles &&
+							showDetails.original_name &&
+							showDetails.original_name !== showDetails.name
+						) {
+							metadata.alternativeTitles = [showDetails.original_name];
+						}
+					})
+					.catch(() => {
+						/* ignore */
+					})
 			);
 		}
 
@@ -189,10 +205,7 @@ async function fetchTvMetadata(
 /**
  * Get preferred languages for the content
  */
-async function getPreferredLanguages(
-	tmdbId: number,
-	type: 'movie' | 'tv'
-): Promise<string[]> {
+async function getPreferredLanguages(tmdbId: number, type: 'movie' | 'tv'): Promise<string[]> {
 	try {
 		if (type === 'movie') {
 			const { getPreferredLanguagesForMovie } = await import('./language-profile-helper');

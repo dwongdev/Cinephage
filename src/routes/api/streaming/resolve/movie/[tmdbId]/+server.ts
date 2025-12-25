@@ -69,7 +69,10 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		if (response.ok) {
 			worker?.extractionSucceeded('streaming', 'auto');
 		} else {
-			const body = await response.clone().json().catch(() => ({ error: 'Unknown error' }));
+			const body = await response
+				.clone()
+				.json()
+				.catch(() => ({ error: 'Unknown error' }));
 			worker?.fail(body.error || 'Stream resolution failed');
 		}
 

@@ -200,9 +200,9 @@ describe('Provider Health Tracker', () => {
 
 			const score = tracker.getProviderScore('videasy');
 
-			// Success component: 1.0 * 70 = 70
-			// Latency component: 30 - (500/5000) * 30 = 30 - 3 = 27
-			// Total: 97
+			// Success component: 1.0 * 50 = 50
+			// Latency component: 50 - (500/3000) * 50 = 50 - 8.3 = ~42
+			// Total: ~92
 			expect(score).toBeGreaterThan(90);
 		});
 
@@ -214,11 +214,11 @@ describe('Provider Health Tracker', () => {
 
 			const score = tracker.getProviderScore('videasy');
 
-			// Success component: 0 * 70 = 0
-			// Latency component: 30 - (0/5000)*30 = 30 (0 latency from no successful samples)
-			// Total: 30
-			// This is expected behavior - latency score is neutral when no data
-			expect(score).toBe(30);
+			// Success component: 0 * 50 = 0
+			// Latency component: 50 - (0/3000)*50 = 50 (0 latency from no successful samples)
+			// Total: 50
+			// Latency score is full when no data (averageLatencyMs = 0)
+			expect(score).toBe(50);
 		});
 
 		it('should penalize slow latency', () => {
@@ -229,10 +229,10 @@ describe('Provider Health Tracker', () => {
 
 			const score = tracker.getProviderScore('videasy');
 
-			// Success: 70 (100%)
-			// Latency: 30 - (5000/5000)*30 = 0
-			// Total: 70
-			expect(score).toBe(70);
+			// Success: 50 (100%)
+			// Latency: 50 - (5000/3000)*50 = 0 (clamped to 0 since 5000ms > 3000ms threshold)
+			// Total: 50
+			expect(score).toBe(50);
 		});
 	});
 

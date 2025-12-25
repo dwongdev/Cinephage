@@ -31,21 +31,21 @@ const NEGATIVE_CACHE_TTL_MS = 2 * 60 * 1000;
 
 /** Types of extraction failures with different retry strategies */
 export type FailureType =
-	| 'provider_offline'    // Provider unavailable - retry in 5 min
-	| 'content_not_found'   // Content doesn't exist - retry in 24 hours
-	| 'timeout'             // Network timeout - retry quickly (30 sec)
-	| 'validation_failed'   // HLS validation failed - retry in 2 min
-	| 'rate_limited'        // Rate limited - retry in 5 min
-	| 'unknown';            // Unknown failure - default 2 min
+	| 'provider_offline' // Provider unavailable - retry in 5 min
+	| 'content_not_found' // Content doesn't exist - retry in 24 hours
+	| 'timeout' // Network timeout - retry quickly (30 sec)
+	| 'validation_failed' // HLS validation failed - retry in 2 min
+	| 'rate_limited' // Rate limited - retry in 5 min
+	| 'unknown'; // Unknown failure - default 2 min
 
 /** TTLs for each failure type (in ms) */
 const FAILURE_TYPE_TTLS: Record<FailureType, number> = {
-	'provider_offline': 5 * 60 * 1000,        // 5 minutes
-	'content_not_found': 24 * 60 * 60 * 1000, // 24 hours
-	'timeout': 30 * 1000,                      // 30 seconds
-	'validation_failed': 2 * 60 * 1000,        // 2 minutes
-	'rate_limited': 5 * 60 * 1000,             // 5 minutes
-	'unknown': 2 * 60 * 1000                   // 2 minutes (default)
+	provider_offline: 5 * 60 * 1000, // 5 minutes
+	content_not_found: 24 * 60 * 60 * 1000, // 24 hours
+	timeout: 30 * 1000, // 30 seconds
+	validation_failed: 2 * 60 * 1000, // 2 minutes
+	rate_limited: 5 * 60 * 1000, // 5 minutes
+	unknown: 2 * 60 * 1000 // 2 minutes (default)
 };
 
 /**

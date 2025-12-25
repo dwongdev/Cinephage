@@ -66,7 +66,6 @@ export class PersistentStreamCache {
 		if (this.isWarmed) return;
 
 		try {
-			const now = new Date().toISOString();
 			// Get top entries by hit count (filter expired ones in JS since expiresAt is text)
 			const entries = await db
 				.select()
@@ -179,9 +178,7 @@ export class PersistentStreamCache {
 					if (value) {
 						const parsed = this.parseKey(key);
 						if (parsed) {
-							const expiresAt = new Date(
-								Date.now() + STREAM_CACHE_TTL_MS
-							).toISOString();
+							const expiresAt = new Date(Date.now() + STREAM_CACHE_TTL_MS).toISOString();
 
 							await db
 								.insert(streamExtractionCache)
@@ -279,9 +276,10 @@ export class PersistentStreamCache {
 
 			// Note: Drizzle returns different types based on driver
 			// For better-sqlite3, result is the info object
-			const deleted = typeof result === 'object' && 'changes' in result
-				? (result as { changes: number }).changes
-				: 0;
+			const deleted =
+				typeof result === 'object' && 'changes' in result
+					? (result as { changes: number }).changes
+					: 0;
 
 			if (deleted > 0) {
 				logger.debug('Cleaned up expired cache entries from database', {
