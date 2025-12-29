@@ -184,3 +184,32 @@ export interface DownloadClientSort {
 	column: 'name' | 'priority' | 'implementation' | 'enabled';
 	direction: 'asc' | 'desc';
 }
+
+/**
+ * Unified client item that can represent either a download client or NNTP server.
+ * Used in the settings UI where both types are displayed together.
+ */
+export interface UnifiedClientItem {
+	id: string;
+	name: string;
+	type: 'download-client' | 'nntp-server';
+	implementation: DownloadClientImplementation;
+	host: string;
+	port: number;
+	useSsl: boolean | null;
+	enabled: boolean | null;
+	username?: string | null;
+	hasPassword?: boolean;
+	// Download client fields
+	movieCategory?: string;
+	tvCategory?: string;
+	recentPriority?: string;
+	olderPriority?: string;
+	initialState?: string;
+	downloadPathLocal?: string | null;
+	// NNTP server fields
+	maxConnections?: number | null;
+	priority?: number | null;
+	testResult?: string | null;
+	lastTestedAt?: string | null;
+}

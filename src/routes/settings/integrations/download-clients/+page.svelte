@@ -4,8 +4,8 @@
 	import type { PageData, ActionData } from './$types';
 	import type {
 		DownloadClientFormData,
-		DownloadClientImplementation,
-		ConnectionTestResult
+		ConnectionTestResult,
+		UnifiedClientItem
 	} from '$lib/types/downloadClient';
 
 	import { DownloadClientModal, DownloadClientTable } from '$lib/components/downloadClients';
@@ -22,32 +22,6 @@
 		maxConnections: number;
 		priority: number;
 		enabled: boolean;
-	}
-
-	// Unified client item for the table
-	interface UnifiedClientItem {
-		id: string;
-		name: string;
-		type: 'download-client' | 'nntp-server';
-		implementation: DownloadClientImplementation;
-		host: string;
-		port: number;
-		useSsl: boolean | null;
-		enabled: boolean | null;
-		username?: string | null;
-		hasPassword?: boolean;
-		// Download client fields
-		movieCategory?: string;
-		tvCategory?: string;
-		recentPriority?: string;
-		olderPriority?: string;
-		initialState?: string;
-		downloadPathLocal?: string | null;
-		// NNTP server fields
-		maxConnections?: number | null;
-		priority?: number | null;
-		testResult?: string | null;
-		lastTestedAt?: string | null;
 	}
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();

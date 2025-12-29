@@ -10,27 +10,7 @@
 		CheckCircle2,
 		XCircle
 	} from 'lucide-svelte';
-	import type { DownloadClientImplementation } from '$lib/types/downloadClient';
-
-	// Unified client item that can be either a download client or NNTP server
-	interface UnifiedClientItem {
-		id: string;
-		name: string;
-		type: 'download-client' | 'nntp-server';
-		implementation: DownloadClientImplementation;
-		host: string;
-		port: number;
-		useSsl: boolean | null;
-		enabled: boolean | null;
-		// Download client fields
-		movieCategory?: string;
-		tvCategory?: string;
-		// NNTP server fields
-		maxConnections?: number | null;
-		priority?: number | null;
-		testResult?: string | null;
-		lastTestedAt?: string | null;
-	}
+	import type { UnifiedClientItem } from '$lib/types/downloadClient';
 
 	interface Props {
 		clients: UnifiedClientItem[];
