@@ -74,9 +74,7 @@ export interface EnhancedSearchResult {
 	indexerResults: IndexerSearchResult[];
 	/** Indexers that were rejected from this search */
 	rejectedIndexers?: RejectedIndexer[];
-	/** Quality preset used for filtering/scoring */
-	qualityPresetId?: string;
-	/** Scoring profile used for detailed quality scoring */
+	/** Scoring profile used for quality scoring */
 	scoringProfileId?: string;
 }
 
@@ -325,7 +323,6 @@ export class SearchOrchestrator {
 		}
 
 		const enrichmentOpts: EnrichmentOptions = {
-			qualityPresetId: opts.enrichment?.qualityPresetId,
 			scoringProfileId: opts.enrichment?.scoringProfileId,
 			matchToTmdb: opts.enrichment?.matchToTmdb ?? false,
 			tmdbHint: opts.enrichment?.tmdbHint,
@@ -361,7 +358,6 @@ export class SearchOrchestrator {
 			fromCache: false,
 			indexerResults,
 			rejectedIndexers,
-			qualityPresetId: enrichResult.qualityPreset?.id,
 			scoringProfileId: enrichResult.scoringProfile?.id
 		};
 

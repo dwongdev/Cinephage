@@ -163,67 +163,6 @@ export const ISO639_2_TO_1: ReadonlyMap<string, string> = new Map(
 );
 
 /**
- * Validate if a language code is supported
- */
-export function isValidLanguageCode(code: string): boolean {
-	return VALID_LANGUAGE_CODES.has(code.toLowerCase());
-}
-
-/**
- * Normalize a language code (lowercase, handle variants)
- */
-export function normalizeLanguageCode(code: string): string {
-	const lower = code.toLowerCase().trim();
-
-	// Check if it's a valid 2-letter code
-	if (VALID_LANGUAGE_CODES.has(lower)) {
-		return lower;
-	}
-
-	// Try to convert from 3-letter code
-	const converted = ISO639_2_TO_1.get(lower);
-	if (converted) {
-		return converted;
-	}
-
-	// Handle common aliases
-	const aliases: Record<string, string> = {
-		pb: 'pt-br', // Brazilian Portuguese alias
-		pob: 'pt-br', // Another Brazilian Portuguese alias
-		chi: 'zh', // Chinese
-		chs: 'zh-cn', // Chinese Simplified
-		cht: 'zh-tw', // Chinese Traditional
-		zht: 'zh-tw', // Chinese Traditional
-		zhs: 'zh-cn', // Chinese Simplified
-		nor: 'no', // Norwegian
-		nob: 'no', // Norwegian Bokmål
-		nno: 'no', // Norwegian Nynorsk
-		ger: 'de', // German
-		fre: 'fr', // French
-		spa: 'es', // Spanish
-		por: 'pt', // Portuguese
-		jpn: 'ja', // Japanese
-		kor: 'ko', // Korean
-		ara: 'ar', // Arabic
-		dut: 'nl', // Dutch
-		rum: 'ro', // Romanian
-		gre: 'el', // Greek
-		heb: 'he', // Hebrew
-		per: 'fa' // Persian/Farsi
-	};
-
-	return aliases[lower] ?? lower;
-}
-
-/**
- * Get language name from code
- */
-export function getLanguageName(code: string): string {
-	const normalized = normalizeLanguageCode(code);
-	return LANGUAGE_CODE_TO_NAME.get(normalized) ?? code.toUpperCase();
-}
-
-/**
  * All supported provider implementations.
  * This is the single source of truth - add new providers here.
  */

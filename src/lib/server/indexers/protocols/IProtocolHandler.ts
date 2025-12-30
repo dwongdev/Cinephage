@@ -8,6 +8,7 @@
  */
 
 import type { ReleaseResult, EnhancedReleaseResult } from '../types/release';
+import { formatSize } from '../types/release';
 import type {
 	IndexerProtocol,
 	TorrentProtocolSettings,
@@ -270,17 +271,8 @@ export abstract class BaseProtocolHandler implements IProtocolHandler {
 	/**
 	 * Format file size for display
 	 */
-	protected formatSize(bytes: number): string {
-		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-		let size = bytes;
-		let unitIndex = 0;
-
-		while (size >= 1024 && unitIndex < units.length - 1) {
-			size /= 1024;
-			unitIndex++;
-		}
-
-		return `${size.toFixed(2)} ${units[unitIndex]}`;
+	protected formatSizeDisplay(bytes: number): string {
+		return formatSize(bytes);
 	}
 
 	/**

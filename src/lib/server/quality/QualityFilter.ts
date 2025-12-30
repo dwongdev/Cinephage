@@ -1,14 +1,13 @@
 /**
  * Quality Filter
  *
- * Filters and scores releases based on quality presets and scoring profiles.
+ * Filters and scores releases based on scoring profiles.
  *
- * This module bridges the legacy QualityPreset system with the new scoring engine.
- * - QualityPresets: Simple min/max filters for resolution and source
- * - ScoringProfiles: Full format-based scoring with release group tiers, audio, etc.
+ * The scoring engine provides format-based scoring with resolution order,
+ * release group tiers, audio preferences, and more.
  *
- * When both are available, the preset acts as a filter (pass/fail) and the
- * scoring profile provides the detailed quality ranking.
+ * Legacy QualityPreset support is maintained internally for basic filtering
+ * (resolution min/max, source filtering) using hardcoded defaults.
  */
 
 import type { ParsedRelease, Resolution, Source } from '../indexers/parser/types.js';
@@ -23,7 +22,7 @@ import { db } from '../db/index.js';
 import { createChildLogger } from '$lib/logging';
 
 const logger = createChildLogger({ module: 'QualityFilter' });
-import { qualityPresets, scoringProfiles, profileSizeLimits } from '../db/schema.js';
+import { scoringProfiles, profileSizeLimits } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_PRESETS } from './types.js';
 
@@ -55,18 +54,14 @@ export interface EnhancedQualityResult extends QualityMatchResult {
  * QualityFilter - Filter and score releases based on quality preferences
  */
 export class QualityFilter {
-	private presetsCache: Map<string, QualityPreset> = new Map();
 	private profilesCache: Map<string, ScoringProfile> = new Map();
-	private defaultPreset: QualityPreset | null = null;
 	private defaultProfile: ScoringProfile | null = null;
 
 	/**
-	 * Clear all caches - call this when profiles or presets are updated
+	 * Clear all caches - call this when profiles are updated
 	 */
 	clearCache(): void {
-		this.presetsCache.clear();
 		this.profilesCache.clear();
-		this.defaultPreset = null;
 		this.defaultProfile = null;
 	}
 
@@ -90,23 +85,11 @@ export class QualityFilter {
 	}
 
 	/**
-	 * Get a quality preset by ID
+	 * Get a quality preset by ID from hardcoded defaults
+	 * (Legacy: presets are no longer stored in database)
 	 */
-	async getPreset(id: string): Promise<QualityPreset | null> {
-		// Check cache first
-		if (this.presetsCache.has(id)) {
-			return this.presetsCache.get(id)!;
-		}
-
-		const result = await db.select().from(qualityPresets).where(eq(qualityPresets.id, id)).get();
-
-		if (result) {
-			const preset = this.mapDbToPreset(result);
-			this.presetsCache.set(id, preset);
-			return preset;
-		}
-
-		return null;
+	getPreset(id: string): QualityPreset | null {
+		return DEFAULT_PRESETS[id] ?? null;
 	}
 
 	/**
@@ -193,27 +176,12 @@ export class QualityFilter {
 	}
 
 	/**
-	 * Get the default quality preset
+	 * Get the default quality preset from hardcoded defaults
+	 * (Legacy: presets are no longer stored in database)
 	 */
-	async getDefaultPreset(): Promise<QualityPreset> {
-		if (this.defaultPreset) {
-			return this.defaultPreset;
-		}
-
-		const result = await db
-			.select()
-			.from(qualityPresets)
-			.where(eq(qualityPresets.isDefault, true))
-			.get();
-
-		if (result) {
-			this.defaultPreset = this.mapDbToPreset(result);
-			return this.defaultPreset;
-		}
-
-		// If no default exists, seed the presets and return the first one
-		await this.seedDefaultPresets();
-		return this.getDefaultPreset();
+	getDefaultPreset(): QualityPreset {
+		// Return the 'any' preset which allows all quality levels
+		return DEFAULT_PRESETS['any'];
 	}
 
 	/**
@@ -275,11 +243,11 @@ export class QualityFilter {
 	}
 
 	/**
-	 * Get all quality presets
+	 * Get all quality presets from hardcoded defaults
+	 * (Legacy: presets are no longer stored in database)
 	 */
-	async getAllPresets(): Promise<QualityPreset[]> {
-		const results = await db.select().from(qualityPresets).all();
-		return results.map((r) => this.mapDbToPreset(r));
+	getAllPresets(): QualityPreset[] {
+		return Object.values(DEFAULT_PRESETS);
 	}
 
 	/**
@@ -294,36 +262,6 @@ export class QualityFilter {
 		const builtIns = DEFAULT_PROFILES.filter((p) => !dbIds.has(p.id));
 
 		return [...builtIns, ...dbMapped];
-	}
-
-	/**
-	 * Seed default quality presets if none exist
-	 */
-	async seedDefaultPresets(): Promise<void> {
-		const existing = await db.select().from(qualityPresets).all();
-		if (existing.length > 0) {
-			return;
-		}
-
-		for (const preset of Object.values(DEFAULT_PRESETS)) {
-			await db.insert(qualityPresets).values({
-				id: preset.id,
-				name: preset.name,
-				minResolution: preset.minResolution,
-				preferredResolution: preset.preferredResolution,
-				maxResolution: preset.maxResolution,
-				allowedSources: preset.allowedSources,
-				excludedSources: preset.excludedSources,
-				preferHdr: preset.preferHdr,
-				isDefault: preset.isDefault,
-				minSizeMb: preset.minSizeMb,
-				maxSizeMb: preset.maxSizeMb
-			});
-		}
-
-		// Clear caches
-		this.presetsCache.clear();
-		this.defaultPreset = null;
 	}
 
 	/**
@@ -769,25 +707,6 @@ export class QualityFilter {
 		const maxPossible = AUDIO_ORDER['atmos'];
 
 		return Math.max(0, Math.round((order / maxPossible) * 1000));
-	}
-
-	/**
-	 * Map database row to QualityPreset
-	 */
-	private mapDbToPreset(row: typeof qualityPresets.$inferSelect): QualityPreset {
-		return {
-			id: row.id,
-			name: row.name,
-			minResolution: row.minResolution as Resolution | null,
-			preferredResolution: row.preferredResolution as Resolution | null,
-			maxResolution: row.maxResolution as Resolution | null,
-			allowedSources: row.allowedSources as Source[] | null,
-			excludedSources: row.excludedSources as Source[] | null,
-			preferHdr: row.preferHdr ?? false,
-			isDefault: row.isDefault ?? false,
-			minSizeMb: row.minSizeMb,
-			maxSizeMb: row.maxSizeMb
-		};
 	}
 
 	/**

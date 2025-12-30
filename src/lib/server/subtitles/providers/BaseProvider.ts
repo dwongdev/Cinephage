@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { TimeoutError, ConnectionError } from '../errors/ProviderErrors';
 import { logger } from '$lib/logging';
+import { normalizeLanguageCode } from '$lib/shared/languages';
 
 /**
  * Abstract base class for subtitle providers.
@@ -144,65 +145,7 @@ export abstract class BaseSubtitleProvider implements ISubtitleProvider {
 	 * Helper: Normalize language code to ISO 639-1
 	 */
 	protected normalizeLanguage(code: string): LanguageCode {
-		// Handle common variations
-		const normalized = code.toLowerCase().trim();
-
-		// Map 3-letter codes to 2-letter
-		const iso639_3to1: Record<string, string> = {
-			eng: 'en',
-			spa: 'es',
-			fra: 'fr',
-			fre: 'fr',
-			deu: 'de',
-			ger: 'de',
-			ita: 'it',
-			por: 'pt',
-			rus: 'ru',
-			jpn: 'ja',
-			kor: 'ko',
-			zho: 'zh',
-			chi: 'zh',
-			ara: 'ar',
-			hin: 'hi',
-			pol: 'pl',
-			nld: 'nl',
-			dut: 'nl',
-			swe: 'sv',
-			nor: 'no',
-			dan: 'da',
-			fin: 'fi',
-			tur: 'tr',
-			heb: 'he',
-			tha: 'th',
-			vie: 'vi',
-			ind: 'id',
-			ces: 'cs',
-			cze: 'cs',
-			slk: 'sk',
-			slo: 'sk',
-			hun: 'hu',
-			ron: 'ro',
-			rum: 'ro',
-			bul: 'bg',
-			hrv: 'hr',
-			srp: 'sr',
-			ukr: 'uk',
-			ell: 'el',
-			gre: 'el'
-		};
-
-		// If it's a 3-letter code, try to convert
-		if (normalized.length === 3 && iso639_3to1[normalized]) {
-			return iso639_3to1[normalized];
-		}
-
-		// If it's already 2 letters, return as-is
-		if (normalized.length === 2) {
-			return normalized;
-		}
-
-		// Return original if we can't normalize
-		return normalized;
+		return normalizeLanguageCode(code);
 	}
 
 	/**

@@ -589,6 +589,18 @@ export class DiskScanService extends EventEmitter {
 					.filter((ep) => episodeNums.includes(ep.episodeNumber))
 					.map((ep) => ep.id);
 
+				// If no episodes found in DB, we can't link this file - let it become unmatched
+				// This prevents creating orphaned episode_files with empty episodeIds
+				if (episodeIds.length === 0) {
+					logger.debug('[DiskScan] No matching episodes in DB for file', {
+						fileName,
+						seasonNum,
+						episodeNums,
+						seriesId: s.id
+					});
+					return false; // Fall back to unmatched
+				}
+
 				// Determine quality - for .strm files, we only know it's streaming (quality determined at playback)
 				const isStrmFile = file.path.endsWith('.strm');
 				const quality = isStrmFile

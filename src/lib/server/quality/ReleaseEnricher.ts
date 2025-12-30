@@ -21,10 +21,7 @@ import { logger } from '$lib/logging';
  * Options for enrichment
  */
 export interface EnrichmentOptions {
-	/** Quality preset ID to filter/score against */
-	qualityPresetId?: string;
-
-	/** Scoring profile ID for detailed quality scoring */
+	/** Scoring profile ID for quality scoring */
 	scoringProfileId?: string;
 
 	/** Whether to match releases to TMDB entries */
@@ -59,9 +56,6 @@ export interface EnrichmentResult {
 	/** Number of releases that were rejected */
 	rejectedCount: number;
 
-	/** Quality preset used (if any) */
-	qualityPreset?: QualityPreset;
-
 	/** Scoring profile used (if any) */
 	scoringProfile?: ScoringProfile;
 
@@ -90,14 +84,8 @@ export class ReleaseEnricher {
 		// Default to enhanced scoring
 		const useEnhanced = options.useEnhancedScoring !== false;
 
-		// Load quality preset if specified
-		let preset: QualityPreset | undefined;
-		if (options.qualityPresetId) {
-			preset = (await this.filter.getPreset(options.qualityPresetId)) ?? undefined;
-		}
-		if (!preset) {
-			preset = await this.filter.getDefaultPreset();
-		}
+		// Use hardcoded default preset for legacy filtering
+		const preset = this.filter.getDefaultPreset();
 
 		// Load scoring profile if using enhanced scoring
 		let profile: ScoringProfile | undefined;
@@ -144,7 +132,6 @@ export class ReleaseEnricher {
 		return {
 			releases: enriched,
 			rejectedCount,
-			qualityPreset: preset,
 			scoringProfile: profile,
 			enrichTimeMs: Date.now() - startTime
 		};

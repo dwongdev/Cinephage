@@ -321,8 +321,6 @@ export interface EnhancedSearchResult extends Omit<SearchResult, 'releases'> {
 	rejectedCount: number;
 	/** Enrichment time in milliseconds */
 	enrichTimeMs: number;
-	/** Quality preset used */
-	qualityPresetId?: string;
 	/** Scoring profile used */
 	scoringProfileId?: string;
 }

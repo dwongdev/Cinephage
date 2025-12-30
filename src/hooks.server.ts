@@ -13,6 +13,7 @@ import {
 } from '$lib/server/monitoring/MonitoringScheduler.js';
 import { taskHistoryService } from '$lib/server/tasks/TaskHistoryService.js';
 import { getExternalIdService } from '$lib/server/services/ExternalIdService.js';
+import { getDataRepairService } from '$lib/server/services/DataRepairService.js';
 import { qualityFilter } from '$lib/server/quality';
 import { isAppError } from '$lib/errors';
 import { initializeDatabase } from '$lib/server/db';
@@ -20,6 +21,7 @@ import { getBrowserSolver } from '$lib/server/indexers/http/browser';
 import { getServiceManager } from '$lib/server/services/service-manager.js';
 import { initPersistentStreamCache } from '$lib/server/streaming/cache';
 import { getNntpClientManager } from '$lib/server/streaming/nzb';
+import { getExtractionCacheManager } from '$lib/server/streaming/nzb/extraction/ExtractionCacheManager';
 
 /**
  * Content Security Policy header.
@@ -55,6 +57,7 @@ let monitoringInitialized = false;
 let externalIdServiceInitialized = false;
 let browserSolverInitialized = false;
 let nntpClientManagerInitialized = false;
+let dataRepairServiceInitialized = false;
 
 async function checkFFprobe() {
 	const available = await isFFprobeAvailable();
@@ -179,6 +182,36 @@ async function initializeNntpClientManager() {
 	}
 }
 
+async function initializeExtractionCacheManager() {
+	try {
+		// Start the extraction cache manager (for auto-cleanup of extracted files)
+		const cacheManager = getExtractionCacheManager();
+		if (cacheManager.status !== 'pending') return; // Already started
+		cacheManager.start();
+		logger.info('Extraction cache manager started for auto-cleanup');
+	} catch (error) {
+		// Non-fatal - application continues without auto-cleanup
+		logger.error('Failed to start extraction cache manager', error);
+	}
+}
+
+async function initializeDataRepairService() {
+	if (dataRepairServiceInitialized) return;
+
+	try {
+		// Start the data repair service (fixes data from previous bugs)
+		// This runs once on startup and processes any repair flags from migrations
+		const dataRepairService = getDataRepairService();
+		dataRepairService.start();
+
+		dataRepairServiceInitialized = true;
+		logger.info('Data repair service started');
+	} catch (error) {
+		// Non-fatal - application continues, but data may need manual repair
+		logger.error('Failed to start data repair service', error);
+	}
+}
+
 // Start initialization in next tick - ensures module loading completes immediately
 // so the HTTP server can start responding to requests while services initialize in background.
 // Using setImmediate pushes the async work to the next event loop iteration.
@@ -188,16 +221,22 @@ setImmediate(async () => {
 		// This is the only truly blocking operation (other services depend on DB schema)
 		await initializeDatabase();
 
-		// 1b. Warm the stream cache from database (fast, improves first playback)
+		// 1b. Run data repair service to fix any flagged data from previous bugs
+		// This processes repair flags set by migrations (e.g., series missing episodes)
+		initializeDataRepairService().catch((e) => logger.error('Data repair service failed', e));
+
+		// 1c. Warm the stream cache from database (fast, improves first playback)
 		initPersistentStreamCache().catch((e) => logger.error('Stream cache warming failed', e));
 
 		// 2. Register all services with ServiceManager for centralized lifecycle management
 		const serviceManager = getServiceManager();
+		serviceManager.register(getDataRepairService());
 		serviceManager.register(getLibraryScheduler());
 		serviceManager.register(getDownloadMonitor());
 		serviceManager.register(getMonitoringScheduler());
 		serviceManager.register(getExternalIdService());
 		serviceManager.register(getNntpClientManager());
+		serviceManager.register(getExtractionCacheManager());
 
 		// 3. Essential services run in parallel (fire-and-forget with error handling)
 		// These don't block each other or HTTP responses
@@ -212,6 +251,9 @@ setImmediate(async () => {
 			initializeMonitoring().catch((e) => logger.error('Monitoring init failed', e));
 			initializeExternalIdService().catch((e) => logger.error('External ID init failed', e));
 			initializeNntpClientManager().catch((e) => logger.error('NNTP client init failed', e));
+			initializeExtractionCacheManager().catch((e) =>
+				logger.error('Extraction cache init failed', e)
+			);
 		}, 5000);
 
 		// 5. Browser solver starts after other services (resource-intensive, lower priority)

@@ -193,7 +193,7 @@ export class TorrentProtocolHandler extends BaseProtocolHandler implements ITorr
 
 		// Reject above maximum size
 		if (settings.maximumSize !== undefined && result.size > settings.maximumSize) {
-			return `Exceeds maximum size (${this.formatSize(result.size)})`;
+			return `Exceeds maximum size (${this.formatSizeDisplay(result.size)})`;
 		}
 
 		return undefined;
