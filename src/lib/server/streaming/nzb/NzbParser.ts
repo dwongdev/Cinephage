@@ -8,6 +8,7 @@
 import * as cheerio from 'cheerio';
 import { logger } from '$lib/logging';
 import { createHash } from 'crypto';
+import { isMediaFile, isRarFile } from './constants';
 
 /**
  * Segment information from NZB.
@@ -64,40 +65,6 @@ export interface ParsedNzb {
 }
 
 /**
- * Common video file extensions.
- */
-const VIDEO_EXTENSIONS = new Set([
-	'.mkv',
-	'.mp4',
-	'.avi',
-	'.mov',
-	'.wmv',
-	'.flv',
-	'.webm',
-	'.m4v',
-	'.mpg',
-	'.mpeg',
-	'.ts',
-	'.m2ts',
-	'.vob'
-]);
-
-/**
- * Common audio file extensions.
- */
-const AUDIO_EXTENSIONS = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma']);
-
-/**
- * RAR file patterns.
- */
-const RAR_PATTERNS = [
-	/\.rar$/i,
-	/\.r\d{2}$/i,
-	/\.part\d+\.rar$/i,
-	/\.\d{3}$/ // .001, .002 etc
-];
-
-/**
  * Extract filename from subject line.
  * Subjects often have format: "description yEnc (1/10) filename.ext"
  */
@@ -122,13 +89,6 @@ function extractFilename(subject: string): string {
 
 	// Fall back to subject itself
 	return subject.slice(0, 100);
-}
-
-/**
- * Check if a filename is a RAR archive.
- */
-function isRarFile(filename: string): boolean {
-	return RAR_PATTERNS.some((pattern) => pattern.test(filename));
 }
 
 /**
@@ -159,15 +119,6 @@ function extractRarPartNumber(filename: string): number | undefined {
 	}
 
 	return undefined;
-}
-
-/**
- * Check if a filename is a media file.
- */
-export function isMediaFile(filename: string): boolean {
-	const lower = filename.toLowerCase();
-	const ext = lower.slice(lower.lastIndexOf('.'));
-	return VIDEO_EXTENSIONS.has(ext) || AUDIO_EXTENSIONS.has(ext);
 }
 
 /**
@@ -293,63 +244,4 @@ export function parseNzb(content: Buffer | string): ParsedNzb {
 		totalSize,
 		groups: Array.from(allGroups)
 	};
-}
-
-/**
- * Get file by name from parsed NZB.
- */
-export function findFileByName(parsed: ParsedNzb, name: string): NzbFile | undefined {
-	const lower = name.toLowerCase();
-	return parsed.files.find((f) => f.name.toLowerCase() === lower);
-}
-
-/**
- * Get all RAR parts sorted by part number.
- */
-export function getRarParts(parsed: ParsedNzb): NzbFile[] {
-	return parsed.files
-		.filter((f) => f.isRar)
-		.sort((a, b) => (a.rarPartNumber || 0) - (b.rarPartNumber || 0));
-}
-
-/**
- * Calculate byte offset for a segment within a file.
- * This is an approximation - actual offsets are determined by yEnc headers.
- */
-export function estimateSegmentOffset(file: NzbFile, segmentNumber: number): number {
-	let offset = 0;
-	for (const segment of file.segments) {
-		if (segment.number === segmentNumber) {
-			return offset;
-		}
-		offset += segment.bytes;
-	}
-	return offset;
-}
-
-/**
- * Find segment containing a byte offset.
- * Returns segment index and offset within segment.
- */
-export function findSegmentForOffset(
-	file: NzbFile,
-	byteOffset: number
-): { segmentIndex: number; offsetInSegment: number } | null {
-	let currentOffset = 0;
-
-	for (let i = 0; i < file.segments.length; i++) {
-		const segment = file.segments[i];
-		const segmentEnd = currentOffset + segment.bytes;
-
-		if (byteOffset < segmentEnd) {
-			return {
-				segmentIndex: i,
-				offsetInSegment: byteOffset - currentOffset
-			};
-		}
-
-		currentOffset = segmentEnd;
-	}
-
-	return null;
 }

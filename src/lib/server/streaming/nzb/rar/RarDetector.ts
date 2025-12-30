@@ -4,6 +4,7 @@
 
 import { RAR4_SIGNATURE, RAR5_SIGNATURE } from './types';
 import type { RarDetectionResult } from './types';
+import { MEDIA_EXTENSIONS_NO_DOT_SET } from '../constants';
 
 /**
  * RAR filename patterns for detection.
@@ -116,33 +117,7 @@ export function getRarPartOrder(filename: string): number {
  */
 export function isMediaContent(filename: string): boolean {
 	const ext = filename.toLowerCase().split('.').pop() || '';
-
-	const mediaExtensions = new Set([
-		// Video
-		'mkv',
-		'mp4',
-		'avi',
-		'mov',
-		'wmv',
-		'flv',
-		'webm',
-		'm4v',
-		'mpg',
-		'mpeg',
-		'ts',
-		'm2ts',
-		'vob',
-		// Audio
-		'mp3',
-		'flac',
-		'aac',
-		'ogg',
-		'wav',
-		'm4a',
-		'wma'
-	]);
-
-	return mediaExtensions.has(ext);
+	return MEDIA_EXTENSIONS_NO_DOT_SET.has(ext);
 }
 
 /**

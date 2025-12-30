@@ -10,6 +10,7 @@ import { parseRarArchive, canStreamRar, getStreamingError } from './RarHeaderPar
 import type { NzbFile } from '../NzbParser';
 import type { NntpClientManager } from '../nntp/NntpClientManager';
 import type { RarVolumeInfo, AssembledRar, AssembledRarFile, RarFileSpan } from './types';
+import { MEDIA_EXTENSIONS_NO_DOT_SET } from '../constants';
 
 /**
  * Minimum bytes needed to parse RAR header.
@@ -225,4 +226,23 @@ export function getPositionInVolume(
 	}
 
 	return null;
+}
+
+/**
+ * Find the largest media file within an assembled RAR archive.
+ * Returns null if no media files are found.
+ */
+export function findLargestMediaFile(assembled: AssembledRar): AssembledRarFile | null {
+	let largest: AssembledRarFile | null = null;
+	let largestSize = 0;
+
+	for (const file of assembled.files) {
+		const ext = file.name.toLowerCase().split('.').pop() || '';
+		if (MEDIA_EXTENSIONS_NO_DOT_SET.has(ext) && file.size > largestSize) {
+			largest = file;
+			largestSize = file.size;
+		}
+	}
+
+	return largest;
 }

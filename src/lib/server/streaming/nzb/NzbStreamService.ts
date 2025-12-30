@@ -1,15 +1,29 @@
 /**
  * NzbStreamService - Coordinates NZB streaming operations.
  *
- * Central service for creating streams, managing parsed NZB cache,
- * and coordinating NNTP fetches.
+ * Central service for creating streams from NZB content.
+ * Delegates streamability checking to StreamabilityChecker and
+ * extraction to ExtractionCoordinator.
  */
 
+import { Readable } from 'node:stream';
+import { createReadStream, existsSync, statSync } from 'fs';
+import { basename } from 'path';
 import { logger } from '$lib/logging';
 import { getNntpClientManager } from './nntp/NntpClientManager';
 import { type ParsedNzb } from './NzbParser';
-import { getNzbMountManager, type MountInfo } from './NzbMountManager';
+import { getNzbMountManager, type MountInfo, type StreamabilityInfo } from './NzbMountManager';
 import { NzbSeekableStream, parseRangeHeader } from './streams/NzbSeekableStream';
+import { assembleMultiPartRar, findLargestMediaFile } from './rar/MultiPartAssembler';
+import { RarVirtualFile } from './rar/RarVirtualFile';
+import { getContentType } from './constants';
+import { getStreamabilityChecker } from './StreamabilityChecker';
+import {
+	getExtractionCoordinator,
+	type ExtractionProgressCallback,
+	type ExtractionResult
+} from './ExtractionCoordinator';
+import { getExtractionCacheManager } from './extraction/ExtractionCacheManager';
 
 /**
  * Cached parsed NZB for active streams.
@@ -23,7 +37,7 @@ interface CachedNzb {
  * Stream creation result.
  */
 export interface CreateStreamResult {
-	stream: NzbSeekableStream;
+	stream: Readable;
 	contentLength: number;
 	startByte: number;
 	endByte: number;
@@ -31,6 +45,9 @@ export interface CreateStreamResult {
 	isPartial: boolean;
 	contentType: string;
 }
+
+// Re-export types from ExtractionCoordinator for backwards compatibility
+export type { ExtractionProgressCallback, ExtractionResult };
 
 /**
  * NZB cache TTL (1 hour).
@@ -59,11 +76,39 @@ class NzbStreamService {
 	): Promise<CreateStreamResult> {
 		const mountManager = getNzbMountManager();
 		const clientManager = getNntpClientManager();
+		const extractionCoordinator = getExtractionCoordinator();
 
 		// Get mount info
 		const mount = await mountManager.getMount(mountId);
 		if (!mount) {
 			throw new Error(`Mount not found: ${mountId}`);
+		}
+
+		// Check if we have an extracted file ready to stream
+		const extractedFilePath = await extractionCoordinator.getExtractedFilePath(mountId);
+		if (extractedFilePath && existsSync(extractedFilePath)) {
+			logger.info('[NzbStreamService] Streaming from extracted file', {
+				mountId,
+				extractedFilePath
+			});
+
+			// Refresh expiration when accessing
+			const cacheManager = getExtractionCacheManager();
+			await cacheManager.refreshExpiration(mountId);
+
+			return this.createExtractedFileStream(extractedFilePath, rangeHeader);
+		}
+
+		// If mount requires extraction and no extracted file exists, inform caller
+		if (mount.status === 'requires_extraction') {
+			throw new Error(
+				'Content requires extraction before streaming. Call startExtraction() first.'
+			);
+		}
+
+		// If extraction is in progress, throw appropriate error
+		if (mount.status === 'downloading' || mount.status === 'extracting') {
+			throw new Error(`Extraction in progress: ${mount.status}`);
 		}
 
 		if (mount.status !== 'ready') {
@@ -73,7 +118,14 @@ class NzbStreamService {
 		// Get the parsed NZB (from cache or re-fetch)
 		const parsed = await this.getParsedNzb(mount);
 
-		// Find the file
+		// Check if this NZB contains only RAR files (needs RAR streaming)
+		const hasOnlyRar = parsed.files.length > 0 && parsed.files.every((f) => f.isRar);
+
+		if (hasOnlyRar) {
+			return this.createRarStream(mountId, parsed, rangeHeader, clientManager);
+		}
+
+		// Standard NZB streaming for non-RAR files
 		const file = parsed.files.find((f) => f.index === fileIndex);
 		if (!file) {
 			throw new Error(`File not found at index ${fileIndex}`);
@@ -93,7 +145,7 @@ class NzbStreamService {
 			prefetchCount: 5
 		});
 
-		const contentType = this.detectContentType(file.name);
+		const contentType = getContentType(file.name);
 
 		logger.info('[NzbStreamService] Created stream', {
 			mountId,
@@ -115,6 +167,188 @@ class NzbStreamService {
 	}
 
 	/**
+	 * Create a stream for content inside a RAR archive.
+	 */
+	private async createRarStream(
+		mountId: string,
+		parsed: ParsedNzb,
+		rangeHeader: string | null,
+		clientManager: ReturnType<typeof getNntpClientManager>
+	): Promise<CreateStreamResult> {
+		// Update access time
+		const mountManager = getNzbMountManager();
+		await mountManager.touchMount(mountId);
+
+		// Check RAR cache from streamability checker first
+		const streamabilityChecker = getStreamabilityChecker();
+		let assembled = streamabilityChecker.getCachedRar(mountId);
+
+		if (!assembled) {
+			logger.info('[NzbStreamService] Assembling RAR archive', {
+				mountId,
+				rarFiles: parsed.files.length
+			});
+
+			// Assemble the multi-part RAR
+			assembled = await assembleMultiPartRar(parsed.files, clientManager);
+
+			// Cache for subsequent range requests
+			streamabilityChecker.cacheRar(mountId, assembled);
+		}
+
+		// Check if RAR is streamable (uncompressed)
+		if (!assembled.isStreamable) {
+			throw new Error(
+				'This release uses RAR compression and cannot be streamed. Please search for a different release.'
+			);
+		}
+
+		// Find the largest media file inside the RAR
+		const innerFile = findLargestMediaFile(assembled);
+		if (!innerFile) {
+			throw new Error('No video file found inside the RAR archive.');
+		}
+
+		// Check if inner file is encrypted without password
+		if (innerFile.isEncrypted) {
+			throw new Error(
+				'This release is password protected. Please provide password or search for an unprotected release.'
+			);
+		}
+
+		// Parse range header against inner file size
+		const range = parseRangeHeader(rangeHeader, innerFile.size);
+
+		// Create RAR virtual file stream
+		const stream = new RarVirtualFile({
+			assembledRar: assembled,
+			innerFile,
+			nzbFiles: parsed.files,
+			clientManager,
+			range: range ?? undefined,
+			prefetchCount: 5
+		});
+
+		const contentType = getContentType(innerFile.name);
+
+		logger.info('[NzbStreamService] Created RAR stream', {
+			mountId,
+			innerFile: innerFile.name,
+			innerSize: innerFile.size,
+			volumes: assembled.volumes.length,
+			range: range ? `${range.start}-${range.end}` : 'full',
+			contentType
+		});
+
+		return {
+			stream,
+			contentLength: stream.contentLength,
+			startByte: stream.startByte,
+			endByte: stream.endByte,
+			totalSize: stream.totalSize,
+			isPartial: range !== null,
+			contentType
+		};
+	}
+
+	/**
+	 * Create a stream from an extracted local file with Range support.
+	 */
+	private async createExtractedFileStream(
+		filePath: string,
+		rangeHeader: string | null
+	): Promise<CreateStreamResult> {
+		const stats = statSync(filePath);
+		const totalSize = stats.size;
+
+		// Parse range header
+		const range = parseRangeHeader(rangeHeader, totalSize);
+
+		let startByte = 0;
+		let endByte = totalSize - 1;
+
+		if (range) {
+			startByte = range.start;
+			endByte = range.end;
+		}
+
+		const contentLength = endByte - startByte + 1;
+
+		// Create read stream with range
+		const stream = createReadStream(filePath, {
+			start: startByte,
+			end: endByte
+		});
+
+		const contentType = getContentType(filePath);
+
+		logger.info('[NzbStreamService] Created extracted file stream', {
+			filePath: basename(filePath),
+			range: range ? `${startByte}-${endByte}` : 'full',
+			contentLength,
+			totalSize
+		});
+
+		return {
+			stream,
+			contentLength,
+			startByte,
+			endByte,
+			totalSize,
+			isPartial: range !== null,
+			contentType
+		};
+	}
+
+	/**
+	 * Check if a mount's content can be streamed directly or requires extraction.
+	 * Delegates to StreamabilityChecker.
+	 */
+	async checkStreamability(mountId: string): Promise<StreamabilityInfo> {
+		const checker = getStreamabilityChecker();
+		return checker.checkStreamability(mountId, (mount) => this.getParsedNzb(mount));
+	}
+
+	/**
+	 * Start extraction process for a mount.
+	 * Delegates to ExtractionCoordinator.
+	 */
+	async startExtraction(
+		mountId: string,
+		onProgress?: ExtractionProgressCallback
+	): Promise<ExtractionResult> {
+		const coordinator = getExtractionCoordinator();
+		return coordinator.startExtraction(mountId, (mount) => this.getParsedNzb(mount), onProgress);
+	}
+
+	/**
+	 * Cancel an ongoing extraction.
+	 * Delegates to ExtractionCoordinator.
+	 */
+	cancelExtraction(mountId: string): boolean {
+		const coordinator = getExtractionCoordinator();
+		return coordinator.cancelExtraction(mountId);
+	}
+
+	/**
+	 * Check if extraction is in progress for a mount.
+	 * Delegates to ExtractionCoordinator.
+	 */
+	isExtractionInProgress(mountId: string): boolean {
+		const coordinator = getExtractionCoordinator();
+		return coordinator.isExtractionInProgress(mountId);
+	}
+
+	/**
+	 * Clean up extracted files for a mount.
+	 * Delegates to ExtractionCoordinator.
+	 */
+	async cleanupExtractedFiles(mountId: string): Promise<void> {
+		const coordinator = getExtractionCoordinator();
+		return coordinator.cleanupExtractedFiles(mountId);
+	}
+
+	/**
 	 * Get parsed NZB from cache or storage.
 	 */
 	private async getParsedNzb(mount: MountInfo): Promise<ParsedNzb> {
@@ -123,10 +357,6 @@ class NzbStreamService {
 		if (cached && Date.now() - cached.timestamp < NZB_CACHE_TTL) {
 			return cached.parsed;
 		}
-
-		// Need to re-fetch and parse NZB
-		// For now, we need the NZB content stored somewhere
-		// In the full implementation, we'd store the NZB content or fetch from downloadUrl
 
 		// Check if we have mediaFiles with full segment data
 		// If not, we need to re-fetch the NZB
@@ -178,40 +408,6 @@ class NzbStreamService {
 	}
 
 	/**
-	 * Detect content type from filename.
-	 */
-	private detectContentType(filename: string): string {
-		const ext = filename.toLowerCase().split('.').pop() || '';
-
-		const types: Record<string, string> = {
-			// Video
-			mkv: 'video/x-matroska',
-			mp4: 'video/mp4',
-			avi: 'video/x-msvideo',
-			mov: 'video/quicktime',
-			wmv: 'video/x-ms-wmv',
-			flv: 'video/x-flv',
-			webm: 'video/webm',
-			m4v: 'video/x-m4v',
-			mpg: 'video/mpeg',
-			mpeg: 'video/mpeg',
-			ts: 'video/mp2t',
-			m2ts: 'video/mp2t',
-			vob: 'video/dvd',
-			// Audio
-			mp3: 'audio/mpeg',
-			flac: 'audio/flac',
-			aac: 'audio/aac',
-			ogg: 'audio/ogg',
-			wav: 'audio/wav',
-			m4a: 'audio/x-m4a',
-			wma: 'audio/x-ms-wma'
-		};
-
-		return types[ext] || 'application/octet-stream';
-	}
-
-	/**
 	 * Cleanup old cache entries.
 	 */
 	private cleanupCache(): void {
@@ -226,7 +422,7 @@ class NzbStreamService {
 		}
 
 		if (cleaned > 0) {
-			logger.debug('[NzbStreamService] Cleaned NZB cache', { count: cleaned });
+			logger.debug('[NzbStreamService] Cleaned NZB cache', { cleaned });
 		}
 	}
 
@@ -239,6 +435,10 @@ class NzbStreamService {
 			this.cleanupInterval = null;
 		}
 		this.nzbCache.clear();
+
+		// Also shutdown collaborators
+		getStreamabilityChecker().shutdown();
+		getExtractionCoordinator().shutdown();
 	}
 }
 

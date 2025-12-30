@@ -13,87 +13,12 @@
 import type { RequestHandler } from './$types';
 import { logger } from '$lib/logging';
 import { ensureVttFormat } from '$lib/server/streaming/utils';
-import { PROXY_FETCH_TIMEOUT_MS } from '$lib/server/streaming/constants';
+import { isUrlSafe, fetchWithTimeout, MAX_REDIRECTS } from '$lib/server/http/ssrf-protection';
 
 const streamLog = { logCategory: 'streams' as const };
 
 // Maximum subtitle file size (2MB should be plenty for any subtitle file)
 const MAX_SUBTITLE_SIZE = 2 * 1024 * 1024;
-
-// Maximum redirects to follow
-const MAX_REDIRECTS = 5;
-
-// Allowed URL schemes
-const ALLOWED_SCHEMES = ['http:', 'https:'];
-
-// Private IP ranges that should be blocked (SSRF protection)
-const PRIVATE_IP_PATTERNS = [
-	/^127\./, // 127.0.0.0/8 (localhost)
-	/^10\./, // 10.0.0.0/8 (private)
-	/^172\.(1[6-9]|2[0-9]|3[0-1])\./, // 172.16.0.0/12 (private)
-	/^192\.168\./, // 192.168.0.0/16 (private)
-	/^169\.254\./, // 169.254.0.0/16 (link-local)
-	/^0\./, // 0.0.0.0/8
-	/^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./, // 100.64.0.0/10 (CGNAT)
-	/^192\.0\.0\./, // 192.0.0.0/24 (IETF protocol assignments)
-	/^192\.0\.2\./, // 192.0.2.0/24 (TEST-NET-1)
-	/^198\.51\.100\./, // 198.51.100.0/24 (TEST-NET-2)
-	/^203\.0\.113\./, // 203.0.113.0/24 (TEST-NET-3)
-	/^::1$/, // IPv6 localhost
-	/^fc00:/i, // IPv6 unique local
-	/^fe80:/i // IPv6 link-local
-];
-
-const BLOCKED_HOSTNAMES = ['localhost', 'localhost.localdomain', '[::1]', '0.0.0.0'];
-
-/**
- * Validates that a URL is safe to proxy (not internal/private network)
- */
-function isUrlSafe(urlString: string): { safe: boolean; reason?: string } {
-	try {
-		const url = new URL(urlString);
-
-		if (!ALLOWED_SCHEMES.includes(url.protocol)) {
-			return { safe: false, reason: `Invalid scheme: ${url.protocol}` };
-		}
-
-		const hostname = url.hostname.toLowerCase();
-		if (BLOCKED_HOSTNAMES.includes(hostname)) {
-			return { safe: false, reason: 'Blocked hostname' };
-		}
-
-		for (const pattern of PRIVATE_IP_PATTERNS) {
-			if (pattern.test(hostname)) {
-				return { safe: false, reason: 'Private/internal IP address' };
-			}
-		}
-
-		if (hostname.startsWith('[') && hostname.includes('::1')) {
-			return { safe: false, reason: 'IPv6 localhost' };
-		}
-
-		return { safe: true };
-	} catch {
-		return { safe: false, reason: 'Invalid URL format' };
-	}
-}
-
-/**
- * Fetch with timeout using AbortController
- */
-async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), PROXY_FETCH_TIMEOUT_MS);
-
-	try {
-		return await fetch(url, {
-			...options,
-			signal: controller.signal
-		});
-	} finally {
-		clearTimeout(timeoutId);
-	}
-}
 
 export const GET: RequestHandler = async ({ url }) => {
 	const subtitleUrl = url.searchParams.get('url');

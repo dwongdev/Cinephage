@@ -14,7 +14,33 @@ import { parseNzb, type NzbFile } from './NzbParser';
 /**
  * Mount status values.
  */
-export type MountStatus = 'pending' | 'parsing' | 'ready' | 'error' | 'expired';
+export type MountStatus =
+	| 'pending'
+	| 'parsing'
+	| 'ready'
+	| 'requires_extraction'
+	| 'downloading'
+	| 'extracting'
+	| 'error'
+	| 'expired';
+
+/**
+ * Streamability info for a mount.
+ */
+export interface StreamabilityInfo {
+	/** Whether content can be streamed directly */
+	canStream: boolean;
+	/** Whether extraction is required */
+	requiresExtraction: boolean;
+	/** Detected archive type */
+	archiveType?: 'rar' | '7z' | 'zip' | 'none';
+	/** Compression method (0 = stored, >0 = compressed) */
+	compressionMethod?: number;
+	/** Whether password is required */
+	requiresPassword?: boolean;
+	/** Error message if not streamable */
+	error?: string;
+}
 
 /**
  * Mount creation input.
@@ -47,6 +73,12 @@ export interface MountInfo {
 		isEncrypted: boolean;
 		partCount: number;
 	};
+	/** Streamability info (populated after checkStreamability is called) */
+	streamability?: StreamabilityInfo;
+	/** Path to extracted file if extraction completed */
+	extractedFilePath?: string;
+	/** Extraction progress (0-100) */
+	extractionProgress?: number;
 	movieId?: string;
 	seriesId?: string;
 	errorMessage?: string;
@@ -240,6 +272,51 @@ class NzbMountManager {
 	}
 
 	/**
+	 * Update mount status.
+	 */
+	async updateStatus(
+		id: string,
+		status: MountStatus,
+		options?: {
+			streamability?: StreamabilityInfo;
+			extractedFilePath?: string;
+			extractionProgress?: number;
+			errorMessage?: string;
+		}
+	): Promise<void> {
+		const now = new Date().toISOString();
+
+		const updateData: Record<string, unknown> = {
+			status,
+			updatedAt: now
+		};
+
+		if (options?.streamability) {
+			updateData.streamability = options.streamability;
+		}
+
+		if (options?.extractedFilePath !== undefined) {
+			updateData.extractedFilePath = options.extractedFilePath;
+		}
+
+		if (options?.extractionProgress !== undefined) {
+			updateData.extractionProgress = options.extractionProgress;
+		}
+
+		if (options?.errorMessage !== undefined) {
+			updateData.errorMessage = options.errorMessage;
+		}
+
+		await db.update(nzbStreamMounts).set(updateData).where(eq(nzbStreamMounts.id, id));
+
+		logger.debug('[NzbMountManager] Updated mount status', {
+			id,
+			status,
+			hasStreamability: !!options?.streamability
+		});
+	}
+
+	/**
 	 * Clean up expired mounts.
 	 */
 	async cleanupExpired(): Promise<number> {
@@ -322,6 +399,9 @@ class NzbMountManager {
 			totalSize: row.totalSize,
 			mediaFiles,
 			rarInfo,
+			streamability: row.streamability ?? undefined,
+			extractedFilePath: row.extractedFilePath ?? undefined,
+			extractionProgress: row.extractionProgress ?? undefined,
 			movieId: row.movieId ?? undefined,
 			seriesId: row.seriesId ?? undefined,
 			errorMessage: row.errorMessage ?? undefined,
