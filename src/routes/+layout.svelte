@@ -25,7 +25,8 @@
 		Radio,
 		LayoutGrid,
 		Calendar,
-		Users
+		Users,
+		Rss
 	} from 'lucide-svelte';
 
 	let { children } = $props();
@@ -48,6 +49,7 @@
 				{ href: '/livetv/channels', label: 'Channels', icon: Radio },
 				{ href: '/livetv/categories', label: 'Categories', icon: LayoutGrid },
 				{ href: '/livetv/guide', label: 'Guide', icon: Calendar },
+				{ href: '/livetv/epg', label: 'EPG Sources', icon: Rss },
 				{ href: '/livetv/accounts', label: 'Accounts', icon: Users }
 			]
 		},

@@ -1,4 +1,12 @@
-import { integer, real, sqliteTable, text, primaryKey, index } from 'drizzle-orm/sqlite-core';
+import {
+	integer,
+	real,
+	sqliteTable,
+	text,
+	primaryKey,
+	index,
+	uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
@@ -2100,6 +2108,268 @@ export const nzbStreamMounts = sqliteTable(
 
 export type NzbStreamMountRecord = typeof nzbStreamMounts.$inferSelect;
 export type NewNzbStreamMountRecord = typeof nzbStreamMounts.$inferInsert;
+
+// ============================================================================
+// LIVE TV TABLES
+// ============================================================================
+
+/**
+ * Stalker Portal Accounts - IPTV account configurations for Stalker Portal/MAG STB
+ * Stores portal URL and MAC address for authentication
+ */
+export const stalkerPortalAccounts = sqliteTable(
+	'stalker_portal_accounts',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		name: text('name').notNull(),
+		// Portal URL (e.g., http://portal.example.com/c)
+		portalUrl: text('portal_url').notNull(),
+		// MAC address in format 00:1A:79:XX:XX:XX
+		macAddress: text('mac_address').notNull(),
+		enabled: integer('enabled', { mode: 'boolean' }).default(true),
+		// Priority for ordering accounts (lower = higher priority)
+		priority: integer('priority').default(1),
+		// Cached account info from portal
+		accountInfo: text('account_info', { mode: 'json' }).$type<{
+			expDate?: string;
+			maxConnections?: number;
+			activeConnections?: number;
+			status?: string;
+		}>(),
+		// Cached channel/category counts for quick display
+		channelCount: integer('channel_count').default(0),
+		categoryCount: integer('category_count').default(0),
+		// Connection testing
+		lastTestedAt: text('last_tested_at'),
+		testResult: text('test_result'), // 'success' | 'failed' | null
+		testError: text('test_error'),
+		// Channel sync settings
+		lastSyncAt: text('last_sync_at'), // Last channel sync timestamp
+		syncIntervalHours: integer('sync_interval_hours'), // Auto-sync interval (null = manual only)
+		// EPG settings
+		epgEnabled: integer('epg_enabled', { mode: 'boolean' }).default(true), // Fetch EPG from this provider
+		createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [
+		index('idx_stalker_accounts_enabled').on(table.enabled),
+		index('idx_stalker_accounts_priority').on(table.priority)
+	]
+);
+
+export type StalkerPortalAccountRecord = typeof stalkerPortalAccounts.$inferSelect;
+export type NewStalkerPortalAccountRecord = typeof stalkerPortalAccounts.$inferInsert;
+
+/**
+ * Channel Categories - User-created categories for organizing lineup channels
+ * These are separate from portal categories - users create their own organization
+ */
+export const channelCategories = sqliteTable(
+	'channel_categories',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		name: text('name').notNull(),
+		position: integer('position').notNull(),
+		color: text('color'), // Hex color for UI badge
+		icon: text('icon'), // Lucide icon name
+		createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [index('idx_channel_categories_position').on(table.position)]
+);
+
+export type ChannelCategoryRecord = typeof channelCategories.$inferSelect;
+export type NewChannelCategoryRecord = typeof channelCategories.$inferInsert;
+
+/**
+ * Channel Lineup Items - User's custom channel lineup for Live TV
+ * Stores references to channels from Stalker Portal accounts with custom ordering
+ * Channel metadata is cached since channels are fetched live from portals
+ */
+export const channelLineupItems = sqliteTable(
+	'channel_lineup_items',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		// Reference to the source account
+		accountId: text('account_id')
+			.notNull()
+			.references(() => stalkerPortalAccounts.id, { onDelete: 'cascade' }),
+		// Channel identifier from the portal (not a DB foreign key since channels are live)
+		channelId: text('channel_id').notNull(),
+		// Position in the lineup (1-based, for drag-to-reorder)
+		position: integer('position').notNull(),
+		// Future: Custom channel number for EPG/remote control
+		channelNumber: integer('channel_number'),
+		// Cached channel metadata (channels fetched live from portals)
+		cachedName: text('cached_name').notNull(),
+		cachedLogo: text('cached_logo'),
+		cachedCategoryId: text('cached_category_id'),
+		cachedCategoryName: text('cached_category_name'),
+		// Additional cached provider data for sync and EPG
+		cachedCmd: text('cached_cmd'), // Channel cmd for faster streaming
+		cachedArchive: integer('cached_archive', { mode: 'boolean' }), // Catchup support flag
+		cachedArchiveDays: integer('cached_archive_days'), // Archive duration in days
+		cachedXmltvId: text('cached_xmltv_id'), // Provider's xmltvId for EPG matching
+		// Sync status
+		syncStatus: text('sync_status').$type<'synced' | 'stale' | 'removed'>().default('synced'),
+		// User customizations (override cached values when set)
+		customName: text('custom_name'),
+		customLogo: text('custom_logo'),
+		epgId: text('epg_id'), // XMLTV EPG ID for Jellyfin/Plex matching
+		// User-created category (separate from portal category)
+		categoryId: text('category_id').references(() => channelCategories.id, {
+			onDelete: 'set null'
+		}),
+		addedAt: text('added_at').$defaultFn(() => new Date().toISOString()),
+		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [
+		uniqueIndex('idx_lineup_account_channel').on(table.accountId, table.channelId),
+		index('idx_lineup_position').on(table.position),
+		index('idx_lineup_account').on(table.accountId),
+		index('idx_lineup_category').on(table.categoryId)
+	]
+);
+
+export type ChannelLineupItemRecord = typeof channelLineupItems.$inferSelect;
+export type NewChannelLineupItemRecord = typeof channelLineupItems.$inferInsert;
+
+/**
+ * EPG Sources - External XMLTV feeds for program guide data
+ */
+export const epgSources = sqliteTable(
+	'epg_sources',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		name: text('name').notNull(),
+		url: text('url').notNull(),
+		enabled: integer('enabled', { mode: 'boolean' }).default(true),
+		priority: integer('priority').default(1), // Lower = higher priority for matching
+		lastFetchedAt: text('last_fetched_at'),
+		fetchIntervalHours: integer('fetch_interval_hours').default(6),
+		channelCount: integer('channel_count').default(0), // Cached channel count from feed
+		status: text('status').$type<'ok' | 'error' | 'pending'>().default('pending'),
+		errorMessage: text('error_message'),
+		createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [
+		index('idx_epg_sources_enabled').on(table.enabled),
+		index('idx_epg_sources_priority').on(table.priority)
+	]
+);
+
+export type EpgSourceRecord = typeof epgSources.$inferSelect;
+export type NewEpgSourceRecord = typeof epgSources.$inferInsert;
+
+/**
+ * EPG Programs - Cached program guide data from providers and XMLTV sources
+ */
+export const epgPrograms = sqliteTable(
+	'epg_programs',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		// Links to channel via provider channel ID (for matching)
+		channelXmltvId: text('channel_xmltv_id').notNull(), // e.g., "CNN.us" or provider channel ID
+		// Source of EPG data
+		epgSourceId: text('epg_source_id').references(() => epgSources.id, { onDelete: 'cascade' }), // null = provider EPG
+		accountId: text('account_id').references(() => stalkerPortalAccounts.id, {
+			onDelete: 'cascade'
+		}), // for provider EPG
+		// Program details
+		startTime: text('start_time').notNull(), // ISO timestamp
+		endTime: text('end_time').notNull(), // ISO timestamp
+		title: text('title').notNull(),
+		description: text('description'),
+		category: text('category'),
+		icon: text('icon'), // Program poster/icon URL
+		rating: text('rating'),
+		episodeNumber: text('episode_number'), // S01E01 format if available
+		createdAt: text('created_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [
+		index('idx_epg_programs_channel').on(table.channelXmltvId),
+		index('idx_epg_programs_source').on(table.epgSourceId),
+		index('idx_epg_programs_account').on(table.accountId),
+		index('idx_epg_programs_time').on(table.startTime, table.endTime),
+		index('idx_epg_programs_channel_time').on(table.channelXmltvId, table.startTime)
+	]
+);
+
+export type EpgProgramRecord = typeof epgPrograms.$inferSelect;
+export type NewEpgProgramRecord = typeof epgPrograms.$inferInsert;
+
+/**
+ * Live TV Settings - Key-value store for scheduler and Live TV configuration
+ */
+export const liveTvSettings = sqliteTable('live_tv_settings', {
+	key: text('key').primaryKey(),
+	value: text('value').notNull()
+});
+
+// ============================================================================
+// LIVE TV RELATIONS
+// ============================================================================
+
+/**
+ * Channel Categories Relations
+ */
+export const channelCategoriesRelations = relations(channelCategories, ({ many }) => ({
+	channels: many(channelLineupItems)
+}));
+
+/**
+ * Channel Lineup Items Relations
+ */
+export const channelLineupItemsRelations = relations(channelLineupItems, ({ one }) => ({
+	account: one(stalkerPortalAccounts, {
+		fields: [channelLineupItems.accountId],
+		references: [stalkerPortalAccounts.id]
+	}),
+	category: one(channelCategories, {
+		fields: [channelLineupItems.categoryId],
+		references: [channelCategories.id]
+	})
+}));
+
+/**
+ * Stalker Portal Accounts Relations
+ */
+export const stalkerPortalAccountsRelations = relations(stalkerPortalAccounts, ({ many }) => ({
+	lineupItems: many(channelLineupItems),
+	epgPrograms: many(epgPrograms)
+}));
+
+/**
+ * EPG Sources Relations
+ */
+export const epgSourcesRelations = relations(epgSources, ({ many }) => ({
+	programs: many(epgPrograms)
+}));
+
+/**
+ * EPG Programs Relations
+ */
+export const epgProgramsRelations = relations(epgPrograms, ({ one }) => ({
+	source: one(epgSources, {
+		fields: [epgPrograms.epgSourceId],
+		references: [epgSources.id]
+	}),
+	account: one(stalkerPortalAccounts, {
+		fields: [epgPrograms.accountId],
+		references: [stalkerPortalAccounts.id]
+	})
+}));
 
 // ============================================================================
 // NZB STREAMING RELATIONS

@@ -11,6 +11,7 @@ import {
 	getMonitoringScheduler,
 	monitoringScheduler
 } from '$lib/server/monitoring/MonitoringScheduler.js';
+import { getLiveTvScheduler } from '$lib/server/livetv/scheduler/LiveTvScheduler.js';
 import { taskHistoryService } from '$lib/server/tasks/TaskHistoryService.js';
 import { getExternalIdService } from '$lib/server/services/ExternalIdService.js';
 import { getDataRepairService } from '$lib/server/services/DataRepairService.js';
@@ -58,6 +59,7 @@ let externalIdServiceInitialized = false;
 let browserSolverInitialized = false;
 let nntpClientManagerInitialized = false;
 let dataRepairServiceInitialized = false;
+let liveTvSchedulerInitialized = false;
 
 async function checkFFprobe() {
 	const available = await isFFprobeAvailable();
@@ -212,6 +214,23 @@ async function initializeDataRepairService() {
 	}
 }
 
+async function initializeLiveTvScheduler() {
+	if (liveTvSchedulerInitialized) return;
+
+	try {
+		// Start the Live TV scheduler (channel sync, EPG updates)
+		// Has a 2-minute grace period before running any tasks
+		const liveTvScheduler = getLiveTvScheduler();
+		await liveTvScheduler.initialize();
+
+		liveTvSchedulerInitialized = true;
+		logger.info('Live TV scheduler initialized');
+	} catch (error) {
+		// Non-fatal - Live TV features will still work, just no auto-updates
+		logger.error('Failed to initialize Live TV scheduler', error);
+	}
+}
+
 // Start initialization in next tick - ensures module loading completes immediately
 // so the HTTP server can start responding to requests while services initialize in background.
 // Using setImmediate pushes the async work to the next event loop iteration.
@@ -237,6 +256,7 @@ setImmediate(async () => {
 		serviceManager.register(getExternalIdService());
 		serviceManager.register(getNntpClientManager());
 		serviceManager.register(getExtractionCacheManager());
+		serviceManager.register(getLiveTvScheduler());
 
 		// 3. Essential services run in parallel (fire-and-forget with error handling)
 		// These don't block each other or HTTP responses
@@ -255,6 +275,12 @@ setImmediate(async () => {
 				logger.error('Extraction cache init failed', e)
 			);
 		}, 5000);
+
+		// 4b. Live TV scheduler starts 15s after other background services
+		// Has its own 2-minute grace period before running auto-sync/EPG tasks
+		setTimeout(() => {
+			initializeLiveTvScheduler().catch((e) => logger.error('Live TV scheduler init failed', e));
+		}, 15000);
 
 		// 5. Browser solver starts after other services (resource-intensive, lower priority)
 		// This is delayed to allow core services to stabilize first

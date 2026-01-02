@@ -25,8 +25,13 @@ import { logger } from '$lib/logging';
  * Version 8: Fixed nzb_stream_mounts status CHECK constraint to include all extraction states
  * Version 9: Remove deprecated qualityPresets system in favor of scoringProfiles
  * Version 10: Flag series with broken episode metadata for automatic repair
+ * Version 11: Added stalker_portal_accounts table for Live TV IPTV support
+ * Version 12: Added channel_lineup_items table for custom Live TV channel lineup
+ * Version 13: Added channel_categories table and extended channel_lineup_items with customization fields
+ * Version 14: Added EPG support - epg_sources, epg_programs tables, extended accounts and lineup items
+ * Version 15: Added live_tv_settings table for scheduler configuration
  */
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 /**
  * All table definitions with CREATE TABLE IF NOT EXISTS
@@ -724,6 +729,98 @@ const TABLE_DEFINITIONS: string[] = [
 		"expires_at" text,
 		"created_at" text,
 		"updated_at" text
+	)`,
+
+	// Live TV tables
+	`CREATE TABLE IF NOT EXISTS "stalker_portal_accounts" (
+		"id" text PRIMARY KEY NOT NULL,
+		"name" text NOT NULL,
+		"portal_url" text NOT NULL,
+		"mac_address" text NOT NULL,
+		"enabled" integer DEFAULT true,
+		"priority" integer DEFAULT 1,
+		"account_info" text,
+		"channel_count" integer DEFAULT 0,
+		"category_count" integer DEFAULT 0,
+		"last_tested_at" text,
+		"test_result" text,
+		"test_error" text,
+		"last_sync_at" text,
+		"sync_interval_hours" integer,
+		"epg_enabled" integer DEFAULT true,
+		"created_at" text,
+		"updated_at" text
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS "channel_categories" (
+		"id" text PRIMARY KEY NOT NULL,
+		"name" text NOT NULL,
+		"position" integer NOT NULL,
+		"color" text,
+		"icon" text,
+		"created_at" text,
+		"updated_at" text
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS "channel_lineup_items" (
+		"id" text PRIMARY KEY NOT NULL,
+		"account_id" text NOT NULL REFERENCES "stalker_portal_accounts"("id") ON DELETE CASCADE,
+		"channel_id" text NOT NULL,
+		"position" integer NOT NULL,
+		"channel_number" integer,
+		"cached_name" text NOT NULL,
+		"cached_logo" text,
+		"cached_category_id" text,
+		"cached_category_name" text,
+		"cached_cmd" text,
+		"cached_archive" integer,
+		"cached_archive_days" integer,
+		"cached_xmltv_id" text,
+		"sync_status" text DEFAULT 'synced',
+		"custom_name" text,
+		"custom_logo" text,
+		"epg_id" text,
+		"category_id" text REFERENCES "channel_categories"("id") ON DELETE SET NULL,
+		"added_at" text,
+		"updated_at" text,
+		UNIQUE("account_id", "channel_id")
+	)`,
+
+	// EPG tables
+	`CREATE TABLE IF NOT EXISTS "epg_sources" (
+		"id" text PRIMARY KEY NOT NULL,
+		"name" text NOT NULL,
+		"url" text NOT NULL,
+		"enabled" integer DEFAULT true,
+		"priority" integer DEFAULT 1,
+		"last_fetched_at" text,
+		"fetch_interval_hours" integer DEFAULT 6,
+		"channel_count" integer DEFAULT 0,
+		"status" text DEFAULT 'pending',
+		"error_message" text,
+		"created_at" text,
+		"updated_at" text
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS "epg_programs" (
+		"id" text PRIMARY KEY NOT NULL,
+		"channel_xmltv_id" text NOT NULL,
+		"epg_source_id" text REFERENCES "epg_sources"("id") ON DELETE CASCADE,
+		"account_id" text REFERENCES "stalker_portal_accounts"("id") ON DELETE CASCADE,
+		"start_time" text NOT NULL,
+		"end_time" text NOT NULL,
+		"title" text NOT NULL,
+		"description" text,
+		"category" text,
+		"icon" text,
+		"rating" text,
+		"episode_number" text,
+		"created_at" text
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS "live_tv_settings" (
+		"key" text PRIMARY KEY NOT NULL,
+		"value" text NOT NULL
 	)`
 ];
 
@@ -774,7 +871,25 @@ const INDEX_DEFINITIONS: string[] = [
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_movie" ON "nzb_stream_mounts" ("movie_id")`,
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_series" ON "nzb_stream_mounts" ("series_id")`,
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_expires" ON "nzb_stream_mounts" ("expires_at")`,
-	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_hash" ON "nzb_stream_mounts" ("nzb_hash")`
+	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_hash" ON "nzb_stream_mounts" ("nzb_hash")`,
+	// Live TV indexes
+	`CREATE INDEX IF NOT EXISTS "idx_stalker_accounts_enabled" ON "stalker_portal_accounts" ("enabled")`,
+	`CREATE INDEX IF NOT EXISTS "idx_stalker_accounts_priority" ON "stalker_portal_accounts" ("priority")`,
+	// Channel categories indexes
+	`CREATE INDEX IF NOT EXISTS "idx_channel_categories_position" ON "channel_categories" ("position")`,
+	// Channel lineup indexes
+	`CREATE UNIQUE INDEX IF NOT EXISTS "idx_lineup_account_channel" ON "channel_lineup_items" ("account_id", "channel_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_lineup_position" ON "channel_lineup_items" ("position")`,
+	`CREATE INDEX IF NOT EXISTS "idx_lineup_account" ON "channel_lineup_items" ("account_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_lineup_category" ON "channel_lineup_items" ("category_id")`,
+	// EPG indexes
+	`CREATE INDEX IF NOT EXISTS "idx_epg_sources_enabled" ON "epg_sources" ("enabled")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_sources_priority" ON "epg_sources" ("priority")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_programs_channel" ON "epg_programs" ("channel_xmltv_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_programs_source" ON "epg_programs" ("epg_source_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_programs_account" ON "epg_programs" ("account_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_programs_time" ON "epg_programs" ("start_time", "end_time")`,
+	`CREATE INDEX IF NOT EXISTS "idx_epg_programs_channel_time" ON "epg_programs" ("channel_xmltv_id", "start_time")`
 ];
 
 /**
@@ -1330,6 +1445,278 @@ const SCHEMA_UPDATES: Record<number, (sqlite: Database.Database) => void> = {
 		logger.info('[SchemaSync] Queued series for metadata repair on next startup', {
 			count: brokenSeries.length
 		});
+	},
+
+	// Version 11: Add stalker_portal_accounts table for Live TV IPTV support
+	11: (sqlite) => {
+		// Create the stalker portal accounts table for IPTV support
+		sqlite
+			.prepare(
+				`CREATE TABLE IF NOT EXISTS "stalker_portal_accounts" (
+					"id" text PRIMARY KEY NOT NULL,
+					"name" text NOT NULL,
+					"portal_url" text NOT NULL,
+					"mac_address" text NOT NULL,
+					"enabled" integer DEFAULT true,
+					"priority" integer DEFAULT 1,
+					"account_info" text,
+					"channel_count" integer DEFAULT 0,
+					"category_count" integer DEFAULT 0,
+					"last_tested_at" text,
+					"test_result" text,
+					"test_error" text,
+					"created_at" text,
+					"updated_at" text
+				)`
+			)
+			.run();
+
+		// Create indexes
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_stalker_accounts_enabled" ON "stalker_portal_accounts" ("enabled")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_stalker_accounts_priority" ON "stalker_portal_accounts" ("priority")`
+			)
+			.run();
+
+		logger.info('[SchemaSync] Added stalker_portal_accounts table for Live TV');
+	},
+
+	// Version 12: Add channel_lineup_items table for custom Live TV channel lineup
+	12: (sqlite) => {
+		sqlite
+			.prepare(
+				`CREATE TABLE IF NOT EXISTS "channel_lineup_items" (
+					"id" text PRIMARY KEY NOT NULL,
+					"account_id" text NOT NULL REFERENCES "stalker_portal_accounts"("id") ON DELETE CASCADE,
+					"channel_id" text NOT NULL,
+					"position" integer NOT NULL,
+					"channel_number" integer,
+					"cached_name" text NOT NULL,
+					"cached_logo" text,
+					"cached_category_id" text,
+					"cached_category_name" text,
+					"added_at" text,
+					"updated_at" text,
+					UNIQUE("account_id", "channel_id")
+				)`
+			)
+			.run();
+
+		// Create indexes
+		sqlite
+			.prepare(
+				`CREATE UNIQUE INDEX IF NOT EXISTS "idx_lineup_account_channel" ON "channel_lineup_items" ("account_id", "channel_id")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_lineup_position" ON "channel_lineup_items" ("position")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_lineup_account" ON "channel_lineup_items" ("account_id")`
+			)
+			.run();
+
+		logger.info('[SchemaSync] Added channel_lineup_items table for custom Live TV lineup');
+	},
+
+	// Version 13: Add channel_categories table and extend channel_lineup_items with customization fields
+	13: (sqlite) => {
+		// Create channel_categories table
+		sqlite
+			.prepare(
+				`CREATE TABLE IF NOT EXISTS "channel_categories" (
+					"id" text PRIMARY KEY NOT NULL,
+					"name" text NOT NULL,
+					"position" integer NOT NULL,
+					"color" text,
+					"icon" text,
+					"created_at" text,
+					"updated_at" text
+				)`
+			)
+			.run();
+
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_channel_categories_position" ON "channel_categories" ("position")`
+			)
+			.run();
+
+		// Add new columns to channel_lineup_items for customization
+		if (!columnExists(sqlite, 'channel_lineup_items', 'custom_name')) {
+			sqlite.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "custom_name" text`).run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'custom_logo')) {
+			sqlite.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "custom_logo" text`).run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'epg_id')) {
+			sqlite.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "epg_id" text`).run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'category_id')) {
+			sqlite
+				.prepare(
+					`ALTER TABLE "channel_lineup_items" ADD COLUMN "category_id" text REFERENCES "channel_categories"("id") ON DELETE SET NULL`
+				)
+				.run();
+		}
+
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_lineup_category" ON "channel_lineup_items" ("category_id")`
+			)
+			.run();
+
+		logger.info(
+			'[SchemaSync] Added channel_categories and extended channel_lineup_items with customization fields'
+		);
+	},
+
+	// Version 14: Add EPG support - epg_sources, epg_programs tables, extend accounts and lineup items
+	14: (sqlite) => {
+		// Extend stalker_portal_accounts with sync and EPG settings
+		if (!columnExists(sqlite, 'stalker_portal_accounts', 'last_sync_at')) {
+			sqlite.prepare(`ALTER TABLE "stalker_portal_accounts" ADD COLUMN "last_sync_at" text`).run();
+		}
+		if (!columnExists(sqlite, 'stalker_portal_accounts', 'sync_interval_hours')) {
+			sqlite
+				.prepare(`ALTER TABLE "stalker_portal_accounts" ADD COLUMN "sync_interval_hours" integer`)
+				.run();
+		}
+		if (!columnExists(sqlite, 'stalker_portal_accounts', 'epg_enabled')) {
+			sqlite
+				.prepare(
+					`ALTER TABLE "stalker_portal_accounts" ADD COLUMN "epg_enabled" integer DEFAULT true`
+				)
+				.run();
+		}
+
+		// Extend channel_lineup_items with additional cached provider data
+		if (!columnExists(sqlite, 'channel_lineup_items', 'cached_cmd')) {
+			sqlite.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "cached_cmd" text`).run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'cached_archive')) {
+			sqlite
+				.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "cached_archive" integer`)
+				.run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'cached_archive_days')) {
+			sqlite
+				.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "cached_archive_days" integer`)
+				.run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'cached_xmltv_id')) {
+			sqlite.prepare(`ALTER TABLE "channel_lineup_items" ADD COLUMN "cached_xmltv_id" text`).run();
+		}
+		if (!columnExists(sqlite, 'channel_lineup_items', 'sync_status')) {
+			sqlite
+				.prepare(
+					`ALTER TABLE "channel_lineup_items" ADD COLUMN "sync_status" text DEFAULT 'synced'`
+				)
+				.run();
+		}
+
+		// Create EPG sources table
+		sqlite
+			.prepare(
+				`CREATE TABLE IF NOT EXISTS "epg_sources" (
+					"id" text PRIMARY KEY NOT NULL,
+					"name" text NOT NULL,
+					"url" text NOT NULL,
+					"enabled" integer DEFAULT true,
+					"priority" integer DEFAULT 1,
+					"last_fetched_at" text,
+					"fetch_interval_hours" integer DEFAULT 6,
+					"channel_count" integer DEFAULT 0,
+					"status" text DEFAULT 'pending',
+					"error_message" text,
+					"created_at" text,
+					"updated_at" text
+				)`
+			)
+			.run();
+
+		// Create EPG programs table
+		sqlite
+			.prepare(
+				`CREATE TABLE IF NOT EXISTS "epg_programs" (
+					"id" text PRIMARY KEY NOT NULL,
+					"channel_xmltv_id" text NOT NULL,
+					"epg_source_id" text REFERENCES "epg_sources"("id") ON DELETE CASCADE,
+					"account_id" text REFERENCES "stalker_portal_accounts"("id") ON DELETE CASCADE,
+					"start_time" text NOT NULL,
+					"end_time" text NOT NULL,
+					"title" text NOT NULL,
+					"description" text,
+					"category" text,
+					"icon" text,
+					"rating" text,
+					"episode_number" text,
+					"created_at" text
+				)`
+			)
+			.run();
+
+		// Create indexes for EPG tables
+		sqlite
+			.prepare(`CREATE INDEX IF NOT EXISTS "idx_epg_sources_enabled" ON "epg_sources" ("enabled")`)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_sources_priority" ON "epg_sources" ("priority")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_programs_channel" ON "epg_programs" ("channel_xmltv_id")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_programs_source" ON "epg_programs" ("epg_source_id")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_programs_account" ON "epg_programs" ("account_id")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_programs_time" ON "epg_programs" ("start_time", "end_time")`
+			)
+			.run();
+		sqlite
+			.prepare(
+				`CREATE INDEX IF NOT EXISTS "idx_epg_programs_channel_time" ON "epg_programs" ("channel_xmltv_id", "start_time")`
+			)
+			.run();
+
+		logger.info(
+			'[SchemaSync] Added EPG support - epg_sources, epg_programs tables and extended accounts/lineup'
+		);
+	},
+
+	// Version 15: Add live_tv_settings table for scheduler configuration
+	15: (sqlite) => {
+		if (!tableExists(sqlite, 'live_tv_settings')) {
+			sqlite
+				.prepare(
+					`CREATE TABLE IF NOT EXISTS "live_tv_settings" (
+						"key" text PRIMARY KEY NOT NULL,
+						"value" text NOT NULL
+					)`
+				)
+				.run();
+		}
+		logger.info('[SchemaSync] Added live_tv_settings table for Live TV scheduler');
 	}
 };
 
