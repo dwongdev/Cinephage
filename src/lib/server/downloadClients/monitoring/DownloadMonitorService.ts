@@ -870,8 +870,9 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			// 1. By downloadId (primary)
 			// 2. By stored infoHash
 			// 3. By extracting hash from magnetUrl
+			// 4. By title (SABnzbd only - nzo_id changes on re-grab)
 			let download = downloadMap.get(queueItem.downloadId.toLowerCase());
-			let matchedBy: 'downloadId' | 'infoHash' | 'magnetUrl' | null = download
+			let matchedBy: 'downloadId' | 'infoHash' | 'magnetUrl' | 'title' | null = download
 				? 'downloadId'
 				: null;
 
@@ -888,6 +889,16 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 					download = downloadMap.get(extractedHash.toLowerCase());
 					if (download) matchedBy = 'magnetUrl';
 				}
+			}
+
+			// Fallback for SABnzbd: try matching by title
+			// SABnzbd generates new nzo_id when downloads are re-added,
+			// unlike torrent hashes which are persistent
+			if (!download && client.implementation === 'sabnzbd') {
+				download = downloads.find(
+					(d) => d.name.toLowerCase() === queueItem.title.toLowerCase()
+				);
+				if (download) matchedBy = 'title';
 			}
 
 			if (download) {

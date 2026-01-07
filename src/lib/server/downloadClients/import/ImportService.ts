@@ -1380,6 +1380,17 @@ export class ImportService extends EventEmitter {
 	 */
 	private async cleanupUsenetSource(sourcePath: string): Promise<void> {
 		try {
+			// Safety check: Don't delete paths that are too short or look like base directories
+			// A valid usenet download path should have the download name as a subfolder
+			const pathParts = sourcePath.split('/').filter((p) => p.length > 0);
+			if (pathParts.length < 4) {
+				logger.warn('[ImportService] Refusing to delete path that looks like a base directory', {
+					sourcePath,
+					pathDepth: pathParts.length
+				});
+				return;
+			}
+
 			// Check if it exists first
 			const exists = await fileExists(sourcePath);
 			if (!exists) {

@@ -772,7 +772,10 @@ export class SearchOrchestrator {
 
 	/**
 	 * Filter releases by season/episode when specified in criteria.
-	 * Only applies to TV searches with season/episode specified.
+	 *
+	 * For movie searches: Rejects releases that are clearly TV episodes (have S01E03 patterns)
+	 *
+	 * For TV searches with season/episode specified:
 	 * - Season-only search: Returns season packs (single or multi-season) that contain the target season
 	 * - Season+episode search: Returns matching individual episodes AND season packs containing the episode
 	 *   (Season packs will be scored higher via pack bonus, so they'll naturally float to the top)
@@ -783,6 +786,29 @@ export class SearchOrchestrator {
 		releases: ReleaseResult[],
 		criteria: SearchCriteria
 	): ReleaseResult[] {
+		// For movie searches, reject releases that are clearly TV episodes
+		if (isMovieSearch(criteria)) {
+			return releases.filter((release) => {
+				const releaseWithCache = release as ReleaseResult & {
+					_parsedRelease?: ReturnType<typeof parseRelease>;
+				};
+				if (!releaseWithCache._parsedRelease) {
+					releaseWithCache._parsedRelease = parseRelease(release.title);
+				}
+				const parsed = releaseWithCache._parsedRelease;
+
+				// Reject if release has episode info (S01E03, season pack, etc.)
+				if (parsed.episode) {
+					logger.debug('[SearchOrchestrator] Rejecting TV release for movie search', {
+						title: release.title,
+						episode: parsed.episode
+					});
+					return false;
+				}
+				return true;
+			});
+		}
+
 		if (!isTvSearch(criteria)) {
 			return releases;
 		}

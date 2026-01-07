@@ -136,7 +136,7 @@ export class MonitoringSearchService {
 	 */
 	private async isMovieAlreadyDownloading(movieId: string): Promise<boolean> {
 		const activeDownloads = await db
-			.select({ id: downloadQueue.id })
+			.select({ id: downloadQueue.id, status: downloadQueue.status, title: downloadQueue.title })
 			.from(downloadQueue)
 			.where(
 				and(
@@ -145,7 +145,15 @@ export class MonitoringSearchService {
 				)
 			)
 			.limit(1);
-		return activeDownloads.length > 0;
+
+		const found = activeDownloads.length > 0;
+		logger.debug('[MonitoringSearch] isMovieAlreadyDownloading check', {
+			movieId,
+			found,
+			activeDownload: found ? activeDownloads[0] : undefined
+		});
+
+		return found;
 	}
 
 	/**

@@ -195,6 +195,16 @@ export class SABnzbdClient implements IDownloadClient {
 		}
 
 		// Fallback: construct from base + category dir + name
+		// Validate item.name before constructing path
+		if (!item.name || item.name.trim().length === 0) {
+			logger.warn('[SABnzbd] Cannot construct path: item name is empty', {
+				nzo_id: item.nzo_id,
+				storage: item.storage,
+				baseDir
+			});
+			return baseDir;
+		}
+
 		const category = sabConfig.categories.find(
 			(c) => c.name.toLowerCase() === item.category?.toLowerCase()
 		);
@@ -766,7 +776,13 @@ export class SABnzbdClient implements IDownloadClient {
 			name: item.name,
 			hash: item.nzo_id,
 			progress: this.estimateHistoryProgress(item.status, isCompleted),
-			status: isCompleted ? 'completed' : this.mapStatus(item.status, 0),
+			// If SABnzbd says 'Completed' but storage path is invalid, keep as 'downloading'
+			// to prevent premature import attempts
+			status: isCompleted
+				? 'completed'
+				: item.status === 'Completed'
+					? 'downloading'
+					: this.mapStatus(item.status, 0),
 			size: item.bytes,
 			downloadSpeed: 0,
 			uploadSpeed: 0,
