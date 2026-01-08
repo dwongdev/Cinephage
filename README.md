@@ -49,19 +49,19 @@ Cinephage takes a unified approach to media management. Movies, TV shows, indexe
 
 ## Status
 
-| Feature            | Status       | Notes                                                |
-| ------------------ | ------------ | ---------------------------------------------------- |
-| Content Discovery  | Stable       | TMDB integration, trending, search                   |
-| Library Management | Stable       | File watching, scanning, TMDB matching               |
-| Quality Scoring    | Stable       | 4 built-in profiles + custom profile creation        |
-| Download Clients   | Stable       | qBittorrent, SABnzbd, NZBGet                         |
-| Indexers           | Stable       | 7 built-in + Newznab for usenet                      |
-| Subtitles          | Stable       | 8 providers, 80+ languages                           |
-| Streaming          | Stable       | 10 providers with circuit breaker failover           |
-| Smart Lists        | Stable       | Dynamic TMDB queries with auto-add to library        |
-| Monitoring         | Experimental | Automated searches, upgrades, new episode detection  |
-| Notifications      | Stable       | Jellyfin/Emby library update integration             |
-| Live TV/IPTV       | Experimental | Stalker portal with scanner, EPG (limited support)   |
+| Feature            | Status       | Notes                                               |
+| ------------------ | ------------ | --------------------------------------------------- |
+| Content Discovery  | Stable       | TMDB integration, trending, search                  |
+| Library Management | Stable       | File watching, scanning, TMDB matching              |
+| Quality Scoring    | Stable       | 4 built-in profiles + custom profile creation       |
+| Download Clients   | Stable       | qBittorrent, SABnzbd, NZBGet                        |
+| Indexers           | Stable       | 7 built-in + Newznab for usenet                     |
+| Subtitles          | Stable       | 8 providers, 80+ languages                          |
+| Streaming          | Stable       | 10 providers with circuit breaker failover          |
+| Smart Lists        | Stable       | Dynamic TMDB queries with auto-add to library       |
+| Monitoring         | Experimental | Automated searches, upgrades, new episode detection |
+| Notifications      | Stable       | Jellyfin/Emby library update integration            |
+| Live TV/IPTV       | Experimental | Stalker portal with scanner, EPG (limited support)  |
 
 ---
 
