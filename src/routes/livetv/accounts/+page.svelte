@@ -1,6 +1,12 @@
 <script lang="ts">
-	import { Plus, RefreshCw, Loader2 } from 'lucide-svelte';
-	import { StalkerAccountTable, StalkerAccountModal } from '$lib/components/livetv';
+	import { Plus, RefreshCw, Loader2, Search } from 'lucide-svelte';
+	import {
+		StalkerAccountTable,
+		StalkerAccountModal,
+		PortalScanModal,
+		PortalScanProgress,
+		ScanResultsTable
+	} from '$lib/components/livetv';
 	import type { StalkerAccount, StalkerAccountTestResult } from '$lib/types/livetv';
 	import { onMount } from 'svelte';
 
@@ -22,6 +28,12 @@
 
 	// Syncing state
 	let syncingId = $state<string | null>(null);
+
+	// Scanner state
+	type ScannerView = 'none' | 'modal' | 'progress' | 'results';
+	let scannerView = $state<ScannerView>('none');
+	let activeWorkerId = $state<string | null>(null);
+	let activePortalId = $state<string | null>(null);
 
 	// Load accounts on mount
 	onMount(() => {
@@ -208,6 +220,31 @@
 
 		return response.json();
 	}
+
+	// Scanner functions
+	function openScanner() {
+		scannerView = 'modal';
+	}
+
+	function closeScanner() {
+		scannerView = 'none';
+		activeWorkerId = null;
+		activePortalId = null;
+	}
+
+	function handleScanStarted(workerId: string, portalId: string) {
+		activeWorkerId = workerId;
+		activePortalId = portalId;
+		scannerView = 'progress';
+	}
+
+	function handleScanComplete() {
+		scannerView = 'results';
+	}
+
+	function handleAccountsCreated() {
+		loadAccounts();
+	}
 </script>
 
 <svelte:head>
@@ -233,6 +270,10 @@
 				{:else}
 					<RefreshCw class="h-4 w-4" />
 				{/if}
+			</button>
+			<button class="btn btn-sm btn-ghost" onclick={openScanner}>
+				<Search class="h-4 w-4" />
+				Scan for Accounts
 			</button>
 			<button class="btn btn-sm btn-primary" onclick={openAddModal}>
 				<Plus class="h-4 w-4" />
@@ -280,3 +321,32 @@
 	onDelete={handleDelete}
 	onTest={handleTestConfig}
 />
+
+<!-- Scanner Modal -->
+<PortalScanModal
+	open={scannerView === 'modal'}
+	onClose={closeScanner}
+	onScanStarted={handleScanStarted}
+/>
+
+<!-- Scanner Progress -->
+{#if scannerView === 'progress' && activeWorkerId}
+	<div class="mt-6">
+		<PortalScanProgress
+			workerId={activeWorkerId}
+			onClose={closeScanner}
+			onComplete={handleScanComplete}
+		/>
+	</div>
+{/if}
+
+<!-- Scan Results -->
+{#if scannerView === 'results' && activePortalId}
+	<div class="mt-6">
+		<ScanResultsTable
+			portalId={activePortalId}
+			onClose={closeScanner}
+			onAccountsCreated={handleAccountsCreated}
+		/>
+	</div>
+{/if}

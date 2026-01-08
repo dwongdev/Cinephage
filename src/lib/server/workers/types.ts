@@ -8,7 +8,14 @@ import type { LogCategory } from '$lib/logging';
 /**
  * Types of workers supported by the system.
  */
-export type WorkerType = 'stream' | 'import' | 'scan' | 'monitoring' | 'search' | 'subtitle-search';
+export type WorkerType =
+	| 'stream'
+	| 'import'
+	| 'scan'
+	| 'monitoring'
+	| 'search'
+	| 'subtitle-search'
+	| 'portal-scan';
 
 /**
  * Worker lifecycle status.
@@ -72,7 +79,8 @@ export const DEFAULT_WORKER_CONFIG: WorkerManagerConfig = {
 		scan: parseInt(process.env.WORKER_MAX_SCANS || '2', 10) || 2,
 		monitoring: parseInt(process.env.WORKER_MAX_MONITORING || '5', 10) || 5,
 		search: parseInt(process.env.WORKER_MAX_SEARCH || '3', 10) || 3,
-		'subtitle-search': parseInt(process.env.WORKER_MAX_SUBTITLE_SEARCH || '3', 10) || 3
+		'subtitle-search': parseInt(process.env.WORKER_MAX_SUBTITLE_SEARCH || '3', 10) || 3,
+		'portal-scan': parseInt(process.env.WORKER_MAX_PORTAL_SCANS || '2', 10) || 2
 	},
 	cleanupAfterMs: parseInt(process.env.WORKER_CLEANUP_MS || '1800000', 10) || 1800000, // 30 minutes
 	maxLogsPerWorker: parseInt(process.env.WORKER_MAX_LOGS || '1000', 10) || 1000
@@ -108,6 +116,8 @@ export function workerTypeToLogCategory(type: WorkerType): LogCategory {
 			return 'indexers';
 		case 'subtitle-search':
 			return 'subtitles';
+		case 'portal-scan':
+			return 'scans';
 		default:
 			return 'main';
 	}
@@ -189,5 +199,25 @@ export interface SubtitleSearchWorkerMetadata {
 	languageProfileId: string;
 	subtitlesDownloaded: number;
 	errors: string[];
+	[key: string]: unknown;
+}
+
+/**
+ * Portal scan worker specific metadata.
+ */
+export interface PortalScanWorkerMetadata {
+	portalId: string;
+	portalName: string;
+	portalUrl: string;
+	scanType: 'random' | 'sequential' | 'import';
+	macPrefix?: string;
+	macRangeStart?: string;
+	macRangeEnd?: string;
+	totalMacs: number;
+	testedMacs: number;
+	foundMacs: number;
+	currentMac?: string;
+	rateLimit: number;
+	historyId?: string;
 	[key: string]: unknown;
 }

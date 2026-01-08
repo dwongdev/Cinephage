@@ -6,6 +6,11 @@
 export { default as StalkerAccountTable } from './StalkerAccountTable.svelte';
 export { default as StalkerAccountModal } from './StalkerAccountModal.svelte';
 
+// Portal scanning
+export { default as PortalScanModal } from './PortalScanModal.svelte';
+export { default as PortalScanProgress } from './PortalScanProgress.svelte';
+export { default as ScanResultsTable } from './ScanResultsTable.svelte';
+
 // Channel lineup
 export { default as ChannelLineupTable } from './ChannelLineupTable.svelte';
 export { default as ChannelCategorySection } from './ChannelCategorySection.svelte';

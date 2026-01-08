@@ -902,3 +902,52 @@ export const stalkerAccountTestSchema = z.object({
 export type StalkerAccountCreate = z.infer<typeof stalkerAccountCreateSchema>;
 export type StalkerAccountUpdate = z.infer<typeof stalkerAccountUpdateSchema>;
 export type StalkerAccountTest = z.infer<typeof stalkerAccountTestSchema>;
+
+// ============================================================================
+// Stalker Portal Schemas (for scanner feature)
+// ============================================================================
+
+/**
+ * Schema for creating a Stalker Portal.
+ */
+export const stalkerPortalCreateSchema = z.object({
+	name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
+	url: z
+		.string()
+		.min(1, 'URL is required')
+		.refine(
+			(url) => {
+				try {
+					// Accept URLs with or without protocol
+					const testUrl = url.startsWith('http') ? url : `http://${url}`;
+					new URL(testUrl);
+					return true;
+				} catch {
+					return false;
+				}
+			},
+			{ message: 'Must be a valid portal URL' }
+		),
+	enabled: z.boolean().default(true)
+});
+
+/**
+ * Schema for updating a Stalker Portal.
+ */
+export const stalkerPortalUpdateSchema = z.object({
+	name: z.string().min(1).max(100).optional(),
+	url: z.string().min(1).optional(),
+	enabled: z.boolean().optional()
+});
+
+/**
+ * Schema for detecting portal type.
+ */
+export const stalkerPortalDetectSchema = z.object({
+	url: z.string().min(1, 'URL is required')
+});
+
+// Stalker Portal Type Exports
+export type StalkerPortalCreate = z.infer<typeof stalkerPortalCreateSchema>;
+export type StalkerPortalUpdate = z.infer<typeof stalkerPortalUpdateSchema>;
+export type StalkerPortalDetect = z.infer<typeof stalkerPortalDetectSchema>;

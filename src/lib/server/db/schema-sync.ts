@@ -45,8 +45,9 @@ import { logger } from '$lib/logging';
  * Version 28: Dropped old live_tv_settings table (replaced by EPG scheduler settings)
  * Version 29: Clean break migration - drops all orphaned Live TV tables from intermediate rewrites
  * Version 30: Add device parameters to stalker_accounts for proper Stalker protocol support
+ * Version 31: Add portal scanner tables (stalker_portals, portal_scan_results, portal_scan_history)
  */
-export const CURRENT_SCHEMA_VERSION = 30;
+export const CURRENT_SCHEMA_VERSION = 31;
 
 /**
  * All table definitions with CREATE TABLE IF NOT EXISTS
@@ -770,6 +771,20 @@ const TABLE_DEFINITIONS: string[] = [
 		"updated_at" text
 	)`,
 
+	// Live TV - Stalker Portals (for scanning)
+	`CREATE TABLE IF NOT EXISTS "stalker_portals" (
+		"id" text PRIMARY KEY NOT NULL,
+		"name" text NOT NULL,
+		"url" text NOT NULL UNIQUE,
+		"endpoint" text,
+		"server_timezone" text,
+		"last_scanned_at" text,
+		"last_scan_results" text,
+		"enabled" integer DEFAULT 1,
+		"created_at" text,
+		"updated_at" text
+	)`,
+
 	// Live TV - Stalker Portal Accounts
 	`CREATE TABLE IF NOT EXISTS "stalker_accounts" (
 		"id" text PRIMARY KEY NOT NULL,
@@ -777,6 +792,8 @@ const TABLE_DEFINITIONS: string[] = [
 		"portal_url" text NOT NULL,
 		"mac_address" text NOT NULL,
 		"enabled" integer DEFAULT 1,
+		"portal_id" text REFERENCES "stalker_portals"("id") ON DELETE SET NULL,
+		"discovered_from_scan" integer DEFAULT 0,
 		"serial_number" text,
 		"device_id" text,
 		"device_id2" text,
@@ -798,6 +815,41 @@ const TABLE_DEFINITIONS: string[] = [
 		"sync_status" text DEFAULT 'never',
 		"created_at" text,
 		"updated_at" text
+	)`,
+
+	// Live TV - Portal Scan Results (pending approval)
+	`CREATE TABLE IF NOT EXISTS "portal_scan_results" (
+		"id" text PRIMARY KEY NOT NULL,
+		"portal_id" text NOT NULL REFERENCES "stalker_portals"("id") ON DELETE CASCADE,
+		"mac_address" text NOT NULL,
+		"status" text NOT NULL DEFAULT 'pending',
+		"channel_count" integer,
+		"category_count" integer,
+		"expires_at" text,
+		"account_status" text,
+		"playback_limit" integer,
+		"server_timezone" text,
+		"raw_profile" text,
+		"discovered_at" text NOT NULL,
+		"processed_at" text
+	)`,
+
+	// Live TV - Portal Scan History
+	`CREATE TABLE IF NOT EXISTS "portal_scan_history" (
+		"id" text PRIMARY KEY NOT NULL,
+		"portal_id" text NOT NULL REFERENCES "stalker_portals"("id") ON DELETE CASCADE,
+		"worker_id" text,
+		"scan_type" text NOT NULL,
+		"mac_prefix" text,
+		"mac_range_start" text,
+		"mac_range_end" text,
+		"macs_to_test" integer,
+		"macs_tested" integer DEFAULT 0,
+		"macs_found" integer DEFAULT 0,
+		"status" text NOT NULL DEFAULT 'running',
+		"error" text,
+		"started_at" text NOT NULL,
+		"completed_at" text
 	)`,
 
 	// Live TV - Stalker Portal Categories (cached from portal)
@@ -935,9 +987,17 @@ const INDEX_DEFINITIONS: string[] = [
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_series" ON "nzb_stream_mounts" ("series_id")`,
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_expires" ON "nzb_stream_mounts" ("expires_at")`,
 	`CREATE INDEX IF NOT EXISTS "idx_nzb_mounts_hash" ON "nzb_stream_mounts" ("nzb_hash")`,
+	// Stalker Portal indexes
+	`CREATE INDEX IF NOT EXISTS "idx_stalker_portals_enabled" ON "stalker_portals" ("enabled")`,
 	// Stalker Portal accounts indexes
 	`CREATE INDEX IF NOT EXISTS "idx_stalker_accounts_enabled" ON "stalker_accounts" ("enabled")`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS "idx_stalker_accounts_portal_mac" ON "stalker_accounts" ("portal_url", "mac_address")`,
+	// Portal scan results indexes
+	`CREATE UNIQUE INDEX IF NOT EXISTS "idx_scan_results_portal_mac" ON "portal_scan_results" ("portal_id", "mac_address")`,
+	`CREATE INDEX IF NOT EXISTS "idx_scan_results_portal_status" ON "portal_scan_results" ("portal_id", "status")`,
+	// Portal scan history indexes
+	`CREATE INDEX IF NOT EXISTS "idx_scan_history_portal" ON "portal_scan_history" ("portal_id")`,
+	`CREATE INDEX IF NOT EXISTS "idx_scan_history_status" ON "portal_scan_history" ("status")`,
 	// Stalker Portal categories indexes
 	`CREATE INDEX IF NOT EXISTS "idx_stalker_categories_account" ON "stalker_categories" ("account_id")`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS "idx_stalker_categories_unique" ON "stalker_categories" ("account_id", "stalker_id")`,
@@ -2348,6 +2408,122 @@ const SCHEMA_UPDATES: Record<number, (sqlite: Database.Database) => void> = {
 			sqlite.prepare(`ALTER TABLE "stalker_accounts" ADD COLUMN "password" text`).run();
 		}
 		logger.info('[SchemaSync] Added device parameters to stalker_accounts for Stalker protocol');
+	},
+
+	// Version 31: Add portal scanner tables (stalker_portals, portal_scan_results, portal_scan_history)
+	31: (sqlite) => {
+		// Create stalker_portals table if it doesn't exist
+		if (!tableExists(sqlite, 'stalker_portals')) {
+			sqlite
+				.prepare(
+					`CREATE TABLE IF NOT EXISTS "stalker_portals" (
+						"id" text PRIMARY KEY NOT NULL,
+						"name" text NOT NULL,
+						"url" text NOT NULL UNIQUE,
+						"endpoint" text,
+						"server_timezone" text,
+						"last_scanned_at" text,
+						"last_scan_results" text,
+						"enabled" integer DEFAULT 1,
+						"created_at" text,
+						"updated_at" text
+					)`
+				)
+				.run();
+			sqlite
+				.prepare(
+					`CREATE INDEX IF NOT EXISTS "idx_stalker_portals_enabled" ON "stalker_portals" ("enabled")`
+				)
+				.run();
+			logger.info('[SchemaSync] Created stalker_portals table');
+		}
+
+		// Add portal_id and discovered_from_scan columns to stalker_accounts
+		if (!columnExists(sqlite, 'stalker_accounts', 'portal_id')) {
+			sqlite
+				.prepare(
+					`ALTER TABLE "stalker_accounts" ADD COLUMN "portal_id" text REFERENCES "stalker_portals"("id") ON DELETE SET NULL`
+				)
+				.run();
+		}
+		if (!columnExists(sqlite, 'stalker_accounts', 'discovered_from_scan')) {
+			sqlite
+				.prepare(
+					`ALTER TABLE "stalker_accounts" ADD COLUMN "discovered_from_scan" integer DEFAULT 0`
+				)
+				.run();
+		}
+
+		// Create portal_scan_results table if it doesn't exist
+		if (!tableExists(sqlite, 'portal_scan_results')) {
+			sqlite
+				.prepare(
+					`CREATE TABLE IF NOT EXISTS "portal_scan_results" (
+						"id" text PRIMARY KEY NOT NULL,
+						"portal_id" text NOT NULL REFERENCES "stalker_portals"("id") ON DELETE CASCADE,
+						"mac_address" text NOT NULL,
+						"status" text NOT NULL DEFAULT 'pending',
+						"channel_count" integer,
+						"category_count" integer,
+						"expires_at" text,
+						"account_status" text,
+						"playback_limit" integer,
+						"server_timezone" text,
+						"raw_profile" text,
+						"discovered_at" text NOT NULL,
+						"processed_at" text
+					)`
+				)
+				.run();
+			sqlite
+				.prepare(
+					`CREATE UNIQUE INDEX IF NOT EXISTS "idx_scan_results_portal_mac" ON "portal_scan_results" ("portal_id", "mac_address")`
+				)
+				.run();
+			sqlite
+				.prepare(
+					`CREATE INDEX IF NOT EXISTS "idx_scan_results_portal_status" ON "portal_scan_results" ("portal_id", "status")`
+				)
+				.run();
+			logger.info('[SchemaSync] Created portal_scan_results table');
+		}
+
+		// Create portal_scan_history table if it doesn't exist
+		if (!tableExists(sqlite, 'portal_scan_history')) {
+			sqlite
+				.prepare(
+					`CREATE TABLE IF NOT EXISTS "portal_scan_history" (
+						"id" text PRIMARY KEY NOT NULL,
+						"portal_id" text NOT NULL REFERENCES "stalker_portals"("id") ON DELETE CASCADE,
+						"worker_id" text,
+						"scan_type" text NOT NULL,
+						"mac_prefix" text,
+						"mac_range_start" text,
+						"mac_range_end" text,
+						"macs_to_test" integer,
+						"macs_tested" integer DEFAULT 0,
+						"macs_found" integer DEFAULT 0,
+						"status" text NOT NULL DEFAULT 'running',
+						"error" text,
+						"started_at" text NOT NULL,
+						"completed_at" text
+					)`
+				)
+				.run();
+			sqlite
+				.prepare(
+					`CREATE INDEX IF NOT EXISTS "idx_scan_history_portal" ON "portal_scan_history" ("portal_id")`
+				)
+				.run();
+			sqlite
+				.prepare(
+					`CREATE INDEX IF NOT EXISTS "idx_scan_history_status" ON "portal_scan_history" ("status")`
+				)
+				.run();
+			logger.info('[SchemaSync] Created portal_scan_history table');
+		}
+
+		logger.info('[SchemaSync] Added portal scanner tables');
 	}
 };
 

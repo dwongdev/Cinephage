@@ -2243,6 +2243,36 @@ export type MediaBrowserServerRecord = typeof mediaBrowserServers.$inferSelect;
 export type NewMediaBrowserServerRecord = typeof mediaBrowserServers.$inferInsert;
 
 // ============================================================================
+// LIVE TV - STALKER PORTALS
+// ============================================================================
+
+/**
+ * Stalker Portals - Saved portal URLs for scanning and account discovery.
+ * Portals can be scanned to find valid MAC addresses.
+ */
+export const stalkerPortals = sqliteTable(
+	'stalker_portals',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		name: text('name').notNull(),
+		url: text('url').notNull().unique(),
+		endpoint: text('endpoint'), // 'portal.php' or 'stalker_portal/server/load.php'
+		serverTimezone: text('server_timezone'),
+		lastScannedAt: text('last_scanned_at'),
+		lastScanResults: text('last_scan_results'), // JSON summary
+		enabled: integer('enabled', { mode: 'boolean' }).default(true),
+		createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [index('idx_stalker_portals_enabled').on(table.enabled)]
+);
+
+export type StalkerPortalRecord = typeof stalkerPortals.$inferSelect;
+export type NewStalkerPortalRecord = typeof stalkerPortals.$inferInsert;
+
+// ============================================================================
 // LIVE TV - STALKER PORTAL ACCOUNTS
 // ============================================================================
 
@@ -2260,6 +2290,10 @@ export const stalkerAccounts = sqliteTable(
 		portalUrl: text('portal_url').notNull(),
 		macAddress: text('mac_address').notNull(),
 		enabled: integer('enabled', { mode: 'boolean' }).default(true),
+
+		// Optional link to saved portal (for scanner-discovered accounts)
+		portalId: text('portal_id').references(() => stalkerPortals.id, { onDelete: 'set null' }),
+		discoveredFromScan: integer('discovered_from_scan', { mode: 'boolean' }).default(false),
 
 		// Device parameters for STB emulation (required for Stalker protocol)
 		serialNumber: text('serial_number'),
@@ -2304,6 +2338,97 @@ export const stalkerAccounts = sqliteTable(
 
 export type StalkerAccountRecord = typeof stalkerAccounts.$inferSelect;
 export type NewStalkerAccountRecord = typeof stalkerAccounts.$inferInsert;
+
+// ============================================================================
+// LIVE TV - PORTAL SCAN RESULTS
+// ============================================================================
+
+/**
+ * Portal Scan Results - Discovered accounts pending user approval.
+ * Stores MAC addresses found during portal scanning along with their profile data.
+ */
+export const portalScanResults = sqliteTable(
+	'portal_scan_results',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		portalId: text('portal_id')
+			.notNull()
+			.references(() => stalkerPortals.id, { onDelete: 'cascade' }),
+		macAddress: text('mac_address').notNull(),
+		status: text('status')
+			.$type<'pending' | 'approved' | 'ignored' | 'expired'>()
+			.notNull()
+			.default('pending'),
+
+		// Account metadata discovered during scan
+		channelCount: integer('channel_count'),
+		categoryCount: integer('category_count'),
+		expiresAt: text('expires_at'),
+		accountStatus: text('account_status').$type<'active' | 'blocked' | 'expired'>(),
+		playbackLimit: integer('playback_limit'),
+		serverTimezone: text('server_timezone'),
+		rawProfile: text('raw_profile'), // JSON - full profile data for review
+
+		// Timestamps
+		discoveredAt: text('discovered_at')
+			.notNull()
+			.$defaultFn(() => new Date().toISOString()),
+		processedAt: text('processed_at') // When user took action
+	},
+	(table) => [
+		uniqueIndex('idx_scan_results_portal_mac').on(table.portalId, table.macAddress),
+		index('idx_scan_results_portal_status').on(table.portalId, table.status)
+	]
+);
+
+export type PortalScanResultRecord = typeof portalScanResults.$inferSelect;
+export type NewPortalScanResultRecord = typeof portalScanResults.$inferInsert;
+
+// ============================================================================
+// LIVE TV - PORTAL SCAN HISTORY
+// ============================================================================
+
+/**
+ * Portal Scan History - Execution history for portal scans.
+ * Tracks each scan operation with configuration and results.
+ */
+export const portalScanHistory = sqliteTable(
+	'portal_scan_history',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => randomUUID()),
+		portalId: text('portal_id')
+			.notNull()
+			.references(() => stalkerPortals.id, { onDelete: 'cascade' }),
+		workerId: text('worker_id'), // Reference to worker for active scans
+		scanType: text('scan_type').$type<'random' | 'sequential' | 'import'>().notNull(),
+		macPrefix: text('mac_prefix'), // For random/sequential scans
+		macRangeStart: text('mac_range_start'), // For sequential
+		macRangeEnd: text('mac_range_end'), // For sequential
+		macsToTest: integer('macs_to_test'),
+		macsTested: integer('macs_tested').default(0),
+		macsFound: integer('macs_found').default(0),
+		status: text('status')
+			.$type<'running' | 'completed' | 'cancelled' | 'failed'>()
+			.notNull()
+			.default('running'),
+		error: text('error'),
+		startedAt: text('started_at')
+			.notNull()
+			.$defaultFn(() => new Date().toISOString()),
+		completedAt: text('completed_at')
+	},
+	(table) => [
+		index('idx_scan_history_portal').on(table.portalId),
+		index('idx_scan_history_status').on(table.status)
+	]
+);
+
+export type PortalScanHistoryRecord = typeof portalScanHistory.$inferSelect;
+export type NewPortalScanHistoryRecord = typeof portalScanHistory.$inferInsert;
 
 // ============================================================================
 // LIVE TV - STALKER PORTAL CATEGORIES (CACHED)
