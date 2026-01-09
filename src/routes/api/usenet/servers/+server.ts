@@ -6,6 +6,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getNntpServerService } from '$lib/server/streaming/nzb/NntpServerService';
+import { getNntpClientManager } from '$lib/server/streaming/nzb';
 import { nntpServerCreateSchema } from '$lib/validation/schemas';
 
 /**
@@ -47,6 +48,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		const created = await service.createServer(result.data);
+		await getNntpClientManager().reload();
 		return json({ success: true, server: created });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';

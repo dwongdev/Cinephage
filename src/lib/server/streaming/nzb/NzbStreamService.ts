@@ -23,7 +23,6 @@ import {
 	type ExtractionProgressCallback,
 	type ExtractionResult
 } from './ExtractionCoordinator';
-import { getExtractionCacheManager } from './extraction/ExtractionCacheManager';
 
 /**
  * Cached parsed NZB for active streams.
@@ -31,6 +30,15 @@ import { getExtractionCacheManager } from './extraction/ExtractionCacheManager';
 interface CachedNzb {
 	parsed: ParsedNzb;
 	timestamp: number;
+}
+
+/**
+ * Track active streams per mount for cleanup scheduling.
+ */
+interface MountStreamState {
+	activeCount: number;
+	cleanupTimer: ReturnType<typeof setTimeout> | null;
+	hasExtractedFile: boolean;
 }
 
 /**
@@ -55,11 +63,18 @@ export type { ExtractionProgressCallback, ExtractionResult };
 const NZB_CACHE_TTL = 60 * 60 * 1000;
 
 /**
+ * Delay before cleaning up extracted files after all streams end (2 minutes).
+ * This allows for seeking/buffering without re-extracting.
+ */
+const STREAM_CLEANUP_DELAY_MS = 2 * 60 * 1000;
+
+/**
  * NzbStreamService manages streaming operations.
  */
 class NzbStreamService {
 	private nzbCache: Map<string, CachedNzb> = new Map();
 	private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+	private mountStreamStates: Map<string, MountStreamState> = new Map();
 
 	constructor() {
 		// Periodic cache cleanup
@@ -92,11 +107,9 @@ class NzbStreamService {
 				extractedFilePath
 			});
 
-			// Refresh expiration when accessing
-			const cacheManager = getExtractionCacheManager();
-			await cacheManager.refreshExpiration(mountId);
+			// No longer refresh expiration - will cleanup after stream ends instead
 
-			return this.createExtractedFileStream(extractedFilePath, rangeHeader);
+			return this.createExtractedFileStream(mountId, extractedFilePath, rangeHeader);
 		}
 
 		// If mount requires extraction and no extracted file exists, inform caller
@@ -253,8 +266,10 @@ class NzbStreamService {
 
 	/**
 	 * Create a stream from an extracted local file with Range support.
+	 * Tracks active streams and schedules cleanup when all streams end.
 	 */
 	private async createExtractedFileStream(
+		mountId: string,
 		filePath: string,
 		rangeHeader: string | null
 	): Promise<CreateStreamResult> {
@@ -280,6 +295,14 @@ class NzbStreamService {
 			end: endByte
 		});
 
+		// Track this stream for cleanup scheduling
+		this.trackStreamStart(mountId, true);
+
+		// When stream ends, schedule cleanup
+		stream.once('close', () => {
+			this.trackStreamEnd(mountId);
+		});
+
 		const contentType = getContentType(filePath);
 
 		logger.info('[NzbStreamService] Created extracted file stream', {
@@ -298,6 +321,92 @@ class NzbStreamService {
 			isPartial: range !== null,
 			contentType
 		};
+	}
+
+	/**
+	 * Track when a stream starts for a mount.
+	 */
+	private trackStreamStart(mountId: string, hasExtractedFile: boolean): void {
+		let state = this.mountStreamStates.get(mountId);
+
+		if (!state) {
+			state = { activeCount: 0, cleanupTimer: null, hasExtractedFile };
+			this.mountStreamStates.set(mountId, state);
+		}
+
+		// Cancel any pending cleanup since a new stream started
+		if (state.cleanupTimer) {
+			clearTimeout(state.cleanupTimer);
+			state.cleanupTimer = null;
+		}
+
+		state.activeCount++;
+		state.hasExtractedFile = hasExtractedFile;
+
+		logger.debug('[NzbStreamService] Stream started', {
+			mountId,
+			activeCount: state.activeCount
+		});
+	}
+
+	/**
+	 * Track when a stream ends for a mount.
+	 * Schedules cleanup if no more active streams.
+	 */
+	private trackStreamEnd(mountId: string): void {
+		const state = this.mountStreamStates.get(mountId);
+		if (!state) return;
+
+		state.activeCount = Math.max(0, state.activeCount - 1);
+
+		logger.debug('[NzbStreamService] Stream ended', {
+			mountId,
+			activeCount: state.activeCount
+		});
+
+		// If no more active streams and has extracted files, schedule cleanup
+		if (state.activeCount === 0 && state.hasExtractedFile) {
+			this.scheduleExtractedFileCleanup(mountId);
+		}
+	}
+
+	/**
+	 * Schedule cleanup of extracted files after a delay.
+	 * Allows time for seeking/buffering without immediate deletion.
+	 */
+	private scheduleExtractedFileCleanup(mountId: string): void {
+		const state = this.mountStreamStates.get(mountId);
+		if (!state) return;
+
+		// Cancel any existing timer
+		if (state.cleanupTimer) {
+			clearTimeout(state.cleanupTimer);
+		}
+
+		logger.info('[NzbStreamService] Scheduling extracted file cleanup', {
+			mountId,
+			delayMs: STREAM_CLEANUP_DELAY_MS
+		});
+
+		state.cleanupTimer = setTimeout(async () => {
+			// Double-check no new streams started
+			const currentState = this.mountStreamStates.get(mountId);
+			if (currentState && currentState.activeCount === 0) {
+				logger.info('[NzbStreamService] Cleaning up extracted files after stream ended', {
+					mountId
+				});
+
+				try {
+					await this.cleanupExtractedFiles(mountId);
+					this.mountStreamStates.delete(mountId);
+				} catch (error) {
+					logger.error('[NzbStreamService] Failed to cleanup extracted files', {
+						mountId,
+						error: error instanceof Error ? error.message : 'Unknown error'
+					});
+				}
+			}
+		}, STREAM_CLEANUP_DELAY_MS);
 	}
 
 	/**
@@ -435,6 +544,14 @@ class NzbStreamService {
 			this.cleanupInterval = null;
 		}
 		this.nzbCache.clear();
+
+		// Clear any pending cleanup timers
+		for (const state of this.mountStreamStates.values()) {
+			if (state.cleanupTimer) {
+				clearTimeout(state.cleanupTimer);
+			}
+		}
+		this.mountStreamStates.clear();
 
 		// Also shutdown collaborators
 		getStreamabilityChecker().shutdown();
