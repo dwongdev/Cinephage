@@ -624,6 +624,21 @@ export class MediaMatcherService {
 			});
 		}
 
+		// Check if movie file with same path already exists (prevent duplicates)
+		const [existingFile] = await db
+			.select()
+			.from(movieFiles)
+			.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.relativePath, fileName)));
+
+		if (existingFile) {
+			logger.debug('[MediaMatcher] Movie file already exists, skipping insert', {
+				movieId,
+				relativePath: fileName,
+				existingFileId: existingFile.id
+			});
+			return;
+		}
+
 		// Create movie file entry
 		await db.insert(movieFiles).values({
 			movieId,
