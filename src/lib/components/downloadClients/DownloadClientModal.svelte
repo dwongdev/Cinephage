@@ -234,7 +234,7 @@
 			host,
 			port,
 			useSsl,
-			urlBase: urlBaseEnabled ? (normalizedUrlBase || null) : null,
+			urlBase: urlBaseEnabled ? normalizedUrlBase || null : null,
 			username: username || null,
 			password: password || null,
 			movieCategory,
@@ -428,7 +428,7 @@
 									mode="connection"
 									bind:urlBaseEnabled
 									bind:urlBase
-									urlBasePlaceholder={urlBasePlaceholder}
+									{urlBasePlaceholder}
 								/>
 							{/if}
 
