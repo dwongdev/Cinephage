@@ -29,30 +29,48 @@ Get Cinephage up and running with Docker (recommended) or manual installation.
 
 Docker provides the simplest setup and automatic updates.
 
-### Using Docker Compose
+### Quick Start
 
-```bash
-mkdir cinephage && cd cinephage
-curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/docker-compose.yaml
-curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/.env.docker.example
-cp .env.docker.example .env
-```
+1. Download the files:
 
-Edit `.env` to configure your installation:
+   ```bash
+   mkdir cinephage && cd cinephage
+   curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/docker-compose.yaml
+   curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/.env.example
+   ```
 
-```bash
-CINEPHAGE_PORT=3000
-CINEPHAGE_MEDIA_PATH=/path/to/your/media
-CINEPHAGE_UID=1000
-CINEPHAGE_GID=1000
-CINEPHAGE_ORIGIN=http://localhost:3000
-```
+2. Create your configuration:
 
-Start Cinephage:
+   ```bash
+   cp .env.example .env
+   ```
 
-```bash
-docker compose up -d
-```
+3. Edit `.env` and set your media path:
+
+   ```bash
+   MEDIA_PATH=/path/to/your/media
+   ```
+
+4. Start Cinephage:
+
+   ```bash
+   docker compose up -d
+   ```
+
+Open http://localhost:3000
+
+### Configuration Options
+
+All settings go in `.env`:
+
+| Variable     | Required | Default               | Description                   |
+| ------------ | -------- | --------------------- | ----------------------------- |
+| `MEDIA_PATH` | Yes      | -                     | Path to your media library    |
+| `PUID`       | No       | 1000                  | User ID for file permissions  |
+| `PGID`       | No       | 1000                  | Group ID for file permissions |
+| `PORT`       | No       | 3000                  | Port to expose                |
+| `ORIGIN`     | No       | http://localhost:3000 | Your access URL               |
+| `TZ`         | No       | UTC                   | Timezone                      |
 
 ### Using Docker Run
 
@@ -72,13 +90,15 @@ docker run -d \
 
 ### Building from Source
 
-If you prefer to build the Docker image yourself:
+To build the Docker image yourself instead of using the pre-built image:
 
 ```bash
 git clone https://github.com/MoldyTaint/cinephage.git
 cd cinephage
-cp .env.docker.example .env
-docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
+cp .env.example .env
+# Edit .env to set MEDIA_PATH
+# Then edit docker-compose.yaml: uncomment "build: ." and comment out "image:"
+docker compose up -d --build
 ```
 
 ---

@@ -1,17 +1,56 @@
+# =============================================================================
+# Cinephage Docker Compose
+# =============================================================================
+#
+# Quick Start:
+#   1. Copy .env.example to .env and edit your settings
+#   2. Run: docker compose up -d
+#   3. Open: http://localhost:3000
+#
+# All settings have sensible defaults. Only MEDIA_PATH is required.
+#
+# To build from source instead of pulling the image:
+#   Uncomment "build: ." and comment out "image:" below
+# =============================================================================
+
 services:
   cinephage:
     image: ghcr.io/moldytaint/cinephage:latest
+    # build: .  # Uncomment to build locally (requires cloning the repo)
     container_name: cinephage
     restart: unless-stopped
-    user: '${CINEPHAGE_UID:-1000}:${CINEPHAGE_GID:-1000}'
+
+    # -------------------------------------------------------------------------
+    # USER PERMISSIONS
+    # Run as your user to avoid file permission issues
+    # Find your IDs with: id -u && id -g
+    # Set via: PUID and PGID in .env
+    # -------------------------------------------------------------------------
+    user: '${PUID:-1000}:${PGID:-1000}'
+
     security_opt:
       - no-new-privileges:true
+
+    # -------------------------------------------------------------------------
+    # PORT
+    # Default: 3000. Override with PORT in .env
+    # -------------------------------------------------------------------------
     ports:
-      - '${CINEPHAGE_PORT:-3000}:3000'
+      - '${PORT:-3000}:3000'
+
+    # -------------------------------------------------------------------------
+    # VOLUMES
+    # -------------------------------------------------------------------------
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ${CINEPHAGE_MEDIA_PATH:-./media}:/media
+      - ./data:/app/data # Database and config (auto-created)
+      - ./logs:/app/logs # Log files (auto-created)
+      - ${MEDIA_PATH:?Set MEDIA_PATH in .env}:/media # Your media library
+
+    # -------------------------------------------------------------------------
+    # ENVIRONMENT
+    # -------------------------------------------------------------------------
     environment:
-      - ORIGIN=${CINEPHAGE_ORIGIN}
-      - TZ=${CINEPHAGE_TZ:-UTC}
+      # Required if accessing via IP/hostname other than localhost
+      - ORIGIN=${ORIGIN:-http://localhost:3000}
+      # Timezone for scheduled tasks (timedatectl list-timezones)
+      - TZ=${TZ:-UTC}

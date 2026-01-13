@@ -13,18 +13,18 @@ Docker is the simplest way to deploy Cinephage in production.
 ```bash
 mkdir -p /opt/cinephage && cd /opt/cinephage
 curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/docker-compose.yaml
-curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/.env.docker.example
-cp .env.docker.example .env
+curl -O https://raw.githubusercontent.com/MoldyTaint/cinephage/main/.env.example
+cp .env.example .env
 ```
 
 Edit `.env`:
 
 ```bash
-CINEPHAGE_PORT=3000
-CINEPHAGE_MEDIA_PATH=/path/to/your/media
-CINEPHAGE_UID=1000
-CINEPHAGE_GID=1000
-CINEPHAGE_ORIGIN=https://cinephage.yourdomain.com
+MEDIA_PATH=/path/to/your/media
+PUID=1000
+PGID=1000
+ORIGIN=https://cinephage.yourdomain.com
+TZ=America/New_York
 ```
 
 Start:
@@ -43,8 +43,8 @@ ls -la /path/to/your/media
 # Note the UID:GID (e.g., 1000:1000)
 
 # Set in .env
-CINEPHAGE_UID=1000
-CINEPHAGE_GID=1000
+PUID=1000
+PGID=1000
 
 # Ensure data directories are accessible
 mkdir -p ./data ./logs
