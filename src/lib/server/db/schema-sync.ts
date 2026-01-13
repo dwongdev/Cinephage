@@ -61,8 +61,9 @@ interface MigrationDefinition {
  * Version 34: Add url_base column to download_clients
  * Version 35: Add mount_mode column to download_clients
  * Version 36: Add nzb_segment_cache table for persistent prefetched segments
+ * Version 37: Add stream_url_type column to stalker_accounts for tracking URL resolution method
  */
-export const CURRENT_SCHEMA_VERSION = 36;
+export const CURRENT_SCHEMA_VERSION = 37;
 
 /**
  * All table definitions with CREATE TABLE IF NOT EXISTS
@@ -2795,6 +2796,25 @@ const MIGRATIONS: MigrationDefinition[] = [
 
 			logger.info(
 				'[SchemaSync] Created nzb_segment_cache table for persistent prefetched segments'
+			);
+		}
+	},
+	// Version 37: Add stream_url_type to stalker_accounts
+	{
+		version: 37,
+		name: 'add_stream_url_type',
+		apply: (sqlite) => {
+			// Add column for tracking URL resolution method
+			// 'direct' = URLs from get_all_channels work directly
+			// 'create_link' = Need to call create_link API to resolve URLs
+			sqlite
+				.prepare(
+					`ALTER TABLE "stalker_accounts" ADD COLUMN "stream_url_type" text DEFAULT 'unknown'`
+				)
+				.run();
+
+			logger.info(
+				'[SchemaSync] Added stream_url_type column to stalker_accounts for URL resolution tracking'
 			);
 		}
 	}

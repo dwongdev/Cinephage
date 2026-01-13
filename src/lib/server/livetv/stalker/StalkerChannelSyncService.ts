@@ -90,6 +90,9 @@ export class StalkerChannelSyncService {
 				channels: channels.length
 			});
 
+			// Detect URL resolution method from first channel
+			const streamUrlType = this.detectStreamUrlType(channels);
+
 			// Sync categories
 			const categoryResult = await this.syncCategories(accountId, categories);
 
@@ -107,7 +110,7 @@ export class StalkerChannelSyncService {
 			// Sync channels
 			const channelResult = await this.syncChannels(accountId, channels, categoryMap);
 
-			// Update account metadata
+			// Update account metadata including URL type
 			const now = new Date().toISOString();
 			db.update(stalkerAccounts)
 				.set({
@@ -116,10 +119,17 @@ export class StalkerChannelSyncService {
 					lastSyncError: null,
 					channelCount: channels.length,
 					categoryCount: categories.length,
+					streamUrlType,
 					updatedAt: now
 				})
 				.where(eq(stalkerAccounts.id, accountId))
 				.run();
+
+			logger.info('[StalkerChannelSync] Detected stream URL type', {
+				accountId,
+				name: account.name,
+				streamUrlType
+			});
 
 			const result: ChannelSyncResult = {
 				success: true,
@@ -487,6 +497,37 @@ export class StalkerChannelSyncService {
 			.all();
 
 		return accounts.map((a) => a.id);
+	}
+
+	/**
+	 * Detect URL resolution method from channel data.
+	 * Checks if URLs are localhost templates (need create_link) or real URLs (work directly).
+	 */
+	private detectStreamUrlType(channels: StalkerChannel[]): 'direct' | 'create_link' | 'unknown' {
+		if (channels.length === 0) {
+			return 'unknown';
+		}
+
+		// Check first few channels to determine URL type
+		for (const channel of channels.slice(0, 5)) {
+			const cmd = channel.cmd?.trim() || '';
+			const parts = cmd.split(/\s+/);
+			const url = parts[parts.length - 1];
+
+			if (!url) continue;
+
+			// Localhost URLs require create_link to resolve
+			if (url.includes('localhost') || url.includes('127.0.0.1')) {
+				return 'create_link';
+			}
+
+			// Real HTTP URLs work directly
+			if (url.startsWith('http://') || url.startsWith('https://')) {
+				return 'direct';
+			}
+		}
+
+		return 'unknown';
 	}
 
 	/**

@@ -2385,6 +2385,14 @@ export const stalkerAccounts = sqliteTable(
 		epgProgramCount: integer('epg_program_count').default(0),
 		hasEpg: integer('has_epg', { mode: 'boolean' }), // null=unknown, true/false after first sync
 
+		// Stream URL resolution method (detected during sync)
+		// 'direct' = URLs from get_all_channels work directly (most portals)
+		// 'create_link' = Need to call create_link API to resolve localhost templates
+		// 'unknown' = Not yet detected
+		streamUrlType: text('stream_url_type')
+			.$type<'direct' | 'create_link' | 'unknown'>()
+			.default('unknown'),
+
 		// Timestamps
 		createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
 		updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
