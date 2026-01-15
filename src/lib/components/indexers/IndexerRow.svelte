@@ -36,7 +36,6 @@
 	<td class="w-24">
 		<IndexerStatusBadge
 			enabled={indexer.enabled}
-			healthy={indexer.status?.healthy ?? true}
 			consecutiveFailures={indexer.status?.consecutiveFailures ?? 0}
 			lastFailure={indexer.status?.lastFailure}
 			disabledUntil={indexer.status?.disabledUntil}

@@ -393,9 +393,7 @@
 
 			// Remove from selection if selected
 			if (selectedIds.has(item.id)) {
-				const newSet = new SvelteSet(selectedIds);
-				newSet.delete(item.id);
-				selectedIds = newSet;
+				selectedIds.delete(item.id);
 			}
 
 			await loadData();
