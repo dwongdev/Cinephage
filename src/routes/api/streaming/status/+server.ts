@@ -17,7 +17,7 @@ import {
 	getProviderIds,
 	type ProviderStatus
 } from '$lib/server/streaming/providers';
-import { getStreamCache } from '$lib/server/streaming/cache';
+import { getStreamCache } from '$lib/server/streaming/cache/StreamCache';
 import { getEncDecClient } from '$lib/server/streaming/enc-dec';
 import { logger } from '$lib/logging';
 

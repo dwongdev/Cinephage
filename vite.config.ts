@@ -37,6 +37,12 @@ function eagerInitPlugin(): Plugin {
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), devtoolsJson(), eagerInitPlugin()],
+	css: {
+		transformer: 'postcss'
+	},
+	build: {
+		cssMinify: 'lightningcss'
+	},
 	ssr: {
 		// Externalize native modules that don't work with Vite's SSR bundling
 		external: ['better-sqlite3']

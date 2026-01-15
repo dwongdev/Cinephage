@@ -265,7 +265,7 @@
 	}
 </script>
 
-<ModalWrapper {open} onClose={onClose} maxWidth="2xl" labelledBy="portal-scan-modal-title">
+<ModalWrapper {open} {onClose} maxWidth="2xl" labelledBy="portal-scan-modal-title">
 	<!-- Header -->
 	<div class="mb-6 flex items-center justify-between">
 		<div class="flex items-center gap-3">
@@ -274,356 +274,346 @@
 			</div>
 			<div>
 				<h3 id="portal-scan-modal-title" class="text-xl font-bold">Scan for Accounts</h3>
-						<div class="mt-1 flex items-center gap-2 text-sm text-base-content/60">
-							<span
-								class="badge badge-sm {currentStep === 'portal' ? 'badge-primary' : 'badge-ghost'}"
-							>
-								1. Portal
-							</span>
-							<ChevronRight class="h-3 w-3" />
-							<span
-								class="badge badge-sm {currentStep === 'config' ? 'badge-primary' : 'badge-ghost'}"
-							>
-								2. Configure
-							</span>
+				<div class="mt-1 flex items-center gap-2 text-sm text-base-content/60">
+					<span class="badge badge-sm {currentStep === 'portal' ? 'badge-primary' : 'badge-ghost'}">
+						1. Portal
+					</span>
+					<ChevronRight class="h-3 w-3" />
+					<span class="badge badge-sm {currentStep === 'config' ? 'badge-primary' : 'badge-ghost'}">
+						2. Configure
+					</span>
+				</div>
+			</div>
+		</div>
+		<button class="btn btn-circle btn-ghost btn-sm" onclick={onClose}>
+			<X class="h-4 w-4" />
+		</button>
+	</div>
+
+	<!-- Step 1: Portal Selection -->
+	{#if currentStep === 'portal'}
+		<div class="space-y-4">
+			{#if loadingPortals}
+				<div class="flex items-center justify-center py-8">
+					<Loader2 class="h-6 w-6 animate-spin text-primary" />
+				</div>
+			{:else}
+				<!-- Existing Portals -->
+				{#if portals.length > 0}
+					<div class="space-y-2">
+						<div class="label py-1">
+							<span class="label-text font-medium">Select an existing portal</span>
+						</div>
+						<div class="space-y-2">
+							{#each portals as portal (portal.id)}
+								<button
+									class="w-full rounded-lg border p-3 text-left transition-colors {selectedPortalId ===
+									portal.id
+										? 'border-primary bg-primary/5'
+										: 'border-base-300 hover:border-primary/50'}"
+									onclick={() => {
+										selectedPortalId = portal.id;
+										creatingPortal = false;
+									}}
+								>
+									<div class="flex items-center justify-between">
+										<div>
+											<div class="font-medium">{portal.name}</div>
+											<div class="text-sm text-base-content/60">{portal.url}</div>
+										</div>
+										{#if selectedPortalId === portal.id}
+											<Radio class="h-5 w-5 text-primary" />
+										{/if}
+									</div>
+								</button>
+							{/each}
 						</div>
 					</div>
-				</div>
-				<button class="btn btn-circle btn-ghost btn-sm" onclick={onClose}>
-					<X class="h-4 w-4" />
-				</button>
-			</div>
 
-			<!-- Step 1: Portal Selection -->
-			{#if currentStep === 'portal'}
-				<div class="space-y-4">
-					{#if loadingPortals}
-						<div class="flex items-center justify-center py-8">
-							<Loader2 class="h-6 w-6 animate-spin text-primary" />
-						</div>
-					{:else}
-						<!-- Existing Portals -->
-						{#if portals.length > 0}
-							<div class="space-y-2">
-								<label class="label py-1">
-									<span class="label-text font-medium">Select an existing portal</span>
+					<div class="divider">OR</div>
+				{/if}
+
+				<!-- Create New Portal -->
+				<div class="space-y-3">
+					<button
+						class="w-full rounded-lg border p-3 text-left transition-colors {creatingPortal
+							? 'border-primary bg-primary/5'
+							: 'border-base-300 hover:border-primary/50'}"
+						onclick={() => {
+							creatingPortal = true;
+							selectedPortalId = null;
+						}}
+					>
+						<div class="font-medium">Add a new portal</div>
+						<div class="text-sm text-base-content/60">Enter a portal URL to scan</div>
+					</button>
+
+					{#if creatingPortal}
+						<div class="ml-4 space-y-3 border-l-2 border-primary/20 pl-4">
+							<div class="form-control">
+								<label class="label py-1" for="portalUrl">
+									<span class="label-text">Portal URL</span>
 								</label>
-								<div class="space-y-2">
-									{#each portals as portal (portal.id)}
-										<button
-											class="w-full rounded-lg border p-3 text-left transition-colors {selectedPortalId ===
-											portal.id
-												? 'border-primary bg-primary/5'
-												: 'border-base-300 hover:border-primary/50'}"
-											onclick={() => {
-												selectedPortalId = portal.id;
-												creatingPortal = false;
-											}}
-										>
-											<div class="flex items-center justify-between">
-												<div>
-													<div class="font-medium">{portal.name}</div>
-													<div class="text-sm text-base-content/60">{portal.url}</div>
-												</div>
-												{#if selectedPortalId === portal.id}
-													<Radio class="h-5 w-5 text-primary" />
-												{/if}
-											</div>
-										</button>
-									{/each}
+								<div class="flex gap-2">
+									<input
+										id="portalUrl"
+										type="url"
+										class="input-bordered input input-sm flex-1"
+										bind:value={newPortalUrl}
+										placeholder="http://portal.example.com/c"
+									/>
+									<button
+										class="btn btn-ghost btn-sm"
+										onclick={detectPortal}
+										disabled={detectingPortal || !newPortalUrl.trim()}
+									>
+										{#if detectingPortal}
+											<Loader2 class="h-4 w-4 animate-spin" />
+										{:else}
+											Detect
+										{/if}
+									</button>
 								</div>
 							</div>
 
-							<div class="divider">OR</div>
-						{/if}
-
-						<!-- Create New Portal -->
-						<div class="space-y-3">
-							<button
-								class="w-full rounded-lg border p-3 text-left transition-colors {creatingPortal
-									? 'border-primary bg-primary/5'
-									: 'border-base-300 hover:border-primary/50'}"
-								onclick={() => {
-									creatingPortal = true;
-									selectedPortalId = null;
-								}}
-							>
-								<div class="font-medium">Add a new portal</div>
-								<div class="text-sm text-base-content/60">Enter a portal URL to scan</div>
-							</button>
-
-							{#if creatingPortal}
-								<div class="ml-4 space-y-3 border-l-2 border-primary/20 pl-4">
-									<div class="form-control">
-										<label class="label py-1" for="portalUrl">
-											<span class="label-text">Portal URL</span>
-										</label>
-										<div class="flex gap-2">
-											<input
-												id="portalUrl"
-												type="url"
-												class="input-bordered input input-sm flex-1"
-												bind:value={newPortalUrl}
-												placeholder="http://portal.example.com/c"
-											/>
-											<button
-												class="btn btn-ghost btn-sm"
-												onclick={detectPortal}
-												disabled={detectingPortal || !newPortalUrl.trim()}
-											>
-												{#if detectingPortal}
-													<Loader2 class="h-4 w-4 animate-spin" />
-												{:else}
-													Detect
-												{/if}
-											</button>
-										</div>
-									</div>
-
-									<div class="form-control">
-										<label class="label py-1" for="portalName">
-											<span class="label-text">Portal Name</span>
-										</label>
-										<input
-											id="portalName"
-											type="text"
-											class="input-bordered input input-sm"
-											bind:value={newPortalName}
-											placeholder="My Portal"
-										/>
-									</div>
-								</div>
-							{/if}
+							<div class="form-control">
+								<label class="label py-1" for="portalName">
+									<span class="label-text">Portal Name</span>
+								</label>
+								<input
+									id="portalName"
+									type="text"
+									class="input-bordered input input-sm"
+									bind:value={newPortalName}
+									placeholder="My Portal"
+								/>
+							</div>
 						</div>
 					{/if}
-
-					{#if portalError}
-						<div class="alert text-sm alert-error">
-							<span>{portalError}</span>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Portal Step Actions -->
-				<div class="modal-action">
-					<button class="btn btn-ghost" onclick={onClose}>Cancel</button>
-					<button
-						class="btn btn-primary"
-						disabled={!canProceedToConfig}
-						onclick={() => (currentStep = 'config')}
-					>
-						Next
-						<ChevronRight class="h-4 w-4" />
-					</button>
 				</div>
 			{/if}
 
-			<!-- Step 2: Scan Configuration -->
-			{#if currentStep === 'config'}
-				<div class="space-y-6">
-					<!-- Portal Info -->
-					<div class="rounded-lg bg-base-200 p-3">
-						<div class="text-sm text-base-content/60">Scanning portal:</div>
-						<div class="font-medium">
-							{selectedPortal?.name || newPortalName || 'New Portal'}
-						</div>
-						<div class="text-sm text-base-content/60">
-							{selectedPortal?.url || newPortalUrl}
-						</div>
-					</div>
+			{#if portalError}
+				<div class="alert text-sm alert-error">
+					<span>{portalError}</span>
+				</div>
+			{/if}
+		</div>
 
-					<!-- Scan Type Selection -->
+		<!-- Portal Step Actions -->
+		<div class="modal-action">
+			<button class="btn btn-ghost" onclick={onClose}>Cancel</button>
+			<button
+				class="btn btn-primary"
+				disabled={!canProceedToConfig}
+				onclick={() => (currentStep = 'config')}
+			>
+				Next
+				<ChevronRight class="h-4 w-4" />
+			</button>
+		</div>
+	{/if}
+
+	<!-- Step 2: Scan Configuration -->
+	{#if currentStep === 'config'}
+		<div class="space-y-6">
+			<!-- Portal Info -->
+			<div class="rounded-lg bg-base-200 p-3">
+				<div class="text-sm text-base-content/60">Scanning portal:</div>
+				<div class="font-medium">
+					{selectedPortal?.name || newPortalName || 'New Portal'}
+				</div>
+				<div class="text-sm text-base-content/60">
+					{selectedPortal?.url || newPortalUrl}
+				</div>
+			</div>
+
+			<!-- Scan Type Selection -->
+			<div class="form-control">
+				<div class="label py-1">
+					<span class="label-text font-medium">Scan Type</span>
+				</div>
+				<div class="flex flex-wrap gap-2">
+					<button
+						class="btn btn-sm {scanType === 'random' ? 'btn-primary' : 'btn-ghost'}"
+						onclick={() => (scanType = 'random')}
+					>
+						Random
+					</button>
+					<button
+						class="btn btn-sm {scanType === 'sequential' ? 'btn-primary' : 'btn-ghost'}"
+						onclick={() => (scanType = 'sequential')}
+					>
+						Sequential
+					</button>
+					<button
+						class="btn btn-sm {scanType === 'import' ? 'btn-primary' : 'btn-ghost'}"
+						onclick={() => (scanType = 'import')}
+					>
+						Import List
+					</button>
+				</div>
+			</div>
+
+			<!-- Random Scan Options -->
+			{#if scanType === 'random'}
+				<div class="space-y-4">
 					<div class="form-control">
-						<label class="label py-1">
-							<span class="label-text font-medium">Scan Type</span>
+						<label class="label py-1" for="macPrefix">
+							<span class="label-text">MAC Prefix</span>
 						</label>
-						<div class="flex flex-wrap gap-2">
-							<button
-								class="btn btn-sm {scanType === 'random' ? 'btn-primary' : 'btn-ghost'}"
-								onclick={() => (scanType = 'random')}
-							>
-								Random
-							</button>
-							<button
-								class="btn btn-sm {scanType === 'sequential' ? 'btn-primary' : 'btn-ghost'}"
-								onclick={() => (scanType = 'sequential')}
-							>
-								Sequential
-							</button>
-							<button
-								class="btn btn-sm {scanType === 'import' ? 'btn-primary' : 'btn-ghost'}"
-								onclick={() => (scanType = 'import')}
-							>
-								Import List
-							</button>
-						</div>
-					</div>
-
-					<!-- Random Scan Options -->
-					{#if scanType === 'random'}
-						<div class="space-y-4">
-							<div class="form-control">
-								<label class="label py-1" for="macPrefix">
-									<span class="label-text">MAC Prefix</span>
-								</label>
-								<select
-									id="macPrefix"
-									class="select-bordered select select-sm"
-									bind:value={macPrefix}
-								>
-									{#each macPrefixes as { prefix, name } (prefix)}
-										<option value={prefix}>{prefix} - {name}</option>
-									{/each}
-								</select>
-								<div class="label py-1">
-									<span class="label-text-alt text-xs">
-										Common prefixes for STB devices like MAG boxes
-									</span>
-								</div>
-							</div>
-
-							<div class="form-control">
-								<label class="label py-1" for="macCount">
-									<span class="label-text">Number of MACs to test</span>
-								</label>
-								<input
-									id="macCount"
-									type="number"
-									class="input-bordered input input-sm w-32"
-									bind:value={macCount}
-									min="1"
-									max="10000"
-								/>
-								<div class="label py-1">
-									<span class="label-text-alt text-xs"> Maximum 10,000 per scan </span>
-								</div>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Sequential Scan Options -->
-					{#if scanType === 'sequential'}
-						<div class="space-y-4">
-							<div class="form-control">
-								<label class="label py-1" for="macStart">
-									<span class="label-text">Start MAC</span>
-								</label>
-								<input
-									id="macStart"
-									type="text"
-									class="input-bordered input input-sm font-mono"
-									class:input-error={macRangeStart && !isValidMac(macRangeStart)}
-									value={macRangeStart}
-									oninput={(e) => handleMacInput(e, 'start')}
-									placeholder="00:1A:79:00:00:00"
-									maxlength="17"
-								/>
-							</div>
-
-							<div class="form-control">
-								<label class="label py-1" for="macEnd">
-									<span class="label-text">End MAC</span>
-								</label>
-								<input
-									id="macEnd"
-									type="text"
-									class="input-bordered input input-sm font-mono"
-									class:input-error={macRangeEnd && !isValidMac(macRangeEnd)}
-									value={macRangeEnd}
-									oninput={(e) => handleMacInput(e, 'end')}
-									placeholder="00:1A:79:FF:FF:FF"
-									maxlength="17"
-								/>
-							</div>
-
-							{#if isValidMac(macRangeStart) && isValidMac(macRangeEnd)}
-								{@const startNum = parseInt(macRangeStart.replace(/:/g, ''), 16)}
-								{@const endNum = parseInt(macRangeEnd.replace(/:/g, ''), 16)}
-								{@const rangeSize = Math.abs(endNum - startNum) + 1}
-								<div class="text-sm text-base-content/60">
-									Range size: {rangeSize.toLocaleString()} MACs
-									{#if rangeSize > 1000000}
-										<span class="text-warning">(Large range - will take a while)</span>
-									{/if}
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Import Scan Options -->
-					{#if scanType === 'import'}
-						<div class="form-control">
-							<label class="label py-1" for="importMacs">
-								<span class="label-text">MAC Addresses</span>
-							</label>
-							<textarea
-								id="importMacs"
-								class="textarea-bordered textarea h-32 font-mono text-sm"
-								bind:value={importedMacs}
-								placeholder="00:1A:79:AB:CD:EF&#10;00:1A:79:12:34:56&#10;..."
-							></textarea>
-							<div class="label py-1">
-								<span class="label-text-alt text-xs">
-									One MAC address per line, or comma/semicolon separated
-								</span>
-							</div>
-							{#if importedMacs.trim()}
-								{@const count = importedMacs.split(/[\n,;]+/).filter((m) => m.trim()).length}
-								<div class="text-sm text-base-content/60">
-									{count} MAC address{count !== 1 ? 'es' : ''} detected
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Rate Limit -->
-					<div class="form-control">
-						<label class="label py-1" for="rateLimit">
-							<span class="label-text">Delay between requests</span>
-							<span class="label-text-alt">{rateLimit}ms</span>
-						</label>
-						<input
-							id="rateLimit"
-							type="range"
-							class="range range-sm"
-							bind:value={rateLimit}
-							min="100"
-							max="5000"
-							step="100"
-						/>
+						<select id="macPrefix" class="select-bordered select select-sm" bind:value={macPrefix}>
+							{#each macPrefixes as { prefix, name } (prefix)}
+								<option value={prefix}>{prefix} - {name}</option>
+							{/each}
+						</select>
 						<div class="label py-1">
 							<span class="label-text-alt text-xs">
-								Lower = faster but may trigger rate limiting
+								Common prefixes for STB devices like MAG boxes
 							</span>
 						</div>
 					</div>
 
-					{#if scanError}
-						<div class="alert text-sm alert-error">
-							<span>{scanError}</span>
+					<div class="form-control">
+						<label class="label py-1" for="macCount">
+							<span class="label-text">Number of MACs to test</span>
+						</label>
+						<input
+							id="macCount"
+							type="number"
+							class="input-bordered input input-sm w-32"
+							bind:value={macCount}
+							min="1"
+							max="10000"
+						/>
+						<div class="label py-1">
+							<span class="label-text-alt text-xs"> Maximum 10,000 per scan </span>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Sequential Scan Options -->
+			{#if scanType === 'sequential'}
+				<div class="space-y-4">
+					<div class="form-control">
+						<label class="label py-1" for="macStart">
+							<span class="label-text">Start MAC</span>
+						</label>
+						<input
+							id="macStart"
+							type="text"
+							class="input-bordered input input-sm font-mono"
+							class:input-error={macRangeStart && !isValidMac(macRangeStart)}
+							value={macRangeStart}
+							oninput={(e) => handleMacInput(e, 'start')}
+							placeholder="00:1A:79:00:00:00"
+							maxlength="17"
+						/>
+					</div>
+
+					<div class="form-control">
+						<label class="label py-1" for="macEnd">
+							<span class="label-text">End MAC</span>
+						</label>
+						<input
+							id="macEnd"
+							type="text"
+							class="input-bordered input input-sm font-mono"
+							class:input-error={macRangeEnd && !isValidMac(macRangeEnd)}
+							value={macRangeEnd}
+							oninput={(e) => handleMacInput(e, 'end')}
+							placeholder="00:1A:79:FF:FF:FF"
+							maxlength="17"
+						/>
+					</div>
+
+					{#if isValidMac(macRangeStart) && isValidMac(macRangeEnd)}
+						{@const startNum = parseInt(macRangeStart.replace(/:/g, ''), 16)}
+						{@const endNum = parseInt(macRangeEnd.replace(/:/g, ''), 16)}
+						{@const rangeSize = Math.abs(endNum - startNum) + 1}
+						<div class="text-sm text-base-content/60">
+							Range size: {rangeSize.toLocaleString()} MACs
+							{#if rangeSize > 1000000}
+								<span class="text-warning">(Large range - will take a while)</span>
+							{/if}
 						</div>
 					{/if}
 				</div>
+			{/if}
 
-				<!-- Config Step Actions -->
-				<div class="modal-action">
-					<button class="btn btn-ghost" onclick={() => (currentStep = 'portal')}>
-						<ChevronLeft class="h-4 w-4" />
-						Back
-					</button>
-					<button class="btn btn-ghost" onclick={onClose}>Cancel</button>
-					<button
-						class="btn btn-primary"
-						disabled={startingScan || !canStartScan()}
-						onclick={handleStartScan}
-					>
-						{#if startingScan}
-							<Loader2 class="h-4 w-4 animate-spin" />
-						{:else}
-							<Search class="h-4 w-4" />
-						{/if}
-						Start Scan
-					</button>
+			<!-- Import Scan Options -->
+			{#if scanType === 'import'}
+				<div class="form-control">
+					<label class="label py-1" for="importMacs">
+						<span class="label-text">MAC Addresses</span>
+					</label>
+					<textarea
+						id="importMacs"
+						class="textarea-bordered textarea h-32 font-mono text-sm"
+						bind:value={importedMacs}
+						placeholder="00:1A:79:AB:CD:EF&#10;00:1A:79:12:34:56&#10;..."
+					></textarea>
+					<div class="label py-1">
+						<span class="label-text-alt text-xs">
+							One MAC address per line, or comma/semicolon separated
+						</span>
+					</div>
+					{#if importedMacs.trim()}
+						{@const count = importedMacs.split(/[\n,;]+/).filter((m) => m.trim()).length}
+						<div class="text-sm text-base-content/60">
+							{count} MAC address{count !== 1 ? 'es' : ''} detected
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Rate Limit -->
+			<div class="form-control">
+				<label class="label py-1" for="rateLimit">
+					<span class="label-text">Delay between requests</span>
+					<span class="label-text-alt">{rateLimit}ms</span>
+				</label>
+				<input
+					id="rateLimit"
+					type="range"
+					class="range range-sm"
+					bind:value={rateLimit}
+					min="100"
+					max="5000"
+					step="100"
+				/>
+				<div class="label py-1">
+					<span class="label-text-alt text-xs"> Lower = faster but may trigger rate limiting </span>
+				</div>
 			</div>
-		{/if}
+
+			{#if scanError}
+				<div class="alert text-sm alert-error">
+					<span>{scanError}</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Config Step Actions -->
+		<div class="modal-action">
+			<button class="btn btn-ghost" onclick={() => (currentStep = 'portal')}>
+				<ChevronLeft class="h-4 w-4" />
+				Back
+			</button>
+			<button class="btn btn-ghost" onclick={onClose}>Cancel</button>
+			<button
+				class="btn btn-primary"
+				disabled={startingScan || !canStartScan()}
+				onclick={handleStartScan}
+			>
+				{#if startingScan}
+					<Loader2 class="h-4 w-4 animate-spin" />
+				{:else}
+					<Search class="h-4 w-4" />
+				{/if}
+				Start Scan
+			</button>
+		</div>
+	{/if}
 </ModalWrapper>

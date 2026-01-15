@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { downloadClientCreateSchema, downloadClientUpdateSchema } from '$lib/validation/schemas';
-import { getDownloadClientManager } from '$lib/server/downloadClients';
+import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadClientManager';
 import { getNntpServerService } from '$lib/server/streaming/nzb/NntpServerService';
 
 export const load: PageServerLoad = async () => {

@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { rootFolderCreateSchema, rootFolderUpdateSchema } from '$lib/validation/schemas';
-import { getRootFolderService } from '$lib/server/downloadClients';
+import { getRootFolderService } from '$lib/server/downloadClients/RootFolderService';
 
 export const load: PageServerLoad = async () => {
 	const rootFolderService = getRootFolderService();

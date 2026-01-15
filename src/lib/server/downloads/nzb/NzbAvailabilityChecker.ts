@@ -5,7 +5,9 @@
  * This prevents sending doomed downloads to download clients that will fail with "cannot be completed".
  */
 
-import { parseNzb, getNntpManager, type NzbSegment } from '$lib/server/streaming/usenet';
+import { getNntpManager } from '$lib/server/streaming/usenet/NntpManager';
+import { parseNzb } from '$lib/server/streaming/usenet/NzbParser';
+import type { NzbSegment } from '$lib/server/streaming/usenet/types';
 import { logger } from '$lib/logging';
 
 export interface AvailabilityResult {

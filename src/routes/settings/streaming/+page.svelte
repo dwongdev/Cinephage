@@ -117,11 +117,11 @@
 					<option value="72">72 hours</option>
 					<option value="168">1 week</option>
 				</select>
-				<label class="label">
+				<div class="label">
 					<span class="label-text-alt text-base-content/50">
 						Extracted files are automatically deleted after this period
 					</span>
-				</label>
+				</div>
 			</div>
 
 			<div class="mt-4 alert alert-info">

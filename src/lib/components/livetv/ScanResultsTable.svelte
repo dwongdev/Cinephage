@@ -41,7 +41,7 @@
 	let results = $state<ScanResult[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let selectedIds = new SvelteSet<string>();
+	let selectedIds = $state(new SvelteSet<string>());
 	let approving = $state(false);
 	let ignoring = $state(false);
 	let clearing = $state(false);

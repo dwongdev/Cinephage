@@ -15,10 +15,11 @@ import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadCl
 import { downloadMonitor } from '$lib/server/downloadClients/monitoring/index.js';
 import { ReleaseParser } from '$lib/server/indexers/parser/ReleaseParser.js';
 import { getDownloadResolutionService } from './DownloadResolutionService.js';
-import { getNzbValidationService, checkNzbAvailability } from './nzb/index.js';
+import { getNzbValidationService } from './nzb/index.js';
+import { checkNzbAvailability } from './nzb/NzbAvailabilityChecker.js';
 import { strmService, StrmService, getStreamingBaseUrl } from '$lib/server/streaming/index.js';
 import { getNzbMountManager } from '$lib/server/streaming/nzb/index.js';
-import { isMediaFile } from '$lib/server/streaming/usenet';
+import { isMediaFile } from '$lib/server/streaming/usenet/types';
 import { fileExists } from '$lib/server/downloadClients/import/index.js';
 import { mediaInfoService } from '$lib/server/library/media-info.js';
 import { getIndexerManager } from '$lib/server/indexers/IndexerManager.js';

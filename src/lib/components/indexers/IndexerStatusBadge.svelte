@@ -9,15 +9,7 @@
 		disabledUntil?: string;
 	}
 
-	let {
-		enabled,
-		healthy: _healthy = true,
-		consecutiveFailures = 0,
-		lastFailure,
-		disabledUntil
-	}: Props = $props();
-	// Intentionally unused - kept for API compatibility
-	void _healthy;
+	let { enabled, consecutiveFailures = 0, lastFailure, disabledUntil }: Props = $props();
 
 	// Use $derived for reactive computed values from props
 	const hasFailures = $derived(consecutiveFailures > 0);

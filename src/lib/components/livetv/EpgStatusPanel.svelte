@@ -149,7 +149,7 @@
 									{:else if account.programCount > 0}
 										<Check class="h-5 w-5 text-success" />
 									{:else}
-										<div class="h-5 w-5" />
+										<div class="h-5 w-5"></div>
 									{/if}
 									<span class="font-medium">{account.name}</span>
 								</div>

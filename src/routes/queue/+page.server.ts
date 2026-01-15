@@ -10,7 +10,7 @@ import {
 } from '$lib/server/db/schema';
 import { eq, desc, and, not, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { downloadMonitor } from '$lib/server/downloadClients/monitoring';
-import { getDownloadClientManager } from '$lib/server/downloadClients';
+import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadClientManager';
 import type {
 	QueueItemWithMedia,
 	QueueStatus,

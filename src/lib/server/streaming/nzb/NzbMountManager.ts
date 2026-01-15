@@ -9,7 +9,8 @@ import { eq, lt, and, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { nzbStreamMounts } from '$lib/server/db/schema';
 import { logger } from '$lib/logging';
-import { parseNzb, type NzbFile } from '$lib/server/streaming/usenet';
+import { parseNzb } from '$lib/server/streaming/usenet/NzbParser';
+import type { NzbFile } from '$lib/server/streaming/usenet/types';
 import { getSegmentCacheService } from '$lib/server/streaming/usenet/SegmentCacheService';
 
 /**

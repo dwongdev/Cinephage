@@ -29,10 +29,18 @@
 	let { data }: { data: PageData } = $props();
 
 	// Local state for form - syncs from data.config on mount
-	let config = $state(structuredClone(data.config));
+	let config = $state({} as PageData['config']);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state(false);
+
+	let hasInitializedConfig = $state(false);
+	$effect(() => {
+		if (!hasInitializedConfig) {
+			config = structuredClone(data.config);
+			hasInitializedConfig = true;
+		}
+	});
 
 	// Preview state
 	let previews = $state<Record<string, Record<string, string>> | null>(null);
@@ -54,11 +62,19 @@
 	let savingPreset = $state(false);
 
 	// Track previous media server to detect changes - used to detect when user changes it
-	let previousMediaServer = structuredClone(data.config.mediaServerIdFormat);
+	let previousMediaServer = $state('');
 
 	// Load custom presets on mount
 	$effect(() => {
 		loadPresets();
+	});
+
+	let hasInitializedMediaServer = $state(false);
+	$effect(() => {
+		if (!hasInitializedMediaServer) {
+			previousMediaServer = data.config.mediaServerIdFormat;
+			hasInitializedMediaServer = true;
+		}
 	});
 
 	// Auto-apply preset when media server format changes

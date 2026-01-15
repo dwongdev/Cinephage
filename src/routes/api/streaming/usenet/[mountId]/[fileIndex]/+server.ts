@@ -8,7 +8,7 @@
 import { Readable } from 'node:stream';
 import type { RequestHandler } from './$types';
 import { logger } from '$lib/logging';
-import { getUsenetStreamService } from '$lib/server/streaming/usenet';
+import { getUsenetStreamService } from '$lib/server/streaming/usenet/UsenetStreamService';
 
 export const GET: RequestHandler = async ({ params, request }) => {
 	const { mountId, fileIndex } = params;

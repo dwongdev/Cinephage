@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getDownloadClientManager } from '$lib/server/downloadClients';
+import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadClientManager';
 import { downloadClientCreateSchema } from '$lib/validation/schemas';
 
 /**

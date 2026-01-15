@@ -10,13 +10,13 @@
 	let { data } = $props();
 
 	// Local state for activities (for SSE updates)
-	let activities = $state<UnifiedActivity[]>(data.activities);
-	let total = $state(data.total);
+	let activities = $state<UnifiedActivity[]>([]);
+	let total = $state(0);
 
 	// Filter state
-	let statusFilter = $state(data.filters.status || 'all');
-	let mediaTypeFilter = $state(data.filters.mediaType || 'all');
-	let searchQuery = $state(data.filters.search || '');
+	let statusFilter = $state('all');
+	let mediaTypeFilter = $state('all');
+	let searchQuery = $state('');
 
 	// Sort state
 	let sortField = $state('time');
@@ -29,10 +29,18 @@
 	// SSE connection
 	let eventSource: EventSource | null = null;
 
+	let hasInitialized = $state(false);
+
 	// Update activities when data changes (navigation)
 	$effect(() => {
 		activities = data.activities;
 		total = data.total;
+		if (!hasInitialized) {
+			statusFilter = data.filters.status || 'all';
+			mediaTypeFilter = data.filters.mediaType || 'all';
+			searchQuery = data.filters.search || '';
+			hasInitialized = true;
+		}
 	});
 
 	// Set up SSE connection
@@ -207,10 +215,11 @@
 			<div class="flex flex-wrap items-center gap-4">
 				<!-- Media Type Filter -->
 				<div class="form-control">
-					<label class="label py-0">
+					<label class="label py-0" for="activity-media-type">
 						<span class="label-text text-xs">Media Type</span>
 					</label>
 					<select
+						id="activity-media-type"
 						class="select-bordered select select-sm"
 						bind:value={mediaTypeFilter}
 						onchange={applyFilters}
@@ -223,10 +232,11 @@
 
 				<!-- Status Filter -->
 				<div class="form-control">
-					<label class="label py-0">
+					<label class="label py-0" for="activity-status">
 						<span class="label-text text-xs">Status</span>
 					</label>
 					<select
+						id="activity-status"
 						class="select-bordered select select-sm"
 						bind:value={statusFilter}
 						onchange={applyFilters}
@@ -242,12 +252,13 @@
 
 				<!-- Search -->
 				<div class="form-control flex-1">
-					<label class="label py-0">
+					<label class="label py-0" for="activity-search">
 						<span class="label-text text-xs">Search</span>
 					</label>
 					<div class="relative">
 						<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-base-content/50" />
 						<input
+							id="activity-search"
 							type="text"
 							placeholder="Search media or release..."
 							class="input-bordered input input-sm w-full pl-9"

@@ -7,13 +7,13 @@ import { ReleaseParser } from '$lib/server/indexers/parser/ReleaseParser';
 import { logger } from '$lib/logging';
 import type { GrabRequest, GrabResponse } from '$lib/types/queue';
 import { getDownloadResolutionService, releaseDecisionService } from '$lib/server/downloads';
-import { checkNzbAvailability } from '$lib/server/downloads/nzb/index.js';
+import { checkNzbAvailability } from '$lib/server/downloads/nzb/NzbAvailabilityChecker.js';
 import { blocklistService } from '$lib/server/monitoring/specifications/BlocklistSpecification.js';
 import type { DownloadInfo } from '$lib/server/downloadClients/core/interfaces';
 import { categoryMatchesSearchType, getCategoryContentType } from '$lib/server/indexers/types';
 import { strmService, StrmService, getStreamingBaseUrl } from '$lib/server/streaming';
 import { getNzbMountManager } from '$lib/server/streaming/nzb';
-import { getUsenetStreamService } from '$lib/server/streaming/usenet';
+import { getUsenetStreamService } from '$lib/server/streaming/usenet/UsenetStreamService';
 import { mediaInfoService } from '$lib/server/library/media-info';
 import { db } from '$lib/server/db';
 import {

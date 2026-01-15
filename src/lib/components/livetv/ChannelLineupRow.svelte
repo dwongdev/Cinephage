@@ -162,7 +162,6 @@
 					onkeydown={handleKeydown}
 					min="1"
 					disabled={saving}
-					autofocus
 				/>
 				{#if saving}
 					<Loader2 class="h-3 w-3 animate-spin text-base-content/50" />
@@ -214,7 +213,6 @@
 					onkeydown={handleKeydown}
 					placeholder={item.channel.name}
 					disabled={saving}
-					autofocus
 				/>
 				{#if saving}
 					<Loader2 class="h-3 w-3 animate-spin text-base-content/50" />

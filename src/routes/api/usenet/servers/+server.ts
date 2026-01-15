@@ -6,7 +6,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getNntpServerService } from '$lib/server/streaming/nzb/NntpServerService';
-import { getNntpManager } from '$lib/server/streaming/usenet';
+import { getNntpManager } from '$lib/server/streaming/usenet/NntpManager';
 import { nntpServerCreateSchema } from '$lib/validation/schemas';
 
 /**

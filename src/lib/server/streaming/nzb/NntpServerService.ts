@@ -12,7 +12,7 @@ import {
 import { eq, asc } from 'drizzle-orm';
 import { logger } from '$lib/logging';
 import { randomUUID } from 'crypto';
-import { getDownloadClientManager } from '$lib/server/downloadClients';
+import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadClientManager';
 import type { NntpServerCreate, NntpServerUpdate } from '$lib/validation/schemas';
 
 /**

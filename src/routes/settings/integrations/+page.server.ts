@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { settings } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { getIndexerManager } from '$lib/server/indexers/IndexerManager';
-import { getDownloadClientManager } from '$lib/server/downloadClients';
+import { getDownloadClientManager } from '$lib/server/downloadClients/DownloadClientManager';
 import { getSubtitleProviderManager } from '$lib/server/subtitles/services/SubtitleProviderManager';
 import { LanguageProfileService } from '$lib/server/subtitles/services/LanguageProfileService';
 import { getMediaBrowserManager } from '$lib/server/notifications/mediabrowser';

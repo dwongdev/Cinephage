@@ -32,10 +32,10 @@
 	let error = $state<string | null>(null);
 
 	// Selection state
-	let selectedIds = new SvelteSet<string>();
+	let selectedIds = $state(new SvelteSet<string>());
 
 	// Expanded categories state (all expanded by default)
-	let expandedCategories = new SvelteSet<string | null>();
+	let expandedCategories = $state(new SvelteSet<string | null>());
 
 	// Drag state
 	let draggedItemId = $state<string | null>(null);
@@ -52,7 +52,7 @@
 
 	// Browser modal state
 	let browserModalOpen = $state(false);
-	let lineupChannelIds = new SvelteSet<string>();
+	let lineupChannelIds = $state(new SvelteSet<string>());
 
 	// Backup browser state
 	let browserMode = $state<'add-to-lineup' | 'select-backup'>('add-to-lineup');
@@ -640,7 +640,7 @@
 
 							<!-- M3U URL -->
 							<div class="space-y-1">
-								<label class="text-xs font-medium text-base-content/70">M3U Playlist</label>
+								<div class="text-xs font-medium text-base-content/70">M3U Playlist</div>
 								<div class="flex gap-2">
 									<input
 										type="text"
@@ -664,7 +664,7 @@
 
 							<!-- EPG URL -->
 							<div class="space-y-1">
-								<label class="text-xs font-medium text-base-content/70">XMLTV EPG Guide</label>
+								<div class="text-xs font-medium text-base-content/70">XMLTV EPG Guide</div>
 								<div class="flex gap-2">
 									<input
 										type="text"

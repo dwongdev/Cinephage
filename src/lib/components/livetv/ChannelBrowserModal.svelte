@@ -57,8 +57,8 @@
 	let totalPages = $state(0);
 
 	// Selection state
-	let selectedIds = new SvelteSet<string>();
-	let addingIds = new SvelteSet<string>();
+	let selectedIds = $state(new SvelteSet<string>());
+	let addingIds = $state(new SvelteSet<string>());
 	let bulkAdding = $state(false);
 
 	// Local copy of lineup IDs (updated after successful adds)
@@ -363,262 +363,262 @@
 	}
 </script>
 
-<ModalWrapper {open} onClose={onClose} maxWidth="5xl" labelledBy="channel-browser-modal-title">
+<ModalWrapper {open} {onClose} maxWidth="5xl" labelledBy="channel-browser-modal-title">
 	<!-- Header -->
-			<div class="mb-4 flex items-center justify-between">
-				<div>
-					<h3 id="channel-browser-modal-title" class="text-lg font-bold">
-						{isBackupMode ? 'Select Backup Channel' : 'Browse Channels'}
-					</h3>
-					<p class="text-sm text-base-content/60">
-						{isBackupMode
-							? 'Select an alternative channel source'
-							: 'Add channels from your Stalker accounts'}
-					</p>
-				</div>
-				<button class="btn btn-circle btn-ghost btn-sm" onclick={onClose}>
-					<X class="h-4 w-4" />
-				</button>
-			</div>
+	<div class="mb-4 flex items-center justify-between">
+		<div>
+			<h3 id="channel-browser-modal-title" class="text-lg font-bold">
+				{isBackupMode ? 'Select Backup Channel' : 'Browse Channels'}
+			</h3>
+			<p class="text-sm text-base-content/60">
+				{isBackupMode
+					? 'Select an alternative channel source'
+					: 'Add channels from your Stalker accounts'}
+			</p>
+		</div>
+		<button class="btn btn-circle btn-ghost btn-sm" onclick={onClose}>
+			<X class="h-4 w-4" />
+		</button>
+	</div>
 
-			<!-- Filters Row -->
-			<div class="mb-4 flex flex-wrap items-center gap-3">
-				<!-- Account Filter -->
-				<select
-					class="select-bordered select w-full select-sm sm:w-48"
-					bind:value={selectedAccountId}
-					onchange={handleFilterChange}
-				>
-					<option value="">All Accounts</option>
-					{#each accounts as account (account.id)}
-						<option value={account.id}>
-							{account.name}
-							{#if account.channelCount}({account.channelCount.toLocaleString()}){/if}
-						</option>
-					{/each}
-				</select>
+	<!-- Filters Row -->
+	<div class="mb-4 flex flex-wrap items-center gap-3">
+		<!-- Account Filter -->
+		<select
+			class="select-bordered select w-full select-sm sm:w-48"
+			bind:value={selectedAccountId}
+			onchange={handleFilterChange}
+		>
+			<option value="">All Accounts</option>
+			{#each accounts as account (account.id)}
+				<option value={account.id}>
+					{account.name}
+					{#if account.channelCount}({account.channelCount.toLocaleString()}){/if}
+				</option>
+			{/each}
+		</select>
 
-				<!-- Category Filter -->
-				<select
-					class="select-bordered select w-full select-sm sm:w-48"
-					bind:value={selectedCategoryId}
-					onchange={handleFilterChange}
-					disabled={!selectedAccountId}
-				>
-					<option value="">All Categories</option>
-					{#each stalkerCategories as category (category.id)}
-						<option value={category.id}>
-							{category.title}
-							({category.channelCount})
-						</option>
-					{/each}
-				</select>
+		<!-- Category Filter -->
+		<select
+			class="select-bordered select w-full select-sm sm:w-48"
+			bind:value={selectedCategoryId}
+			onchange={handleFilterChange}
+			disabled={!selectedAccountId}
+		>
+			<option value="">All Categories</option>
+			{#each stalkerCategories as category (category.id)}
+				<option value={category.id}>
+					{category.title}
+					({category.channelCount})
+				</option>
+			{/each}
+		</select>
 
-				<!-- Search Input -->
-				<div class="relative flex-1">
-					<Search
-						class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-base-content/40"
-					/>
-					<input
-						type="text"
-						placeholder="Search channels..."
-						class="input-bordered input input-sm w-full pl-9"
-						bind:value={searchQuery}
-					/>
-				</div>
-			</div>
+		<!-- Search Input -->
+		<div class="relative flex-1">
+			<Search
+				class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-base-content/40"
+			/>
+			<input
+				type="text"
+				placeholder="Search channels..."
+				class="input-bordered input input-sm w-full pl-9"
+				bind:value={searchQuery}
+			/>
+		</div>
+	</div>
 
-			<!-- Results Summary & Bulk Actions -->
-			<div class="mb-2 flex items-center justify-between">
-				<span class="text-sm text-base-content/60">
-					{total.toLocaleString()} channel{total !== 1 ? 's' : ''}
-					{#if !isBackupMode && selectedIds.size > 0}
-						<span class="text-primary">({selectedIds.size} selected)</span>
-					{/if}
-				</span>
-
-				{#if !isBackupMode}
-					{#if selectedIds.size > 0}
-						<div class="flex gap-2">
-							<button class="btn btn-ghost btn-xs" onclick={clearSelection}>Clear</button>
-							<button
-								class="btn btn-sm btn-primary"
-								onclick={addSelectedChannels}
-								disabled={bulkAdding}
-							>
-								{#if bulkAdding}
-									<Loader2 class="h-4 w-4 animate-spin" />
-								{:else}
-									<Plus class="h-4 w-4" />
-								{/if}
-								Add {selectedIds.size} Selected
-							</button>
-						</div>
-					{:else if selectableChannels.length > 0}
-						<button class="btn btn-ghost btn-xs" onclick={toggleAllVisible}>
-							Select All Visible
-						</button>
-					{/if}
-				{/if}
-			</div>
-
-			<!-- Error Display -->
-			{#if error}
-				<div class="mb-2 alert alert-error">
-					<span>{error}</span>
-					<button class="btn btn-ghost btn-xs" onclick={loadChannels}>Retry</button>
-				</div>
+	<!-- Results Summary & Bulk Actions -->
+	<div class="mb-2 flex items-center justify-between">
+		<span class="text-sm text-base-content/60">
+			{total.toLocaleString()} channel{total !== 1 ? 's' : ''}
+			{#if !isBackupMode && selectedIds.size > 0}
+				<span class="text-primary">({selectedIds.size} selected)</span>
 			{/if}
+		</span>
 
-			<!-- Channel List -->
-			<div class="flex-1 overflow-auto rounded-lg border border-base-300">
-				{#if loading}
-					<div class="flex items-center justify-center py-12">
-						<Loader2 class="h-8 w-8 animate-spin text-primary" />
-					</div>
-				{:else if channels.length === 0}
-					<div class="flex flex-col items-center justify-center py-12 text-base-content/50">
-						<Tv class="mb-4 h-12 w-12" />
-						<p>No channels found</p>
-						{#if debouncedSearch || selectedAccountId || selectedCategoryId}
-							<p class="text-sm">Try adjusting your filters</p>
+		{#if !isBackupMode}
+			{#if selectedIds.size > 0}
+				<div class="flex gap-2">
+					<button class="btn btn-ghost btn-xs" onclick={clearSelection}>Clear</button>
+					<button
+						class="btn btn-sm btn-primary"
+						onclick={addSelectedChannels}
+						disabled={bulkAdding}
+					>
+						{#if bulkAdding}
+							<Loader2 class="h-4 w-4 animate-spin" />
+						{:else}
+							<Plus class="h-4 w-4" />
 						{/if}
-					</div>
-				{:else}
-					<table class="table table-sm">
-						<thead class="sticky top-0 z-10 bg-base-200">
-							<tr>
-								{#if !isBackupMode}
-									<th class="w-10">
-										<input
-											type="checkbox"
-											class="checkbox checkbox-sm"
-											checked={allVisibleSelected}
-											indeterminate={someVisibleSelected}
-											disabled={selectableChannels.length === 0}
-											onchange={toggleAllVisible}
-										/>
-									</th>
-								{/if}
-								<th>Channel</th>
-								<th>Category</th>
-								<th>Account</th>
-								<th class="w-24">Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each channels as channel (channel.id)}
-								{@const excluded = isExcluded(channel.id)}
-								{@const inLineup = isInLineup(channel.id)}
-								{@const isSelected = selectedIds.has(channel.id)}
-								{@const isAdding = addingIds.has(channel.id)}
-
-								<tr class={excluded ? 'bg-base-200/50 opacity-50' : ''}>
-									{#if !isBackupMode}
-										<td>
-											<input
-												type="checkbox"
-												class="checkbox checkbox-sm"
-												checked={isSelected}
-												disabled={inLineup}
-												onchange={() => toggleSelection(channel.id)}
-											/>
-										</td>
-									{/if}
-									<td>
-										<div class="flex items-center gap-3">
-											{#if channel.logo}
-												<img
-													src={channel.logo}
-													alt=""
-													class="h-8 w-8 rounded bg-base-200 object-contain"
-												/>
-											{:else}
-												<div class="flex h-8 w-8 items-center justify-center rounded bg-base-200">
-													<Tv class="h-4 w-4 text-base-content/30" />
-												</div>
-											{/if}
-											<div>
-												<p class="font-medium">{channel.name}</p>
-												{#if channel.number}
-													<p class="text-xs text-base-content/50">#{channel.number}</p>
-												{/if}
-											</div>
-										</div>
-									</td>
-									<td class="text-sm">{channel.categoryTitle || '-'}</td>
-									<td class="text-sm">{channel.accountName || '-'}</td>
-									<td>
-										{#if isBackupMode}
-											{#if excluded}
-												<span class="badge badge-ghost badge-sm">Primary</span>
-											{:else}
-												<button
-													class="btn btn-ghost btn-xs"
-													onclick={() => selectAsBackup(channel)}
-													disabled={addingBackup}
-												>
-													{#if addingBackup}
-														<Loader2 class="h-3 w-3 animate-spin" />
-													{:else}
-														<Plus class="h-3 w-3" />
-													{/if}
-													Select
-												</button>
-											{/if}
-										{:else if inLineup}
-											<span class="badge gap-1 badge-ghost badge-sm">
-												<Check class="h-3 w-3" />
-												Added
-											</span>
-										{:else}
-											<button
-												class="btn btn-ghost btn-xs"
-												onclick={() => addSingleChannel(channel)}
-												disabled={isAdding}
-											>
-												{#if isAdding}
-													<Loader2 class="h-3 w-3 animate-spin" />
-												{:else}
-													<Plus class="h-3 w-3" />
-												{/if}
-												Add
-											</button>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/if}
-			</div>
-
-			<!-- Pagination -->
-			{#if totalPages > 1}
-				<div class="mt-4 flex items-center justify-center gap-2">
-					<button
-						class="btn btn-ghost btn-sm"
-						disabled={page === 1 || loading}
-						onclick={() => (page = page - 1)}
-					>
-						<ChevronLeft class="h-4 w-4" />
-						Previous
-					</button>
-					<span class="text-sm">
-						Page {page} of {totalPages}
-					</span>
-					<button
-						class="btn btn-ghost btn-sm"
-						disabled={page === totalPages || loading}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-						<ChevronRight class="h-4 w-4" />
+						Add {selectedIds.size} Selected
 					</button>
 				</div>
+			{:else if selectableChannels.length > 0}
+				<button class="btn btn-ghost btn-xs" onclick={toggleAllVisible}>
+					Select All Visible
+				</button>
 			{/if}
+		{/if}
+	</div>
 
-		<!-- Footer -->
+	<!-- Error Display -->
+	{#if error}
+		<div class="mb-2 alert alert-error">
+			<span>{error}</span>
+			<button class="btn btn-ghost btn-xs" onclick={loadChannels}>Retry</button>
+		</div>
+	{/if}
+
+	<!-- Channel List -->
+	<div class="flex-1 overflow-auto rounded-lg border border-base-300">
+		{#if loading}
+			<div class="flex items-center justify-center py-12">
+				<Loader2 class="h-8 w-8 animate-spin text-primary" />
+			</div>
+		{:else if channels.length === 0}
+			<div class="flex flex-col items-center justify-center py-12 text-base-content/50">
+				<Tv class="mb-4 h-12 w-12" />
+				<p>No channels found</p>
+				{#if debouncedSearch || selectedAccountId || selectedCategoryId}
+					<p class="text-sm">Try adjusting your filters</p>
+				{/if}
+			</div>
+		{:else}
+			<table class="table table-sm">
+				<thead class="sticky top-0 z-10 bg-base-200">
+					<tr>
+						{#if !isBackupMode}
+							<th class="w-10">
+								<input
+									type="checkbox"
+									class="checkbox checkbox-sm"
+									checked={allVisibleSelected}
+									indeterminate={someVisibleSelected}
+									disabled={selectableChannels.length === 0}
+									onchange={toggleAllVisible}
+								/>
+							</th>
+						{/if}
+						<th>Channel</th>
+						<th>Category</th>
+						<th>Account</th>
+						<th class="w-24">Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each channels as channel (channel.id)}
+						{@const excluded = isExcluded(channel.id)}
+						{@const inLineup = isInLineup(channel.id)}
+						{@const isSelected = selectedIds.has(channel.id)}
+						{@const isAdding = addingIds.has(channel.id)}
+
+						<tr class={excluded ? 'bg-base-200/50 opacity-50' : ''}>
+							{#if !isBackupMode}
+								<td>
+									<input
+										type="checkbox"
+										class="checkbox checkbox-sm"
+										checked={isSelected}
+										disabled={inLineup}
+										onchange={() => toggleSelection(channel.id)}
+									/>
+								</td>
+							{/if}
+							<td>
+								<div class="flex items-center gap-3">
+									{#if channel.logo}
+										<img
+											src={channel.logo}
+											alt=""
+											class="h-8 w-8 rounded bg-base-200 object-contain"
+										/>
+									{:else}
+										<div class="flex h-8 w-8 items-center justify-center rounded bg-base-200">
+											<Tv class="h-4 w-4 text-base-content/30" />
+										</div>
+									{/if}
+									<div>
+										<p class="font-medium">{channel.name}</p>
+										{#if channel.number}
+											<p class="text-xs text-base-content/50">#{channel.number}</p>
+										{/if}
+									</div>
+								</div>
+							</td>
+							<td class="text-sm">{channel.categoryTitle || '-'}</td>
+							<td class="text-sm">{channel.accountName || '-'}</td>
+							<td>
+								{#if isBackupMode}
+									{#if excluded}
+										<span class="badge badge-ghost badge-sm">Primary</span>
+									{:else}
+										<button
+											class="btn btn-ghost btn-xs"
+											onclick={() => selectAsBackup(channel)}
+											disabled={addingBackup}
+										>
+											{#if addingBackup}
+												<Loader2 class="h-3 w-3 animate-spin" />
+											{:else}
+												<Plus class="h-3 w-3" />
+											{/if}
+											Select
+										</button>
+									{/if}
+								{:else if inLineup}
+									<span class="badge gap-1 badge-ghost badge-sm">
+										<Check class="h-3 w-3" />
+										Added
+									</span>
+								{:else}
+									<button
+										class="btn btn-ghost btn-xs"
+										onclick={() => addSingleChannel(channel)}
+										disabled={isAdding}
+									>
+										{#if isAdding}
+											<Loader2 class="h-3 w-3 animate-spin" />
+										{:else}
+											<Plus class="h-3 w-3" />
+										{/if}
+										Add
+									</button>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
+	</div>
+
+	<!-- Pagination -->
+	{#if totalPages > 1}
+		<div class="mt-4 flex items-center justify-center gap-2">
+			<button
+				class="btn btn-ghost btn-sm"
+				disabled={page === 1 || loading}
+				onclick={() => (page = page - 1)}
+			>
+				<ChevronLeft class="h-4 w-4" />
+				Previous
+			</button>
+			<span class="text-sm">
+				Page {page} of {totalPages}
+			</span>
+			<button
+				class="btn btn-ghost btn-sm"
+				disabled={page === totalPages || loading}
+				onclick={() => (page = page + 1)}
+			>
+				Next
+				<ChevronRight class="h-4 w-4" />
+			</button>
+		</div>
+	{/if}
+
+	<!-- Footer -->
 	<div class="modal-action">
 		<button class="btn" onclick={onClose}>Done</button>
 	</div>

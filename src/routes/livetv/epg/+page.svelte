@@ -200,7 +200,7 @@
 				class="tab gap-2 {activeTab === tab.id ? 'tab-active' : ''}"
 				onclick={() => (activeTab = tab.id)}
 			>
-				<svelte:component this={tab.icon} class="h-4 w-4" />
+				<tab.icon class="h-4 w-4" />
 				{tab.label}
 			</button>
 		{/each}
