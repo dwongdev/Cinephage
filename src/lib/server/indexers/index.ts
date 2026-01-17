@@ -66,7 +66,6 @@ export {
 	getRootCategory,
 	toCategory,
 	mapYtsCategory,
-	map1337xCategory,
 	mapEztvCategory,
 	detectQualityCategories,
 	filterMovieCategories,

@@ -353,18 +353,6 @@ describe('ReleaseParser', () => {
 	});
 
 	describe('Real-world samples', () => {
-		it('should parse 1337x-style releases', () => {
-			const result = parseRelease(
-				'The Shawshank Redemption 1994 REMASTERED 1080p BluRay x265-RARBG'
-			);
-
-			expect(result.cleanTitle).toContain('Shawshank Redemption');
-			expect(result.year).toBe(1994);
-			expect(result.resolution).toBe('1080p');
-			expect(result.source).toBe('bluray');
-			expect(result.codec).toBe('h265');
-		});
-
 		it('should parse streaming service releases', () => {
 			const result = parseRelease(
 				'Wednesday.S01E01.Wednesdays.Child.Is.Full.of.Woe.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-CMRG'

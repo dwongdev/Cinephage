@@ -26,63 +26,6 @@ export function mapYtsCategory(quality: string): number[] {
 	return cats;
 }
 
-/** Map 1337x category name to categories */
-export function map1337xCategory(categoryName: string): number[] {
-	const lower = categoryName.toLowerCase();
-
-	// Movies
-	if (lower.includes('movie')) {
-		if (lower.includes('uhd') || lower.includes('4k')) {
-			return [Category.MOVIE, Category.MOVIE_UHD];
-		}
-		if (lower.includes('bluray') || lower.includes('hd') || lower.includes('1080')) {
-			return [Category.MOVIE, Category.MOVIE_HD];
-		}
-		if (lower.includes('web')) {
-			return [Category.MOVIE, Category.MOVIE_WEBDL];
-		}
-		return [Category.MOVIE];
-	}
-
-	// TV
-	if (lower.includes('tv')) {
-		if (lower.includes('uhd') || lower.includes('4k')) {
-			return [Category.TV, Category.TV_UHD];
-		}
-		if (lower.includes('hd') || lower.includes('1080')) {
-			return [Category.TV, Category.TV_HD];
-		}
-		return [Category.TV];
-	}
-
-	// Anime
-	if (lower.includes('anime')) {
-		return [Category.TV_ANIME];
-	}
-
-	// XXX
-	if (lower.includes('xxx') || lower.includes('porn')) {
-		return [Category.XXX];
-	}
-
-	// Games
-	if (lower.includes('game')) {
-		return [Category.PC_GAMES];
-	}
-
-	// Music
-	if (lower.includes('music')) {
-		return [Category.AUDIO];
-	}
-
-	// Software
-	if (lower.includes('software') || lower.includes('app')) {
-		return [Category.PC];
-	}
-
-	return [];
-}
-
 /** Map EZTV quality to TV categories */
 export function mapEztvCategory(quality?: string): number[] {
 	const cats: number[] = [Category.TV];

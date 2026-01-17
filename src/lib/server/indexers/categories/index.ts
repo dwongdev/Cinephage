@@ -16,7 +16,6 @@ export {
 
 export {
 	mapYtsCategory,
-	map1337xCategory,
 	mapEztvCategory,
 	detectQualityCategories,
 	filterMovieCategories,

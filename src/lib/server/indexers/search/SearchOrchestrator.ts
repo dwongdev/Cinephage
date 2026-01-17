@@ -715,7 +715,7 @@ export class SearchOrchestrator {
 		}
 
 		// Tier 2: Fall back to text search with multi-title support
-		// This allows text-only indexers (like 1337x) to participate
+		// This allows text-only indexers to participate
 		// and searches with multiple titles for better regional tracker coverage
 		const allReleases = await this.executeMultiTitleTextSearch(indexer, criteria);
 

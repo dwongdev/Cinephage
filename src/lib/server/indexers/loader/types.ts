@@ -76,7 +76,7 @@ export type DefinitionSource = 'yaml' | 'native';
 export interface IndexerDefinition {
 	// === Identity ===
 
-	/** Unique identifier (e.g., '1337x', 'scenetime') */
+	/** Unique identifier (e.g., 'scenetime', 'torrentday') */
 	id: string;
 
 	/** Display name */
