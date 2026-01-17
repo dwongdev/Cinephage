@@ -435,7 +435,7 @@ describe('NamingService', () => {
 			const info: MediaNamingInfo = {
 				title: 'Test',
 				year: 2023,
-				hdr: 'DV HDR10',
+				hdr: 'dolby-vision-hdr10',
 				codec: 'x265',
 				audioCodec: 'TrueHD',
 				audioChannels: '7.1',
@@ -460,9 +460,8 @@ describe('NamingService', () => {
 				tmdbId: 123
 			};
 			const result = service.generateMovieFolderName(info);
-			// Note: Empty parens removal happens after whitespace normalization,
-			// leaving a double space. This is current behavior.
-			expect(result).toBe('Test Movie  {tmdb-123}');
+			// Empty parens are removed and extra spaces are cleaned up
+			expect(result).toBe('Test Movie {tmdb-123}');
 		});
 
 		it('should handle missing TMDB ID', () => {

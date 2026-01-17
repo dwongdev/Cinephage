@@ -7,4 +7,5 @@
 export { normalizeSource, sourceNormalizer } from './sources';
 export { normalizeVideoCodec, videoCodecNormalizer } from './videoCodecs';
 export { normalizeAudioCodec, audioCodecNormalizer } from './audioCodecs';
+export { normalizeHdr, hdrNormalizer } from './hdr';
 export { createNormalizationMap, type NormalizationMap } from './types';

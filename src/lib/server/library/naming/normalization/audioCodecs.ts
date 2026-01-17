@@ -7,10 +7,11 @@
 import { createNormalizationMap, type NormalizationMap } from './types';
 
 /**
- * Pre-process audio codec input by removing non-alphanumeric characters
+ * Pre-process audio codec input by removing most non-alphanumeric characters
+ * Preserves + for DD+ codec detection
  */
 function preprocessAudioCodec(codec: string): string {
-	return codec.toLowerCase().replace(/[^a-z0-9]/g, '');
+	return codec.toLowerCase().replace(/[^a-z0-9+]/g, '');
 }
 
 const AUDIO_CODEC_MAPPINGS: Record<string, string> = {
@@ -50,6 +51,8 @@ export const audioCodecNormalizer: NormalizationMap = createNormalizationMap(AUD
  */
 export function normalizeAudioCodec(codec: string | undefined): string | undefined {
 	if (!codec) return undefined;
+	// Filter out 'unknown' values
+	if (codec.toLowerCase() === 'unknown') return undefined;
 	const preprocessed = preprocessAudioCodec(codec);
 	return audioCodecNormalizer.normalize(preprocessed);
 }

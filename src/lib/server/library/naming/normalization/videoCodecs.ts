@@ -36,5 +36,9 @@ export const videoCodecNormalizer: NormalizationMap = createNormalizationMap(VID
  */
 export function normalizeVideoCodec(codec: string | undefined): string | undefined {
 	if (!codec) return undefined;
-	return videoCodecNormalizer.normalize(codec);
+	// Filter out 'unknown' values
+	if (codec.toLowerCase() === 'unknown') return undefined;
+	const normalized = videoCodecNormalizer.normalize(codec.toLowerCase());
+	// Only return if it's a known codec, otherwise undefined
+	return videoCodecNormalizer.isKnown(codec.toLowerCase()) ? normalized : undefined;
 }

@@ -234,13 +234,13 @@ export class NamingService {
 		// Remove illegal characters
 		result = result.replace(ILLEGAL_CHARS, '');
 
-		// Clean up multiple spaces
-		result = result.replace(/\s+/g, ' ');
+		// Clean up empty brackets (including surrounding spaces)
+		result = result.replace(/\s*\[\s*\]\s*/g, ' ');
+		result = result.replace(/\s*\(\s*\)\s*/g, ' ');
+		result = result.replace(/\s*\{\s*\}\s*/g, ' ');
 
-		// Clean up empty brackets
-		result = result.replace(/\[\s*\]/g, '');
-		result = result.replace(/\(\s*\)/g, '');
-		result = result.replace(/\{\s*\}/g, '');
+		// Clean up multiple spaces (after bracket removal)
+		result = result.replace(/\s+/g, ' ');
 
 		// Clean up multiple dashes
 		result = result.replace(/-{2,}/g, '-');

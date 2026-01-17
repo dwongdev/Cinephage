@@ -6,14 +6,22 @@ import type { TokenDefinition } from '../types';
 import { normalizeSource } from '../../normalization';
 
 /**
+ * Filter out "unknown" values that come from the parser
+ */
+function isValidValue(value?: string): value is string {
+	return !!value && value.toLowerCase() !== 'unknown';
+}
+
+/**
  * Build quality string like "Bluray-1080p"
  */
 function buildQualityString(source?: string, resolution?: string): string {
 	const parts: string[] = [];
-	if (source) {
-		parts.push(normalizeSource(source));
+	const normalizedSource = source ? normalizeSource(source) : undefined;
+	if (normalizedSource) {
+		parts.push(normalizedSource);
 	}
-	if (resolution) {
+	if (isValidValue(resolution)) {
 		parts.push(resolution);
 	}
 	return parts.join('-');
@@ -58,14 +66,14 @@ export const qualityTokens: TokenDefinition[] = [
 		category: 'quality',
 		description: 'Resolution only (2160p, 1080p, etc.)',
 		applicability: ['movie', 'episode'],
-		render: (info) => info.resolution || ''
+		render: (info) => (isValidValue(info.resolution) ? info.resolution : '')
 	},
 	{
 		name: 'Source',
 		category: 'quality',
 		description: 'Source only (Bluray, WEB-DL, etc.)',
 		applicability: ['movie', 'episode'],
-		render: (info) => (info.source ? normalizeSource(info.source) : '')
+		render: (info) => (info.source ? normalizeSource(info.source) : '') ?? ''
 	},
 	{
 		name: 'Proper',

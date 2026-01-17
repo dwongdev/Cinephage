@@ -3,7 +3,7 @@
  */
 
 import type { TokenDefinition } from '../types';
-import { normalizeVideoCodec } from '../../normalization';
+import { normalizeVideoCodec, normalizeHdr } from '../../normalization';
 
 export const videoTokens: TokenDefinition[] = [
 	{
@@ -19,7 +19,7 @@ export const videoTokens: TokenDefinition[] = [
 		category: 'video',
 		description: 'HDR format (DV, HDR10, HDR10+)',
 		applicability: ['movie', 'episode'],
-		render: (info) => info.hdr || ''
+		render: (info) => normalizeHdr(info.hdr) || ''
 	},
 	{
 		name: 'BitDepth',

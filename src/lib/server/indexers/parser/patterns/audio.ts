@@ -154,14 +154,24 @@ const ATMOS_PATTERNS: RegExp[] = [
 /**
  * Audio channel configuration patterns
  * Profilarr pattern for 7.1: '7\.1'
+ * Enhanced to match embedded channels like AAC5.1, DDP5.1, DTS7.1
+ * Also matches normalized forms like "7 1" (after dot-to-space normalization)
  */
 const CHANNEL_PATTERNS: Array<{ pattern: RegExp; channels: AudioChannels }> = [
-	{ pattern: /\b7\.1\b/, channels: '7.1' },
-	{ pattern: /\b5\.1\b/, channels: '5.1' },
-	{ pattern: /\b2\.0\b/, channels: '2.0' },
+	// Standard decimal notation (with or without word boundary before)
+	// Also match space-separated version for normalized titles
+	{ pattern: /(?:^|[^0-9])7[. ]1(?:\b|$)/, channels: '7.1' },
+	{ pattern: /(?:^|[^0-9])5[. ]1(?:\b|$)/, channels: '5.1' },
+	{ pattern: /(?:^|[^0-9])2[. ]0(?:\b|$)/, channels: '2.0' },
+	{ pattern: /(?:^|[^0-9])1[. ]0(?:\b|$)/, channels: '1.0' },
+	// Named patterns
 	{ pattern: /\bStereo\b/i, channels: '2.0' },
-	{ pattern: /\b1\.0\b/, channels: '1.0' },
-	{ pattern: /\bMono\b/i, channels: '1.0' }
+	{ pattern: /\bMono\b/i, channels: '1.0' },
+	// Channel count notation (8CH, 6CH, 2CH, etc.)
+	{ pattern: /\b8[ ._-]?CH\b/i, channels: '7.1' },
+	{ pattern: /\b6[ ._-]?CH\b/i, channels: '5.1' },
+	{ pattern: /\b2[ ._-]?CH\b/i, channels: '2.0' },
+	{ pattern: /\b1[ ._-]?CH\b/i, channels: '1.0' }
 ];
 
 // =============================================================================

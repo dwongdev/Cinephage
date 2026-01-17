@@ -171,7 +171,8 @@ export class TemplateEngine {
 			// Only return the content if at least one token had a value
 			if (hasAnyValue) {
 				// Clean up any empty spaces from missing tokens
-				return result.replace(/\s+/g, ' ').trim();
+				// Also remove spaces adjacent to brackets
+				return result.replace(/\s+/g, ' ').replace(/\[\s+/g, '[').replace(/\s+\]/g, ']').trim();
 			}
 			return '';
 		});

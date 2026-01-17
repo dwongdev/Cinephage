@@ -71,12 +71,20 @@ const ANIME_GROUP_PATTERNS = [
 ];
 
 /**
- * Patterns for YTS variants (to normalize to "YTS")
+ * Patterns for YTS/YIFY variants (to normalize to "YTS")
+ * YTS and YIFY are the same group
  */
 const YTS_PATTERNS = [
+	// Plain YTS at end: "-YTS" or ".YTS"
+	/[-.]YTS$/i,
+	// Plain YIFY at end: "-YIFY" or ".YIFY"
+	/[-.]YIFY$/i,
 	// YTS with country code: "[YTS.MX]", "[YTS.AM]", "YTS.LT"
 	/\[YTS\.[A-Z]{2,3}\]$/i,
-	/[-.]YTS\.[A-Z]{2,3}$/i
+	/[-.]YTS\.[A-Z]{2,3}$/i,
+	// YIFY with country code variants
+	/\[YIFY\.[A-Z]{2,3}\]$/i,
+	/[-.]YIFY\.[A-Z]{2,3}$/i
 ];
 
 /**

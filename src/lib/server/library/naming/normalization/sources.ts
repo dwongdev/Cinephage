@@ -51,7 +51,13 @@ export const sourceNormalizer: NormalizationMap = createNormalizationMap(SOURCE_
 
 /**
  * Normalize a source name to standard format
+ * Returns undefined for unknown sources
  */
-export function normalizeSource(source: string): string {
-	return sourceNormalizer.normalize(source);
+export function normalizeSource(source: string | undefined): string | undefined {
+	if (!source) return undefined;
+	// Filter out 'unknown' values
+	if (source.toLowerCase() === 'unknown') return undefined;
+	const normalized = sourceNormalizer.normalize(source.toLowerCase());
+	// Only return if it's a known source
+	return sourceNormalizer.isKnown(source.toLowerCase()) ? normalized : undefined;
 }

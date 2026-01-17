@@ -13,7 +13,7 @@ import type { ParsedRelease } from './types.js';
 import { extractResolution } from './patterns/resolution.js';
 import { extractSource } from './patterns/source.js';
 import { extractCodec } from './patterns/codec.js';
-import { extractAudio, extractHdr } from './patterns/audio.js';
+import { extractAudio, extractEnhancedAudio, extractHdr } from './patterns/audio.js';
 import { extractLanguages } from './patterns/language.js';
 import { extractEpisode, extractTitleBeforeEpisode } from './patterns/episode.js';
 import { extractReleaseGroup } from './patterns/releaseGroup.js';
@@ -73,6 +73,7 @@ export class ReleaseParser {
 		const sourceMatch = extractSource(normalized);
 		const codecMatch = extractCodec(normalized);
 		const audioMatch = extractAudio(normalized);
+		const enhancedAudio = extractEnhancedAudio(normalized);
 		const hdrMatch = extractHdr(normalized);
 
 		// Extract episode info (determines if TV release)
@@ -118,6 +119,10 @@ export class ReleaseParser {
 			codec: codecMatch?.codec ?? 'unknown',
 			hdr: hdrMatch?.hdr ?? null,
 			audio: audioMatch?.audio ?? 'unknown',
+			// Enhanced audio info with separated codec, channels, and Atmos
+			audioCodec: enhancedAudio.codec,
+			audioChannels: enhancedAudio.channels !== 'unknown' ? enhancedAudio.channels : undefined,
+			hasAtmos: enhancedAudio.hasAtmos,
 			episode: episodeMatch?.info,
 			languages: languageMatch.languages,
 			releaseGroup: groupMatch?.group,
@@ -208,16 +213,21 @@ export class ReleaseParser {
 
 		// For movies with year: cut BEFORE the year (year is extracted separately to parsedYear)
 		// This ensures cleanTitle contains just the title for better TMDB search matching
-		if (context.year && !context.isTv) {
+		// Also apply to TV shows to avoid duplicate years
+		if (context.year) {
 			const yearStr = String(context.year);
-			const yearIndex = title.indexOf(yearStr);
-			if (yearIndex !== -1) {
-				// Cut before the year (and any preceding parenthesis/space)
-				let cutBeforeYear = yearIndex;
-				if (cutBeforeYear > 0 && title[cutBeforeYear - 1] === '(') {
-					cutBeforeYear--;
+			// Match year with optional parentheses: "(2025)" or just "2025"
+			const yearPatterns = [
+				new RegExp(`\\s*\\(${yearStr}\\)\\s*`), // (2025)
+				new RegExp(`\\s+${yearStr}(?:\\s|$)`) // 2025 at word boundary
+			];
+			for (const pattern of yearPatterns) {
+				const match = title.match(pattern);
+				if (match && match.index !== undefined) {
+					// Cut at year start, keeping everything before
+					cutoffIndex = Math.min(cutoffIndex, match.index);
+					break;
 				}
-				cutoffIndex = Math.min(cutoffIndex, cutBeforeYear);
 			}
 		}
 
@@ -240,6 +250,7 @@ export class ReleaseParser {
 
 	/**
 	 * Convert string to title case
+	 * Preserves roman numerals (I, II, III, IV, V, VI, VII, VIII, IX, X, etc.)
 	 */
 	private toTitleCase(str: string): string {
 		const smallWords = new Set([
@@ -263,20 +274,28 @@ export class ReleaseParser {
 			'yet'
 		]);
 
+		// Roman numeral pattern (standalone words only)
+		const romanNumeralPattern = /^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i;
+
 		return str
-			.toLowerCase()
 			.split(' ')
 			.map((word, index) => {
+				// Preserve roman numerals in uppercase
+				if (romanNumeralPattern.test(word) && word.length > 0) {
+					return word.toUpperCase();
+				}
+				// Convert to lowercase for processing
+				const lowerWord = word.toLowerCase();
 				// Always capitalize first word
 				if (index === 0) {
-					return word.charAt(0).toUpperCase() + word.slice(1);
+					return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
 				}
 				// Keep small words lowercase
-				if (smallWords.has(word)) {
-					return word;
+				if (smallWords.has(lowerWord)) {
+					return lowerWord;
 				}
 				// Capitalize other words
-				return word.charAt(0).toUpperCase() + word.slice(1);
+				return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
 			})
 			.join(' ');
 	}
