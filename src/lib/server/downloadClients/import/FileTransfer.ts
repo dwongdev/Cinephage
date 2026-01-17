@@ -2,7 +2,13 @@
  * File Transfer Service
  *
  * Handles moving/copying/hardlinking files from download location to library.
- * Prefers hardlinks to save disk space while keeping files for seeding.
+ * Always prefers hardlinks to save disk space and preserve source files.
+ *
+ * Transfer Strategy:
+ * - ImportMode.Auto: Always try hardlink first (with copy fallback), then delete source if canMoveFiles=true
+ * - ImportMode.Copy: Always copy (for cross-device or read-only sources)
+ * - ImportMode.Move: Always move (for explicit move requests)
+ * - ImportMode.HardlinkOrCopy: Hardlink with copy fallback, never delete source
  */
 
 import {
@@ -22,9 +28,43 @@ import { join, dirname, basename, extname } from 'path';
 import { logger } from '$lib/logging';
 
 /**
- * Transfer mode for files
+ * Transfer mode for files (low-level operation)
+ * Follows Radarr's TransferMode enum pattern
  */
 export type TransferMode = 'hardlink' | 'copy' | 'move' | 'symlink';
+
+/**
+ * Import mode for deciding how to transfer files (high-level intent)
+ * Follows Radarr's ImportMode enum pattern
+ *
+ * @see Radarr: NzbDrone.Core/MediaFiles/MovieImport/ImportMode.cs
+ */
+export enum ImportMode {
+	/**
+	 * Auto-detect: Always try hardlink first (with copy fallback).
+	 * If canMoveFiles=true, delete source after successful transfer.
+	 * This is the recommended default for all imports.
+	 */
+	Auto = 'auto',
+
+	/**
+	 * Always move the file (rename or copy+delete)
+	 * Only use when explicitly requested
+	 */
+	Move = 'move',
+
+	/**
+	 * Always copy (keep source intact)
+	 * Use for read-only sources or when explicitly requested
+	 */
+	Copy = 'copy',
+
+	/**
+	 * Try hardlink first, fall back to copy, never delete source
+	 * Use when you explicitly want to preserve source files
+	 */
+	HardlinkOrCopy = 'hardlinkOrCopy'
+}
 
 /**
  * Result of a file transfer operation
@@ -36,6 +76,18 @@ export interface TransferResult {
 	mode: TransferMode;
 	error?: string;
 	sizeBytes?: number;
+}
+
+/**
+ * Options for file transfer with import mode support
+ */
+export interface TransferOptions {
+	/** Import mode to use (default: Auto) */
+	importMode?: ImportMode;
+	/** Whether source can be moved (false = seeding torrent) */
+	canMoveFiles?: boolean;
+	/** Whether to preserve symlinks instead of copying target */
+	preserveSymlinks?: boolean;
 }
 
 /**
@@ -252,6 +304,86 @@ export async function moveFile(source: string, dest: string): Promise<TransferRe
 			error: (error as Error).message
 		};
 	}
+}
+
+/**
+ * Transfer a file using ImportMode to determine the transfer strategy.
+ * Follows Radarr's pattern for handling seeding torrents vs usenet.
+ *
+ * @param source - Source file path
+ * @param dest - Destination file path
+ * @param options - Transfer options including ImportMode and canMoveFiles
+ * @returns Transfer result
+ */
+export async function transferFileWithMode(
+	source: string,
+	dest: string,
+	options: TransferOptions = {}
+): Promise<TransferResult> {
+	const { importMode = ImportMode.Auto, canMoveFiles = true, preserveSymlinks = false } = options;
+
+	// Determine effective transfer mode based on ImportMode
+	let effectiveMode: ImportMode;
+	let deleteSourceAfter = false;
+
+	switch (importMode) {
+		case ImportMode.Auto:
+			// Always use hardlink/copy first (hardlink is instant and space-efficient)
+			// If canMoveFiles=true, we'll delete source after successful transfer
+			effectiveMode = ImportMode.HardlinkOrCopy;
+			deleteSourceAfter = canMoveFiles;
+			logger.debug('Auto import mode: hardlink first, delete source after', {
+				canMoveFiles,
+				deleteSourceAfter,
+				source: basename(source)
+			});
+			break;
+
+		case ImportMode.Move:
+		case ImportMode.Copy:
+		case ImportMode.HardlinkOrCopy:
+			effectiveMode = importMode;
+			break;
+
+		default:
+			effectiveMode = ImportMode.HardlinkOrCopy;
+	}
+
+	// Execute based on effective mode
+	let result: TransferResult;
+
+	switch (effectiveMode) {
+		case ImportMode.Move:
+			return moveFile(source, dest);
+
+		case ImportMode.Copy:
+			return transferFile(source, dest, false, preserveSymlinks);
+
+		case ImportMode.HardlinkOrCopy:
+		default:
+			result = await transferFile(source, dest, true, preserveSymlinks);
+			break;
+	}
+
+	// If transfer succeeded and we should delete source, do it now
+	if (result.success && deleteSourceAfter) {
+		try {
+			await unlink(source);
+			logger.debug('Source file deleted after successful hardlink/copy', {
+				source: basename(source)
+			});
+			// Update mode to reflect the full operation
+			result.mode = 'move';
+		} catch (error) {
+			// Non-fatal: file is already in library, source deletion is just cleanup
+			logger.warn('Failed to delete source after transfer (non-fatal)', {
+				source,
+				error: (error as Error).message
+			});
+		}
+	}
+
+	return result;
 }
 
 /**

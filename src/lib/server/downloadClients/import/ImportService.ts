@@ -28,12 +28,14 @@ import {
 import { eq, and, or, inArray, gte } from 'drizzle-orm';
 import { downloadMonitor } from '../monitoring/DownloadMonitorService';
 import {
-	transferFile,
+	transferFileWithMode,
 	findVideoFiles,
 	ensureDirectory,
 	fileExists,
-	VIDEO_EXTENSIONS
+	VIDEO_EXTENSIONS,
+	ImportMode
 } from './FileTransfer';
+import { getDownloadClientManager } from '../DownloadClientManager';
 import { unlink, rm } from 'fs/promises';
 import { ReleaseParser } from '$lib/server/indexers/parser/ReleaseParser';
 import { mediaInfoService } from '$lib/server/library/media-info';
@@ -44,7 +46,12 @@ import {
 } from '$lib/server/library/naming/NamingService';
 import { namingSettingsService } from '$lib/server/library/naming/NamingSettingsService';
 import { logger } from '$lib/logging';
-import { DOWNLOAD, EXCLUDED_FILE_PATTERNS } from '$lib/config/constants';
+import {
+	DOWNLOAD,
+	EXCLUDED_FILE_PATTERNS,
+	DANGEROUS_EXTENSIONS,
+	EXECUTABLE_EXTENSIONS
+} from '$lib/config/constants';
 import { ImportWorker, workerManager } from '$lib/server/workers';
 import { monitoringScheduler } from '$lib/server/monitoring/MonitoringScheduler.js';
 import { searchSubtitlesForNewMedia } from '$lib/server/subtitles/services/SubtitleImportService.js';
@@ -81,16 +88,58 @@ interface ImportableFileOptions {
 }
 
 /**
+ * Result of scanning for dangerous/executable files in a download
+ * Following Radarr's DownloadedMovieImportService pattern
+ * @see https://github.com/Radarr/Radarr/blob/develop/src/NzbDrone.Core/MediaFiles/DownloadedMovieImportService.cs
+ */
+interface DangerousFileResult {
+	hasDangerousFiles: boolean;
+	dangerousFiles: Array<{ path: string; extension: string; reason: 'dangerous' | 'executable' }>;
+}
+
+/**
+ * Import retry configuration
+ */
+const MAX_IMPORT_ATTEMPTS = 10;
+const IMPORT_RETRY_DELAY_MS = 30_000; // 30 seconds between retries
+
+/**
+ * Pending import info for retry tracking
+ */
+interface PendingImportInfo {
+	attempts: number;
+	lastAttempt: number;
+	reason: string;
+}
+
+/**
+ * Import request result
+ */
+export type ImportRequestResult =
+	| { status: 'queued' }
+	| { status: 'already_importing' }
+	| { status: 'already_imported' }
+	| { status: 'pending_retry'; reason: string }
+	| { status: 'failed'; reason: string };
+
+/**
  * Import Service
  *
- * Listens to the download monitor for completed downloads and
- * automatically imports them to the library.
+ * Central service for importing completed downloads into the media library.
+ * All import requests should go through this service to ensure proper
+ * deduplication and sequential processing.
  */
 export class ImportService extends EventEmitter {
 	private static instance: ImportService | null = null;
 	private parser: ReleaseParser;
 	private isProcessing = false;
 	private processingQueue: string[] = [];
+
+	// Pending imports that need retry (e.g., SABnzbd path not ready yet)
+	private pendingImports: Map<string, PendingImportInfo> = new Map();
+
+	// Timer for retrying pending imports
+	private retryTimer: ReturnType<typeof setInterval> | null = null;
 
 	private constructor() {
 		super();
@@ -106,19 +155,45 @@ export class ImportService extends EventEmitter {
 
 	/** Reset the singleton instance (for testing) */
 	static resetInstance(): void {
+		if (ImportService.instance) {
+			ImportService.instance.stop();
+		}
 		ImportService.instance = null;
 	}
 
 	/**
 	 * Start the import service
-	 * Note: Imports are triggered directly by DownloadMonitorService now,
-	 * so this just checks for any pending imports from previous runs.
+	 * Sets up retry timer and checks for pending imports from previous runs.
 	 */
 	start(): void {
 		logger.info('Starting import service');
 
+		// Start retry timer for pending imports (e.g., SABnzbd path not ready)
+		if (!this.retryTimer) {
+			this.retryTimer = setInterval(() => {
+				this.retryPendingImports().catch((err) => {
+					logger.warn('Error retrying pending imports', {
+						error: err instanceof Error ? err.message : String(err)
+					});
+				});
+			}, IMPORT_RETRY_DELAY_MS);
+		}
+
 		// Check for any completed items that weren't imported (from previous runs)
 		this.checkPendingImports();
+	}
+
+	/**
+	 * Stop the import service
+	 */
+	stop(): void {
+		if (this.retryTimer) {
+			clearInterval(this.retryTimer);
+			this.retryTimer = null;
+		}
+		this.pendingImports.clear();
+		this.processingQueue = [];
+		logger.info('Stopped import service');
 	}
 
 	/**
@@ -166,12 +241,167 @@ export class ImportService extends EventEmitter {
 	}
 
 	/**
-	 * Queue an import job
+	 * Queue an import job (internal - skips validation)
 	 */
 	queueImport(queueItemId: string): void {
 		if (!this.processingQueue.includes(queueItemId)) {
 			this.processingQueue.push(queueItemId);
 			this.processNext();
+		}
+	}
+
+	/**
+	 * Request an import for a completed download.
+	 * This is the PRIMARY entry point for triggering imports from outside.
+	 *
+	 * Validates the download is ready for import (has valid path, not already
+	 * importing, etc.) and either queues it or marks it for retry.
+	 *
+	 * @param queueItemId - ID of the queue item to import
+	 * @returns Result indicating what action was taken
+	 */
+	async requestImport(queueItemId: string): Promise<ImportRequestResult> {
+		// Check if already in processing queue
+		if (this.processingQueue.includes(queueItemId)) {
+			logger.debug('Import already queued', { queueItemId });
+			return { status: 'already_importing' };
+		}
+
+		// Get queue item from database
+		const [queueItem] = await db
+			.select()
+			.from(downloadQueue)
+			.where(eq(downloadQueue.id, queueItemId))
+			.limit(1);
+
+		if (!queueItem) {
+			return { status: 'failed', reason: 'Queue item not found' };
+		}
+
+		// Don't import if already importing/imported
+		if (queueItem.status === 'importing') {
+			return { status: 'already_importing' };
+		}
+		if (queueItem.status === 'imported') {
+			this.pendingImports.delete(queueItemId);
+			return { status: 'already_imported' };
+		}
+
+		// Need output path to import
+		if (!queueItem.outputPath) {
+			this.trackPendingImport(queueItemId, 'No output path');
+			return { status: 'pending_retry', reason: 'No output path available' };
+		}
+
+		// Validate outputPath is not just the base download directory
+		// SABnzbd queue items return empty paths initially, which map to just the base directory
+		// This check prevents scanning the entire download folder
+		const manager = getDownloadClientManager();
+		const clients = await manager.getEnabledClients();
+		const client = clients.find((c) => c.client.id === queueItem.downloadClientId);
+
+		if (client?.client.downloadPathLocal) {
+			const basePath = client.client.downloadPathLocal.replace(/\/+$/, '');
+			const outputPath = queueItem.outputPath.replace(/\/+$/, '');
+
+			// If outputPath equals the base path (or is shorter), it's invalid
+			if (outputPath === basePath || outputPath.length <= basePath.length) {
+				this.trackPendingImport(queueItemId, 'Invalid path - waiting for download client');
+				return { status: 'pending_retry', reason: 'Path not ready yet' };
+			}
+		}
+
+		// Path is valid, clear from pending and queue the import
+		this.pendingImports.delete(queueItemId);
+
+		logger.info('Queueing import for completed download', {
+			queueId: queueItemId,
+			title: queueItem.title,
+			outputPath: queueItem.outputPath
+		});
+
+		this.queueImport(queueItemId);
+		return { status: 'queued' };
+	}
+
+	/**
+	 * Track a pending import that needs retry (path was invalid)
+	 */
+	private trackPendingImport(queueItemId: string, reason: string): void {
+		const existing = this.pendingImports.get(queueItemId);
+		const attempts = (existing?.attempts ?? 0) + 1;
+
+		if (attempts > MAX_IMPORT_ATTEMPTS) {
+			logger.error('Max import retry attempts reached', {
+				queueItemId,
+				attempts,
+				reason
+			});
+			this.pendingImports.delete(queueItemId);
+			// Mark as failed in the database
+			downloadMonitor.markFailed(
+				queueItemId,
+				`Import failed after ${attempts} attempts: ${reason}`
+			);
+			return;
+		}
+
+		this.pendingImports.set(queueItemId, {
+			attempts,
+			lastAttempt: Date.now(),
+			reason
+		});
+
+		logger.info('Tracking pending import for retry', {
+			queueItemId,
+			attempts,
+			reason
+		});
+	}
+
+	/**
+	 * Retry pending imports that are ready
+	 */
+	private async retryPendingImports(): Promise<void> {
+		const now = Date.now();
+
+		for (const [queueItemId, info] of this.pendingImports) {
+			// Skip if already in processing queue
+			if (this.processingQueue.includes(queueItemId)) {
+				continue;
+			}
+
+			// Skip if not ready for retry yet
+			if (now - info.lastAttempt < IMPORT_RETRY_DELAY_MS) {
+				continue;
+			}
+
+			// Check if item still exists and is in valid state
+			const [queueItem] = await db
+				.select({ status: downloadQueue.status })
+				.from(downloadQueue)
+				.where(eq(downloadQueue.id, queueItemId))
+				.limit(1);
+
+			if (
+				!queueItem ||
+				queueItem.status === 'imported' ||
+				queueItem.status === 'removed' ||
+				queueItem.status === 'failed'
+			) {
+				// Item no longer exists or is in terminal state
+				this.pendingImports.delete(queueItemId);
+				continue;
+			}
+
+			logger.info('Retrying pending import', {
+				queueItemId,
+				attempt: info.attempts + 1,
+				reason: info.reason
+			});
+
+			// Try to request import again (will validate path and queue if ready)
+			await this.requestImport(queueItemId);
 		}
 	}
 
@@ -264,9 +494,35 @@ export class ImportService extends EventEmitter {
 			});
 		}
 
-		// Mark as importing (returns false if max attempts exceeded)
-		const canProceed = await downloadMonitor.markImporting(queueItemId);
-		if (!canProceed) {
+		// Mark as importing using atomic operation
+		// This prevents race conditions where two processes try to import the same item
+		const markResult = await downloadMonitor.markImporting(queueItemId);
+
+		if (markResult === 'already_importing') {
+			worker.fail('Already being imported by another process');
+			return {
+				success: false,
+				queueItemId,
+				importedFiles: [],
+				failedFiles: [],
+				totalSize: 0,
+				error: 'Already being imported by another process'
+			};
+		}
+
+		if (markResult === 'already_imported') {
+			worker.complete({ imported: 0, failed: 0, totalSize: 0 });
+			return {
+				success: true,
+				queueItemId,
+				importedFiles: [],
+				failedFiles: [],
+				totalSize: 0,
+				error: 'Already imported'
+			};
+		}
+
+		if (markResult === 'max_attempts') {
 			worker.fail('Max import attempts exceeded');
 			return {
 				success: false,
@@ -278,6 +534,18 @@ export class ImportService extends EventEmitter {
 			};
 		}
 
+		if (markResult === 'not_found') {
+			worker.fail('Queue item not found');
+			return {
+				success: false,
+				queueItemId,
+				importedFiles: [],
+				failedFiles: [],
+				totalSize: 0,
+				error: 'Queue item not found'
+			};
+		}
+
 		try {
 			// Set source path
 			const downloadPath = queueItem.outputPath || queueItem.clientDownloadPath;
@@ -285,12 +553,52 @@ export class ImportService extends EventEmitter {
 				worker.setSourcePath(downloadPath);
 			}
 
+			// Fetch download info from client to determine if we can move files
+			// Seeding torrents can't be moved (canMoveFiles=false) - must use hardlink/copy
+			// Usenet downloads can always be moved (canMoveFiles=true)
+			let canMoveFiles = true; // Default to true (safe for usenet)
+
+			if (client) {
+				try {
+					const clientManager = getDownloadClientManager();
+					const clientInstance = await clientManager.getClientInstance(client.id);
+
+					if (clientInstance) {
+						const downloadId = queueItem.infoHash || queueItem.downloadId;
+						const downloadInfo = await clientInstance.getDownload(downloadId);
+
+						if (downloadInfo) {
+							canMoveFiles = downloadInfo.canMoveFiles;
+							logger.debug('Determined import mode from download client', {
+								canMoveFiles,
+								status: downloadInfo.status,
+								protocol: queueItem.protocol,
+								downloadId
+							});
+						}
+					}
+				} catch (err) {
+					logger.warn(
+						'Failed to get download info for import mode detection, defaulting to hardlink',
+						{
+							error: err instanceof Error ? err.message : String(err),
+							queueItemId
+						}
+					);
+					// If we can't determine, prefer hardlink/copy (safer for seeding)
+					canMoveFiles = queueItem.protocol === 'usenet';
+				}
+			} else {
+				// No client info, use protocol to guess
+				canMoveFiles = queueItem.protocol === 'usenet';
+			}
+
 			// Determine what to import based on linked media
 			let result: ImportJobResult;
 			if (queueItem.movieId) {
-				result = await this.importMovie(queueItem, worker, importOptions);
+				result = await this.importMovie(queueItem, worker, importOptions, canMoveFiles);
 			} else if (queueItem.seriesId) {
-				result = await this.importSeries(queueItem, worker, importOptions);
+				result = await this.importSeries(queueItem, worker, importOptions, canMoveFiles);
 			} else {
 				throw new Error('No linked movie or series');
 			}
@@ -325,11 +633,17 @@ export class ImportService extends EventEmitter {
 
 	/**
 	 * Import a movie download
+	 *
+	 * @param queueItem - Queue item to import
+	 * @param worker - Import worker for tracking
+	 * @param importOptions - File detection options
+	 * @param canMoveFiles - Whether files can be moved (false for seeding torrents)
 	 */
 	private async importMovie(
 		queueItem: typeof downloadQueue.$inferSelect,
 		worker: ImportWorker,
-		importOptions: ImportableFileOptions
+		importOptions: ImportableFileOptions,
+		canMoveFiles: boolean
 	): Promise<ImportJobResult> {
 		const result: ImportJobResult = {
 			success: false,
@@ -381,6 +695,22 @@ export class ImportService extends EventEmitter {
 			return result;
 		}
 
+		// Check for dangerous/executable files (malware protection)
+		const dangerousScan = await this.scanForDangerousFiles(downloadPath);
+		if (dangerousScan.hasDangerousFiles) {
+			const fileList = dangerousScan.dangerousFiles
+				.map((f) => `${basename(f.path)} (${f.extension})`)
+				.join(', ');
+			result.error = `Caution: Found potentially dangerous files: ${fileList}`;
+			logger.warn('Rejecting import due to dangerous files', {
+				downloadPath,
+				dangerousFiles: dangerousScan.dangerousFiles
+			});
+			await downloadMonitor.markFailed(queueItem.id, result.error);
+			worker.log('error', result.error);
+			return result;
+		}
+
 		// Find video files in download
 		const videoFiles = await this.findImportableFiles(downloadPath, importOptions);
 
@@ -427,9 +757,16 @@ export class ImportService extends EventEmitter {
 		}
 
 		// Transfer the file FIRST (keep old file until new one is successfully imported)
-		worker.log('info', `Transferring file to: ${destPath}`);
+		// Use ImportMode.Auto to decide based on canMoveFiles:
+		// - Seeding torrents (canMoveFiles=false): Use hardlink/copy to preserve source
+		// - Usenet/completed (canMoveFiles=true): Use move for efficiency
+		worker.log('info', `Transferring file to: ${destPath} (canMoveFiles=${canMoveFiles})`);
 		const preserveSymlinks = rootFolder.preserveSymlinks ?? false;
-		const transferResult = await transferFile(mainFile.path, destPath, true, preserveSymlinks);
+		const transferResult = await transferFileWithMode(mainFile.path, destPath, {
+			importMode: ImportMode.Auto,
+			canMoveFiles,
+			preserveSymlinks
+		});
 
 		if (!transferResult.success) {
 			result.failedFiles.push({
@@ -503,8 +840,12 @@ export class ImportService extends EventEmitter {
 		result.totalSize = transferResult.sizeBytes || 0;
 		result.success = true;
 
-		// Mark as imported
-		await downloadMonitor.markImported(queueItem.id, destPath);
+		// Mark as imported (protocol determines if it shows as 'seeding-imported' or 'imported')
+		await downloadMonitor.markImported(
+			queueItem.id,
+			destPath,
+			queueItem.protocol as 'torrent' | 'usenet'
+		);
 
 		// NOW delete old files (after successful import - so media is never missing)
 		const deletedFileIds: string[] = [];
@@ -588,11 +929,17 @@ export class ImportService extends EventEmitter {
 
 	/**
 	 * Import a series/episode download
+	 *
+	 * @param queueItem - Queue item to import
+	 * @param worker - Import worker for tracking
+	 * @param importOptions - File detection options
+	 * @param canMoveFiles - Whether files can be moved (false for seeding torrents)
 	 */
 	private async importSeries(
 		queueItem: typeof downloadQueue.$inferSelect,
 		worker: ImportWorker,
-		importOptions: ImportableFileOptions
+		importOptions: ImportableFileOptions,
+		_canMoveFiles: boolean
 	): Promise<ImportJobResult> {
 		const result: ImportJobResult = {
 			success: false,
@@ -648,6 +995,22 @@ export class ImportService extends EventEmitter {
 			return result;
 		}
 
+		// Check for dangerous/executable files (malware protection)
+		const dangerousScan = await this.scanForDangerousFiles(downloadPath);
+		if (dangerousScan.hasDangerousFiles) {
+			const fileList = dangerousScan.dangerousFiles
+				.map((f) => `${basename(f.path)} (${f.extension})`)
+				.join(', ');
+			result.error = `Caution: Found potentially dangerous files: ${fileList}`;
+			logger.warn('Rejecting import due to dangerous files', {
+				downloadPath,
+				dangerousFiles: dangerousScan.dangerousFiles
+			});
+			await downloadMonitor.markFailed(queueItem.id, result.error);
+			worker.log('error', result.error);
+			return result;
+		}
+
 		// Find video files
 		const videoFiles = await this.findImportableFiles(downloadPath, importOptions);
 
@@ -687,7 +1050,8 @@ export class ImportService extends EventEmitter {
 					resolvedFile,
 					seriesData,
 					rootFolder,
-					queueItem
+					queueItem,
+					_canMoveFiles
 				);
 
 				if (importResult.success) {
@@ -736,9 +1100,13 @@ export class ImportService extends EventEmitter {
 		result.success = result.importedFiles.length > 0;
 
 		if (result.success) {
-			// Mark as imported
+			// Mark as imported (protocol determines if it shows as 'seeding-imported' or 'imported')
 			const importedPath = result.importedFiles[0]?.destPath || downloadPath;
-			await downloadMonitor.markImported(queueItem.id, importedPath);
+			await downloadMonitor.markImported(
+				queueItem.id,
+				importedPath,
+				queueItem.protocol as 'torrent' | 'usenet'
+			);
 
 			// Create history record
 			await this.createHistoryRecord(queueItem, 'imported', {
@@ -787,7 +1155,8 @@ export class ImportService extends EventEmitter {
 		videoFile: { path: string; size: number },
 		seriesData: typeof series.$inferSelect,
 		rootFolder: typeof rootFolders.$inferSelect,
-		queueItem: typeof downloadQueue.$inferSelect
+		queueItem: typeof downloadQueue.$inferSelect,
+		canMoveFiles: boolean
 	): Promise<ImportResult> {
 		// Parse episode info from filename
 		const parsed = this.parser.parse(basename(videoFile.path));
@@ -821,9 +1190,13 @@ export class ImportService extends EventEmitter {
 		// Ensure season folder exists
 		await ensureDirectory(seasonFolder);
 
-		// Transfer file
+		// Transfer file using mode based on seeding state
 		const preserveSymlinks = rootFolder.preserveSymlinks ?? false;
-		const transferResult = await transferFile(videoFile.path, destPath, true, preserveSymlinks);
+		const transferResult = await transferFileWithMode(videoFile.path, destPath, {
+			importMode: ImportMode.Auto,
+			canMoveFiles,
+			preserveSymlinks
+		});
 
 		if (!transferResult.success) {
 			return {
@@ -1083,6 +1456,83 @@ export class ImportService extends EventEmitter {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Scan a directory for dangerous or executable files
+	 * Following Radarr's DownloadedMovieImportService pattern
+	 * @see https://github.com/Radarr/Radarr/blob/develop/src/NzbDrone.Core/MediaFiles/DownloadedMovieImportService.cs
+	 */
+	private async scanForDangerousFiles(downloadPath: string): Promise<DangerousFileResult> {
+		const result: DangerousFileResult = {
+			hasDangerousFiles: false,
+			dangerousFiles: []
+		};
+
+		try {
+			const stats = await stat(downloadPath);
+
+			if (stats.isFile()) {
+				// Single file - check it directly
+				const ext = extname(downloadPath).toLowerCase();
+				if ((DANGEROUS_EXTENSIONS as readonly string[]).includes(ext)) {
+					result.hasDangerousFiles = true;
+					result.dangerousFiles.push({ path: downloadPath, extension: ext, reason: 'dangerous' });
+				} else if ((EXECUTABLE_EXTENSIONS as readonly string[]).includes(ext)) {
+					result.hasDangerousFiles = true;
+					result.dangerousFiles.push({ path: downloadPath, extension: ext, reason: 'executable' });
+				}
+			} else if (stats.isDirectory()) {
+				// Recursively scan directory for dangerous files
+				await this.scanDirectoryForDangerousFiles(downloadPath, result);
+			}
+		} catch (error) {
+			logger.warn('Failed to scan for dangerous files', {
+				downloadPath,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+
+		return result;
+	}
+
+	/**
+	 * Recursively scan a directory for dangerous files
+	 */
+	private async scanDirectoryForDangerousFiles(
+		dir: string,
+		result: DangerousFileResult
+	): Promise<void> {
+		try {
+			const { readdir } = await import('fs/promises');
+			const entries = await readdir(dir, { withFileTypes: true });
+
+			for (const entry of entries) {
+				const fullPath = join(dir, entry.name);
+
+				if (entry.isDirectory()) {
+					// Skip hidden directories
+					if (entry.name.startsWith('.') || entry.name.startsWith('@')) {
+						continue;
+					}
+					await this.scanDirectoryForDangerousFiles(fullPath, result);
+				} else if (entry.isFile()) {
+					const ext = extname(entry.name).toLowerCase();
+					if ((DANGEROUS_EXTENSIONS as readonly string[]).includes(ext)) {
+						result.hasDangerousFiles = true;
+						result.dangerousFiles.push({ path: fullPath, extension: ext, reason: 'dangerous' });
+					} else if ((EXECUTABLE_EXTENSIONS as readonly string[]).includes(ext)) {
+						result.hasDangerousFiles = true;
+						result.dangerousFiles.push({ path: fullPath, extension: ext, reason: 'executable' });
+					}
+				}
+			}
+		} catch (error) {
+			logger.warn('Failed to scan directory for dangerous files', {
+				dir,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
 	}
 
 	/**

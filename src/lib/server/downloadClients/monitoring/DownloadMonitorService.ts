@@ -37,10 +37,9 @@ const POLL_INTERVAL_ACTIVE = 5_000; // 5 seconds when active downloads
 const POLL_INTERVAL_IDLE = 30_000; // 30 seconds when idle
 
 /**
- * Import retry configuration
+ * Max import attempts before marking as failed
  */
 const MAX_IMPORT_ATTEMPTS = 10;
-const IMPORT_RETRY_DELAY_MS = 30_000; // 30 seconds between retries
 
 /**
  * Grace period for completed items during queue-to-history transition.
@@ -51,9 +50,15 @@ const IMPORT_RETRY_DELAY_MS = 30_000; // 30 seconds between retries
 const COMPLETED_GRACE_PERIOD_MS = 300_000; // 5 minutes
 
 /**
- * Terminal statuses that shouldn't be updated
+ * Terminal statuses - items that are completely done and hidden from queue UI
  */
 const TERMINAL_STATUSES: QueueStatus[] = ['imported', 'removed'];
+
+/**
+ * Post-import statuses - items that are imported but still visible in queue (seeding)
+ * These should NOT be updated by polling - they're managed by removeCompletedDownloads()
+ */
+const POST_IMPORT_STATUSES: QueueStatus[] = ['imported', 'seeding-imported'];
 
 /**
  * Convert database row to QueueItem
@@ -173,15 +178,13 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 	private _error?: Error;
 
 	private isRunning = false;
+	private isPolling = false; // Prevents concurrent poll() calls
 	private pollTimer: ReturnType<typeof setTimeout> | null = null;
 	private lastPollTime = 0;
 	private activeDownloadCount = 0;
 
 	// SSE clients for real-time updates
 	private sseClients: Set<(event: QueueEvent) => void> = new Set();
-
-	// Pending imports that need retry (path was invalid, waiting for SABnzbd to finish)
-	private pendingImports: Map<string, { attempts: number; lastAttempt: number }> = new Map();
 
 	// Last time orphan cleanup was run (runs every 10 minutes)
 	private lastOrphanCleanupTime = 0;
@@ -590,9 +593,6 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			// Actually clear the items
 			for (const item of failedItems) {
 				try {
-					// Clear pending import tracking
-					this.pendingImports.delete(item.id);
-
 					// Mark as removed
 					await db
 						.update(downloadQueue)
@@ -693,6 +693,13 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 	async poll(): Promise<void> {
 		if (!this.isRunning) return;
 
+		// Prevent concurrent polls (e.g., from forcePoll while regular poll is running)
+		if (this.isPolling) {
+			logger.debug('Skipping poll - another poll is already in progress');
+			return;
+		}
+
+		this.isPolling = true;
 		const startTime = Date.now();
 		this.lastPollTime = startTime;
 
@@ -716,6 +723,8 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			logger.error('Error during download poll', {
 				error: error instanceof Error ? error.message : String(error)
 			});
+		} finally {
+			this.isPolling = false;
 		}
 
 		// Schedule next poll
@@ -760,11 +769,17 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			return;
 		}
 
-		// Get all non-terminal queue items grouped by client
+		// Get queue items that need polling (exclude terminal AND post-import statuses)
+		// Post-import items are handled by removeCompletedDownloads(), not regular polling
 		const queueItems = await db
 			.select()
 			.from(downloadQueue)
-			.where(not(inArray(downloadQueue.status, TERMINAL_STATUSES)));
+			.where(
+				and(
+					not(inArray(downloadQueue.status, TERMINAL_STATUSES)),
+					not(inArray(downloadQueue.status, POST_IMPORT_STATUSES))
+				)
+			);
 
 		// Group by client
 		const itemsByClient = new Map<string, (typeof queueItems)[0][]>();
@@ -797,8 +812,7 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 		// This follows Radarr's pattern of removing after seeding is done
 		await this.removeCompletedDownloads(enabledClients);
 
-		// Retry pending imports (SABnzbd items that had invalid paths on first attempt)
-		await this.retryPendingImports();
+		// Note: Pending import retries are now handled by ImportService
 
 		// Emit stats update
 		const stats = await this.getStats();
@@ -809,18 +823,18 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 	 * Remove completed downloads that have met their seeding requirements.
 	 * Follows Radarr's RemoveCompletedDownloads pattern.
 	 *
-	 * This checks for queue items that are 'imported' and whose torrent
+	 * This checks for queue items that are 'imported' or 'seeding-imported' and whose torrent
 	 * has canBeRemoved=true (paused after reaching seed limits).
 	 */
 	private async removeCompletedDownloads(
 		enabledClients: { client: DownloadClient; instance: IDownloadClient }[]
 	): Promise<void> {
 		// Get imported queue items that haven't been cleaned up yet
-		// We look for 'imported' status items that still have a downloadId
+		// Check both 'imported' (usenet) and 'seeding-imported' (torrents still seeding)
 		const importedItems = await db
 			.select()
 			.from(downloadQueue)
-			.where(eq(downloadQueue.status, 'imported'));
+			.where(inArray(downloadQueue.status, ['imported', 'seeding-imported']));
 
 		if (importedItems.length === 0) {
 			return;
@@ -839,54 +853,58 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			}
 
 			try {
-				// Check if the torrent still exists and can be removed
-				const torrentHash = item.infoHash || item.downloadId;
-				const download = await clientInstance.getDownload(torrentHash);
+				// Check if the download still exists and can be removed
+				const downloadHash = item.infoHash || item.downloadId;
+				const download = await clientInstance.getDownload(downloadHash);
 
 				if (!download) {
-					// Torrent already removed from client, clean up queue entry
-					logger.debug('Torrent already removed from client, cleaning up queue entry', {
+					// Download already removed from client, clean up queue entry
+					logger.debug('Download already removed from client, cleaning up queue entry', {
 						title: item.title,
-						hash: torrentHash
+						hash: downloadHash,
+						protocol: item.protocol
 					});
 					await db.delete(downloadQueue).where(eq(downloadQueue.id, item.id));
+					this.emitSSE('queue:removed', { id: item.id });
 					continue;
 				}
 
 				if (download.canBeRemoved) {
-					// Torrent has met seeding requirements and is paused - remove it
-					logger.info('Removing completed torrent from download client (seeding complete)', {
+					// Download has met requirements (seeding limits for torrents, completed for usenet)
+					logger.info('Removing completed download from client', {
 						title: item.title,
-						hash: torrentHash,
+						hash: downloadHash,
+						protocol: item.protocol,
 						ratio: download.ratio,
 						seedingTime: download.seedingTime,
 						ratioLimit: download.ratioLimit,
 						seedingTimeLimit: download.seedingTimeLimit
 					});
 
-					await clientInstance.removeDownload(torrentHash, false);
+					await clientInstance.removeDownload(downloadHash, false);
 
 					// Clean up queue entry
 					await db.delete(downloadQueue).where(eq(downloadQueue.id, item.id));
 
-					logger.info('Successfully removed completed torrent', {
+					logger.info('Successfully removed completed download', {
 						title: item.title,
-						hash: torrentHash
+						hash: downloadHash,
+						protocol: item.protocol
 					});
 
 					this.emitSSE('queue:removed', { id: item.id });
 				} else {
-					// Still seeding, leave it alone
-					logger.debug('Imported torrent still seeding', {
+					// Still seeding/processing, leave it alone
+					logger.debug('Imported download still active', {
 						title: item.title,
-						hash: torrentHash,
+						hash: downloadHash,
 						ratio: download.ratio,
 						status: download.status,
 						canBeRemoved: download.canBeRemoved
 					});
 				}
 			} catch (error) {
-				logger.warn('Failed to check/remove completed torrent', {
+				logger.warn('Failed to check/remove completed download', {
 					title: item.title,
 					error: error instanceof Error ? error.message : String(error)
 				});
@@ -968,9 +986,7 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 					queueItem.downloadId = download.hash;
 				}
 
-				// Download still exists in client
-				const wasDownloadingOrQueued =
-					queueItem.status === 'downloading' || queueItem.status === 'queued';
+				// Count active downloads for adaptive polling
 				const isNowDownloading = download.status === 'downloading';
 
 				if (isNowDownloading || download.status === 'queued') {
@@ -979,27 +995,37 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 
 				await this.updateQueueItem(queueItem, download, client);
 
-				// Check if download just finished
-				// For usenet (SABnzbd): triggers when status becomes 'completed'
-				// For torrents (qBittorrent): triggers when status becomes 'seeding' with 100% progress
-				// Note: qBittorrent goes downloading -> seeding (never 'completed')
-				// SABnzbd reports 100% during post-processing but status stays 'downloading'
-				// until it moves to history with 'Completed' status
-				// Also handle paused downloads at 100% - they should still trigger import
-				const justFinishedDownloading =
+				// Radarr pattern: Check every completed download on every poll
+				// This catches downloads that:
+				// - Just finished
+				// - Were already complete when we started tracking
+				// - Completed between polls
+				// Don't rely on transition detection which can miss fast downloads
+				const isReadyForImport =
 					download.status === 'completed' ||
 					(download.status === 'seeding' && download.progress >= 1) ||
 					(download.status === 'paused' && download.progress >= 1);
 
-				if (wasDownloadingOrQueued && justFinishedDownloading) {
+				// Only check items that haven't been imported yet
+				// Radarr checks items in 'Downloading' or 'ImportBlocked' state
+				const canBeChecked =
+					queueItem.status === 'downloading' ||
+					queueItem.status === 'queued' ||
+					queueItem.status === 'seeding' ||
+					queueItem.status === 'completed' ||
+					queueItem.status === 'stalled';
+
+				if (isReadyForImport && canBeChecked && !queueItem.importedAt) {
+					// This download is ready for import - request import via ImportService
 					const updatedItem = await this.getQueueItem(queueItem.id);
 					if (updatedItem) {
 						this.emit('queue:completed', updatedItem);
 						this.emitSSE('queue:completed', updatedItem);
 
-						// Trigger import automatically
-						this.triggerImport(updatedItem).catch((err) => {
-							logger.error('Failed to trigger import for completed download', {
+						// Request import through ImportService (handles all validation and deduplication)
+						const importService = await getImportService();
+						importService.requestImport(updatedItem.id).catch((err) => {
+							logger.error('Failed to request import for completed download', {
 								queueId: updatedItem.id,
 								title: updatedItem.title,
 								error: err instanceof Error ? err.message : String(err)
@@ -1059,38 +1085,23 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			eta: download.eta,
 			ratio: download.ratio?.toString() || '0',
 			clientDownloadPath: newClientDownloadPath,
-			outputPath
+			outputPath,
+			status: newStatus
 		};
 
-		// Update status if changed
-		if (statusChanged) {
-			// Preserve "sticky" statuses that shouldn't be overwritten by download client polling
-			// - 'failed': Only recover if download becomes actively downloading/queued again
-			// - 'importing': Don't interrupt active import process
-			const stickyStatuses = ['failed', 'importing'];
-			const isRecovering = newStatus === 'downloading' || newStatus === 'queued';
-			const shouldPreserveStatus = stickyStatuses.includes(queueItem.status) && !isRecovering;
+		// Set startedAt on first download progress
+		if (newStatus === 'downloading' && !queueItem.startedAt) {
+			updates.startedAt = now;
+		}
 
-			if (!shouldPreserveStatus) {
-				updates.status = newStatus;
+		// Set completedAt when finished downloading
+		if ((newStatus === 'completed' || newStatus === 'seeding') && !queueItem.completedAt) {
+			updates.completedAt = now;
+		}
 
-				// Set startedAt on first download progress
-				if (newStatus === 'downloading' && !queueItem.startedAt) {
-					updates.startedAt = now;
-				}
-
-				// Set completedAt when finished downloading
-				if (newStatus === 'completed' || newStatus === 'seeding') {
-					if (!queueItem.completedAt) {
-						updates.completedAt = now;
-					}
-				}
-
-				// Capture error message when download fails
-				if (newStatus === 'failed' && download.errorMessage) {
-					updates.errorMessage = download.errorMessage;
-				}
-			}
+		// Capture error message when download fails
+		if (newStatus === 'failed' && download.errorMessage) {
+			updates.errorMessage = download.errorMessage;
 		}
 
 		// Only update if something changed
@@ -1138,16 +1149,6 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 		// 1. Transitioning from SABnzbd queue to history (need grace period)
 		// 2. Actually removed from client
 		if (queueItem.status === 'completed' || queueItem.status === 'seeding') {
-			// Check if this is a pending import - if so, don't mark as removed
-			// SABnzbd takes time to move items from queue to history
-			if (this.pendingImports.has(queueItem.id)) {
-				logger.debug('Completed download not in client but pending import retry', {
-					title: queueItem.title,
-					downloadId: queueItem.downloadId
-				});
-				return;
-			}
-
 			// Give a grace period for completed items (SABnzbd queue->history transition time)
 			const completedAt = queueItem.completedAt
 				? new Date(queueItem.completedAt).getTime()
@@ -1221,150 +1222,6 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 		if (updatedItem) {
 			this.emit('queue:failed', updatedItem);
 			this.emitSSE('queue:failed', updatedItem);
-		}
-	}
-
-	/**
-	 * Track a pending import that needs retry (path was invalid)
-	 */
-	private trackPendingImport(queueItemId: string, reason: string): void {
-		const existing = this.pendingImports.get(queueItemId);
-		const attempts = (existing?.attempts ?? 0) + 1;
-
-		if (attempts > MAX_IMPORT_ATTEMPTS) {
-			logger.error('Max import retry attempts reached', {
-				queueItemId,
-				attempts,
-				reason
-			});
-			this.pendingImports.delete(queueItemId);
-			this.markFailed(queueItemId, `Import failed after ${attempts} attempts: ${reason}`);
-			return;
-		}
-
-		this.pendingImports.set(queueItemId, {
-			attempts,
-			lastAttempt: Date.now()
-		});
-
-		logger.info('Tracking pending import for retry', {
-			queueItemId,
-			attempts,
-			reason
-		});
-	}
-
-	/**
-	 * Retry pending imports that are ready
-	 */
-	private async retryPendingImports(): Promise<void> {
-		const now = Date.now();
-
-		for (const [queueItemId, info] of this.pendingImports) {
-			// Skip if not ready for retry yet
-			if (now - info.lastAttempt < IMPORT_RETRY_DELAY_MS) {
-				continue;
-			}
-
-			const queueItem = await this.getQueueItem(queueItemId);
-			if (!queueItem || queueItem.status !== 'completed') {
-				// Item no longer exists or status changed
-				this.pendingImports.delete(queueItemId);
-				continue;
-			}
-
-			logger.info('Retrying pending import', {
-				queueItemId,
-				title: queueItem.title,
-				attempt: info.attempts + 1
-			});
-
-			await this.triggerImport(queueItem);
-		}
-	}
-
-	/**
-	 * Trigger import for a completed download
-	 */
-	private async triggerImport(queueItem: QueueItem): Promise<void> {
-		// Don't import if already importing/imported
-		if (queueItem.status === 'importing' || queueItem.status === 'imported') {
-			this.pendingImports.delete(queueItem.id);
-			return;
-		}
-
-		// Need output path to import
-		if (!queueItem.outputPath) {
-			logger.warn('Cannot import: no output path available', {
-				queueId: queueItem.id,
-				title: queueItem.title
-			});
-			this.trackPendingImport(queueItem.id, 'No output path');
-			return;
-		}
-
-		// Validate outputPath is not just the base download directory
-		// SABnzbd queue items return empty paths, which map to just the base directory
-		// This check prevents scanning the entire download folder
-		const manager = getDownloadClientManager();
-		const clients = await manager.getEnabledClients();
-		const client = clients.find((c) => c.client.id === queueItem.downloadClientId);
-
-		if (client?.client.downloadPathLocal) {
-			const basePath = client.client.downloadPathLocal.replace(/\/+$/, '');
-			const outputPath = queueItem.outputPath.replace(/\/+$/, '');
-
-			// If outputPath equals the base path (or is shorter), it's invalid
-			if (outputPath === basePath || outputPath.length <= basePath.length) {
-				logger.warn('Cannot import: outputPath is just the base directory (files not ready)', {
-					queueId: queueItem.id,
-					title: queueItem.title,
-					outputPath: queueItem.outputPath,
-					basePath: client.client.downloadPathLocal
-				});
-				this.trackPendingImport(queueItem.id, 'Invalid path - waiting for SABnzbd');
-				return;
-			}
-		}
-
-		// Path is valid, clear from pending
-		this.pendingImports.delete(queueItem.id);
-
-		logger.info('Triggering import for completed download', {
-			queueId: queueItem.id,
-			title: queueItem.title,
-			outputPath: queueItem.outputPath
-		});
-
-		try {
-			const importService = await getImportService();
-			const result = await importService.processImport(queueItem.id);
-
-			if (result.success) {
-				logger.info('Import completed successfully', {
-					queueId: queueItem.id,
-					title: queueItem.title,
-					filesImported: result.importedFiles.length
-				});
-			} else {
-				logger.error('Import failed', {
-					queueId: queueItem.id,
-					title: queueItem.title,
-					error: result.error
-				});
-			}
-		} catch (error) {
-			logger.error('Import threw exception', {
-				queueId: queueItem.id,
-				title: queueItem.title,
-				error: error instanceof Error ? error.message : String(error)
-			});
-
-			// Mark as failed
-			await this.markFailed(
-				queueItem.id,
-				`Import error: ${error instanceof Error ? error.message : String(error)}`
-			);
 		}
 	}
 
@@ -1577,9 +1434,6 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			}
 		}
 
-		// Clear pending import tracking if exists
-		this.pendingImports.delete(id);
-
 		// Update status to removed
 		await db.update(downloadQueue).set({ status: 'removed' }).where(eq(downloadQueue.id, id));
 
@@ -1655,60 +1509,111 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 
 	/**
 	 * Mark a queue item as importing (for ImportService to call)
-	 * Returns false if max import attempts exceeded
+	 * Uses atomic check to prevent race conditions - only succeeds if item
+	 * is not already importing/imported.
+	 *
+	 * @returns 'success' if marked as importing, 'already_importing' if another
+	 *          process got there first, 'max_attempts' if limit exceeded
 	 */
-	async markImporting(id: string): Promise<boolean> {
+	async markImporting(
+		id: string
+	): Promise<'success' | 'already_importing' | 'already_imported' | 'max_attempts' | 'not_found'> {
 		const now = new Date().toISOString();
 
-		// First get current import attempts
+		// Get current state
 		const current = await db
-			.select({ importAttempts: downloadQueue.importAttempts, title: downloadQueue.title })
+			.select({
+				status: downloadQueue.status,
+				importAttempts: downloadQueue.importAttempts,
+				title: downloadQueue.title
+			})
 			.from(downloadQueue)
 			.where(eq(downloadQueue.id, id))
 			.get();
 
-		const newAttempts = (current?.importAttempts ?? 0) + 1;
+		if (!current) {
+			return 'not_found';
+		}
+
+		// Already in terminal state
+		if (current.status === 'importing') {
+			return 'already_importing';
+		}
+		if (current.status === 'imported') {
+			return 'already_imported';
+		}
+
+		const newAttempts = (current.importAttempts ?? 0) + 1;
 
 		// Enforce MAX_IMPORT_ATTEMPTS limit
 		if (newAttempts > MAX_IMPORT_ATTEMPTS) {
 			logger.error('Max import attempts exceeded, marking as failed', {
 				queueItemId: id,
-				title: current?.title,
+				title: current.title,
 				attempts: newAttempts,
 				maxAttempts: MAX_IMPORT_ATTEMPTS
 			});
 			await this.markFailed(id, `Import failed after ${newAttempts} attempts`);
-			return false;
+			return 'max_attempts';
 		}
 
-		await db
+		// Atomic update: only update if status is NOT already 'importing' or 'imported'
+		// This prevents race conditions where two callers both pass the check above
+		const result = await db
 			.update(downloadQueue)
 			.set({
 				status: 'importing',
 				importAttempts: newAttempts,
 				lastAttemptAt: now
 			})
-			.where(eq(downloadQueue.id, id));
+			.where(
+				and(
+					eq(downloadQueue.id, id),
+					not(eq(downloadQueue.status, 'importing')),
+					not(eq(downloadQueue.status, 'imported'))
+				)
+			);
+
+		// Check if the update actually changed anything
+		// SQLite returns changes count in result
+		if (result.changes === 0) {
+			// Another process already marked it as importing
+			logger.debug('markImporting: race condition detected, another process won', { id });
+			return 'already_importing';
+		}
 
 		const updatedItem = await this.getQueueItem(id);
 		if (updatedItem) {
 			this.emit('queue:updated', updatedItem);
 			this.emitSSE('queue:updated', updatedItem);
 		}
-		return true;
+		return 'success';
 	}
 
 	/**
-	 * Mark a queue item as imported and remove from queue
+	 * Mark a queue item as imported.
+	 *
+	 * For torrents: Sets status to 'seeding-imported' to indicate file is imported
+	 * but torrent is still seeding. removeCompletedDownloads() will set to 'imported'
+	 * and delete when seeding requirements are met.
+	 *
+	 * For usenet: Sets status to 'imported' directly (no seeding needed).
 	 */
-	async markImported(id: string, importedPath: string): Promise<void> {
+	async markImported(
+		id: string,
+		importedPath: string,
+		protocol?: 'torrent' | 'usenet'
+	): Promise<void> {
 		const now = new Date().toISOString();
 
-		// First update to imported status
+		// For torrents, use 'seeding-imported' to show it's imported but still seeding
+		// For usenet, use 'imported' directly (no seeding)
+		const status = protocol === 'torrent' ? 'seeding-imported' : 'imported';
+
 		await db
 			.update(downloadQueue)
 			.set({
-				status: 'imported',
+				status,
 				importedPath,
 				importedAt: now
 			})
@@ -1720,19 +1625,12 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 			this.emitSSE('queue:imported', updatedItem);
 		}
 
-		// Clean up the queue entry since history is preserved separately
-		// Delete after a short delay to ensure SSE clients receive the imported event
-		setTimeout(async () => {
-			try {
-				await db.delete(downloadQueue).where(eq(downloadQueue.id, id));
-				logger.debug('Cleaned up imported queue item', { id });
-			} catch (error) {
-				logger.warn('Failed to clean up imported queue item', {
-					id,
-					error: error instanceof Error ? error.message : String(error)
-				});
-			}
-		}, 2000);
+		logger.info('Marked queue item as imported', {
+			id,
+			importedPath,
+			status,
+			protocol
+		});
 	}
 
 	/**

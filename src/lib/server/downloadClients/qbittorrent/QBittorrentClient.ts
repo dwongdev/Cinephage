@@ -679,17 +679,53 @@ export class QBittorrentClient implements IDownloadClient {
 	}
 
 	/**
-	 * Map a QBittorrent torrent to DownloadInfo, calculating canBeRemoved
+	 * Check if torrent state indicates it's actively seeding
+	 * When seeding, files cannot be moved (must use hardlink/copy)
+	 */
+	private isSeeding(state: string): boolean {
+		return (
+			state === 'uploading' || state === 'forcedUP' || state === 'stalledUP' || state === 'queuedUP'
+		);
+	}
+
+	/**
+	 * Check if torrent is completed (downloading finished)
+	 */
+	private isCompleted(state: string, progress: number): boolean {
+		return (
+			progress >= 1 ||
+			state === 'uploading' ||
+			state === 'forcedUP' ||
+			state === 'stalledUP' ||
+			state === 'queuedUP' ||
+			state === 'pausedUP' ||
+			state === 'stoppedUP'
+		);
+	}
+
+	/**
+	 * Map a QBittorrent torrent to DownloadInfo, calculating canMoveFiles and canBeRemoved
+	 *
+	 * Follows Radarr's pattern:
+	 * - canMoveFiles: false when seeding (source must be preserved), true when paused/stopped
+	 * - canBeRemoved: true when paused AND seeding limits met
 	 */
 	private mapTorrentToDownloadInfo(
 		t: QBittorrentTorrent,
 		globalPrefs: QBittorrentPreferences
 	): DownloadInfo {
-		// A torrent can be removed if:
-		// 1. It's paused after upload (pausedUP/stoppedUP)
-		// 2. It has reached its seeding limit
-		const canBeRemoved =
-			this.isPausedAfterSeeding(t.state) && this.hasReachedSeedLimit(t, globalPrefs);
+		const isPaused = this.isPausedAfterSeeding(t.state);
+		const isSeeding = this.isSeeding(t.state);
+		const hasReachedSeedLimit = this.hasReachedSeedLimit(t, globalPrefs);
+
+		// canMoveFiles: false for seeding torrents (must hardlink/copy to preserve source)
+		// true for paused torrents or those not yet completed
+		// Follows Radarr's DownloadClientItem.CanMoveFiles pattern
+		const canMoveFiles = isPaused && !isSeeding;
+
+		// canBeRemoved: torrent is paused AND has reached seeding limits
+		// Follows Radarr's QBittorrent.cs logic
+		const canBeRemoved = isPaused && hasReachedSeedLimit;
 
 		return {
 			id: t.hash,
@@ -710,7 +746,9 @@ export class QBittorrentClient implements IDownloadClient {
 			seedingTime: t.seeding_time,
 			ratioLimit: t.ratio_limit,
 			seedingTimeLimit: t.seeding_time_limit,
-			canBeRemoved
+			canMoveFiles,
+			canBeRemoved,
+			removed: false
 		};
 	}
 
@@ -824,5 +862,94 @@ export class QBittorrentClient implements IDownloadClient {
 				body: formData.toString()
 			});
 		});
+	}
+
+	/**
+	 * Mark a torrent as imported by moving it to a post-import category.
+	 * Follows Radarr's QBittorrent.MarkItemAsImported pattern.
+	 *
+	 * @param hash - Torrent hash
+	 * @param importedCategory - Category to move the torrent to (e.g., "cinephage-imported")
+	 */
+	async markItemAsImported(hash: string, importedCategory?: string): Promise<void> {
+		if (!importedCategory) {
+			logger.debug('[QBittorrent] No imported category configured, skipping category change', {
+				hash
+			});
+			return;
+		}
+
+		try {
+			// Ensure the category exists
+			await this.ensureCategory(importedCategory);
+
+			// Set the category
+			const formData = new URLSearchParams();
+			formData.append('hashes', hash);
+			formData.append('category', importedCategory);
+
+			await this.requestText('/api/v2/torrents/setCategory', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: formData.toString()
+			});
+
+			logger.info('[QBittorrent] Moved torrent to imported category', {
+				hash,
+				category: importedCategory
+			});
+		} catch (error) {
+			logger.warn('[QBittorrent] Failed to set post-import category', {
+				hash,
+				category: importedCategory,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			// Don't throw - this is a non-critical operation
+		}
+	}
+
+	/**
+	 * Set seeding configuration for a torrent.
+	 * Follows Radarr's QBittorrent.SetTorrentSeedingConfiguration pattern.
+	 *
+	 * @param hash - Torrent hash
+	 * @param config - Seed ratio and time limits
+	 */
+	async setSeedingConfig(
+		hash: string,
+		config: { ratioLimit?: number; seedingTimeLimit?: number }
+	): Promise<void> {
+		try {
+			const formData = new URLSearchParams();
+			formData.append('hashes', hash);
+
+			if (config.ratioLimit !== undefined) {
+				// -2 = use global, -1 = unlimited, >0 = specific limit
+				formData.append('ratioLimit', config.ratioLimit.toString());
+			}
+
+			if (config.seedingTimeLimit !== undefined) {
+				// -2 = use global, -1 = unlimited, >0 = limit in minutes
+				formData.append('seedingTimeLimit', config.seedingTimeLimit.toString());
+			}
+
+			await this.requestText('/api/v2/torrents/setShareLimits', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: formData.toString()
+			});
+
+			logger.info('[QBittorrent] Set seeding configuration', {
+				hash,
+				ratioLimit: config.ratioLimit,
+				seedingTimeLimit: config.seedingTimeLimit
+			});
+		} catch (error) {
+			logger.warn('[QBittorrent] Failed to set seeding configuration', {
+				hash,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			throw error;
+		}
 	}
 }

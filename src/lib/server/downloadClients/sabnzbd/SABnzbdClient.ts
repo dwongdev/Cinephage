@@ -803,7 +803,12 @@ export class SABnzbdClient implements IDownloadClient {
 			eta: this.parseTimeToSeconds(item.timeleft),
 			savePath: '', // Not available in queue
 			contentPath: '', // Not available until complete
-			category: item.cat
+			category: item.cat,
+			// Usenet downloads can always be moved (no seeding)
+			canMoveFiles: true,
+			// Can be removed when no longer in queue (still downloading = not removable)
+			canBeRemoved: false,
+			removed: false
 		};
 	}
 
@@ -897,7 +902,11 @@ export class SABnzbdClient implements IDownloadClient {
 			contentPath: outputPath,
 			category: item.category,
 			completedOn: item.completed ? new Date(item.completed * 1000) : undefined,
+			// Usenet downloads can always be moved (no seeding)
+			canMoveFiles: true,
+			// Usenet can be removed once completed
 			canBeRemoved: isCompleted,
+			removed: false,
 			errorMessage: item.fail_message || undefined
 		};
 	}

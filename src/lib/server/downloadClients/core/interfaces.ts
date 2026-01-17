@@ -79,8 +79,25 @@ export interface DownloadInfo {
 	ratioLimit?: number;
 	/** Per-torrent seeding time limit in minutes (-2 = global, -1 = unlimited, >0 = limit) */
 	seedingTimeLimit?: number;
-	/** Whether the torrent is paused and has met seeding requirements (can be removed) */
-	canBeRemoved?: boolean;
+
+	/**
+	 * Whether files can be moved from the download location.
+	 * False for seeding torrents (must use hardlink/copy to preserve source).
+	 * True for usenet downloads or completed torrents that aren't seeding.
+	 * Follows Radarr's DownloadClientItem.CanMoveFiles pattern.
+	 */
+	canMoveFiles: boolean;
+
+	/**
+	 * Whether the download can be removed from the client.
+	 * True when: (usenet AND completed) OR (torrent paused after meeting seed limits)
+	 * Follows Radarr's DownloadClientItem.CanBeRemoved pattern.
+	 */
+	canBeRemoved: boolean;
+
+	/** Whether the download has been removed from the client */
+	removed?: boolean;
+
 	/** Error message from download client when status is 'error' */
 	errorMessage?: string;
 }
@@ -182,4 +199,26 @@ export interface IDownloadClient {
 	 * Optional - returns undefined if not available.
 	 */
 	getBasePath?(): Promise<string | undefined>;
+
+	/**
+	 * Mark a download as imported (e.g., move to post-import category).
+	 * Optional - only implemented by clients that support post-import categories.
+	 * Follows Radarr's DownloadClient.MarkItemAsImported pattern.
+	 *
+	 * @param id - Download ID/hash
+	 * @param importedCategory - Optional category to move the download to
+	 */
+	markItemAsImported?(id: string, importedCategory?: string): Promise<void>;
+
+	/**
+	 * Set seeding configuration for a download.
+	 * Optional - only implemented by torrent clients.
+	 *
+	 * @param id - Download ID/hash
+	 * @param config - Seed ratio and time limits
+	 */
+	setSeedingConfig?(
+		id: string,
+		config: { ratioLimit?: number; seedingTimeLimit?: number }
+	): Promise<void>;
 }

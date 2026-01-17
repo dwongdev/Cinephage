@@ -212,7 +212,12 @@ export class NZBGetClient implements IDownloadClient {
 				eta: 0, // Needs calculation or separate call
 				category: item.Category,
 				savePath: item.DestDir,
-				contentPath: item.DestDir
+				contentPath: item.DestDir,
+				// Usenet downloads can always be moved (no seeding)
+				canMoveFiles: true,
+				// Can be removed when no longer actively downloading
+				canBeRemoved: false,
+				removed: false
 			});
 		}
 
@@ -240,7 +245,11 @@ export class NZBGetClient implements IDownloadClient {
 				savePath: item.DestDir,
 				contentPath: item.DestDir,
 				completedOn: new Date((item.UnixTimeHi * 4294967296 + item.UnixTimeLo) * 1000),
-				canBeRemoved: item.Status === 'SUCCESS'
+				// Usenet downloads can always be moved (no seeding)
+				canMoveFiles: true,
+				// Usenet can be removed once completed
+				canBeRemoved: item.Status === 'SUCCESS',
+				removed: false
 			});
 		}
 

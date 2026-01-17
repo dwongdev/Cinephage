@@ -8,10 +8,11 @@ export {
 	getImportService,
 	resetImportService
 } from './ImportService';
-export type { ImportResult, ImportJobResult } from './ImportService';
+export type { ImportResult, ImportJobResult, ImportRequestResult } from './ImportService';
 
 export {
 	transferFile,
+	transferFileWithMode,
 	moveFile,
 	transferDirectory,
 	findVideoFiles,
@@ -20,8 +21,10 @@ export {
 	getFileSize,
 	isVideoFile,
 	VIDEO_EXTENSIONS,
+	ImportMode,
 	type TransferMode,
 	type TransferResult,
+	type TransferOptions,
 	type BatchTransferOptions,
 	type BatchTransferResult
 } from './FileTransfer';
