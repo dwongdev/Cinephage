@@ -6,6 +6,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { unlink, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from '$lib/logging';
+import { deleteAllAlternateTitles } from '$lib/server/services/index.js';
 
 /**
  * PATCH /api/library/movies/batch
@@ -73,11 +74,12 @@ export const PUT: RequestHandler = PATCH;
  * Body:
  * - movieIds: string[] - Array of movie IDs to delete files for
  * - deleteFiles?: boolean - Whether to delete files from disk (default: false)
+ * - removeFromLibrary?: boolean - Whether to remove movies from library entirely (default: false)
  */
 export const DELETE: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
-		const { movieIds, deleteFiles = false } = body;
+		const { movieIds, deleteFiles = false, removeFromLibrary = false } = body;
 
 		if (!movieIds || !Array.isArray(movieIds) || movieIds.length === 0) {
 			return json(
@@ -87,6 +89,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 		}
 
 		let deletedCount = 0;
+		let removedCount = 0;
 		let skippedCount = 0;
 		const errors: Array<{ id: string; error: string }> = [];
 
@@ -113,7 +116,8 @@ export const DELETE: RequestHandler = async ({ request }) => {
 				// Get files for this movie
 				const files = await db.select().from(movieFiles).where(eq(movieFiles.movieId, movieId));
 
-				if (files.length === 0) {
+				// Skip if no files and not removing from library
+				if (files.length === 0 && !removeFromLibrary) {
 					skippedCount++;
 					continue;
 				}
@@ -145,12 +149,22 @@ export const DELETE: RequestHandler = async ({ request }) => {
 				}
 
 				// Delete movie file records from database
-				await db.delete(movieFiles).where(eq(movieFiles.movieId, movieId));
+				if (files.length > 0) {
+					await db.delete(movieFiles).where(eq(movieFiles.movieId, movieId));
+				}
 
-				// Update movie to show as missing
-				await db.update(movies).set({ hasFile: false }).where(eq(movies.id, movieId));
+				if (removeFromLibrary) {
+					// Delete alternate titles (not cascaded automatically)
+					await deleteAllAlternateTitles('movie', movieId);
 
-				deletedCount++;
+					// Delete the movie from database - CASCADE will handle related records
+					await db.delete(movies).where(eq(movies.id, movieId));
+					removedCount++;
+				} else {
+					// Update movie to show as missing
+					await db.update(movies).set({ hasFile: false }).where(eq(movies.id, movieId));
+					deletedCount++;
+				}
 			} catch (error) {
 				errors.push({
 					id: movieId,
@@ -162,6 +176,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 		return json({
 			success: errors.length === 0,
 			deletedCount,
+			removedCount,
 			skippedCount,
 			failedCount: errors.length,
 			errors: errors.length > 0 ? errors : undefined

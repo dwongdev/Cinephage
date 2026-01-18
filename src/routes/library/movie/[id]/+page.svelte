@@ -224,21 +224,27 @@
 		isDeleteModalOpen = true;
 	}
 
-	async function performDelete(deleteFiles: boolean) {
+	async function performDelete(deleteFiles: boolean, removeFromLibrary: boolean) {
 		isDeleting = true;
 		try {
 			const response = await fetch(
-				`/api/library/movies/${data.movie.id}?deleteFiles=${deleteFiles}`,
+				`/api/library/movies/${data.movie.id}?deleteFiles=${deleteFiles}&removeFromLibrary=${removeFromLibrary}`,
 				{ method: 'DELETE' }
 			);
 			const result = await response.json();
 
 			if (result.success) {
-				toasts.success('Movie files deleted');
-				// Reload to show updated state (movie now missing)
-				window.location.reload();
+				if (removeFromLibrary) {
+					toasts.success('Movie removed from library');
+					// Navigate to library since the movie no longer exists
+					window.location.href = '/library';
+				} else {
+					toasts.success('Movie files deleted');
+					// Reload to show updated state (movie now missing)
+					window.location.reload();
+				}
 			} else {
-				toasts.error('Failed to delete movie files', { description: result.error });
+				toasts.error('Failed to delete movie', { description: result.error });
 			}
 		} catch (error) {
 			console.error('Failed to delete movie:', error);

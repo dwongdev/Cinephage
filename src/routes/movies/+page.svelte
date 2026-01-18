@@ -118,7 +118,7 @@
 		}
 	}
 
-	async function handleBulkDelete(deleteFiles: boolean) {
+	async function handleBulkDelete(deleteFiles: boolean, removeFromLibrary: boolean) {
 		bulkLoading = true;
 		currentBulkAction = 'delete';
 		try {
@@ -127,27 +127,34 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					movieIds: [...selectedMovies],
-					deleteFiles
+					deleteFiles,
+					removeFromLibrary
 				})
 			});
 			const result = await response.json();
-			if (result.success || result.deletedCount > 0) {
-				// Update local data - mark as missing
-				for (const movie of data.movies) {
-					if (selectedMovies.has(movie.id)) {
-						movie.hasFile = false;
-						movie.files = [];
+			if (result.success || result.deletedCount > 0 || result.removedCount > 0) {
+				if (removeFromLibrary && result.removedCount > 0) {
+					// Remove from local data entirely
+					data.movies = data.movies.filter((movie) => !selectedMovies.has(movie.id));
+					toasts.success(`Removed ${result.removedCount} movies from library`);
+				} else {
+					// Update local data - mark as missing
+					for (const movie of data.movies) {
+						if (selectedMovies.has(movie.id)) {
+							movie.hasFile = false;
+							movie.files = [];
+						}
 					}
+					toasts.success(`Deleted files for ${result.deletedCount} movies`);
 				}
-				toasts.success(`Deleted files for ${result.deletedCount} movies`);
 				selectedMovies.clear();
 				showCheckboxes = false;
 				isDeleteModalOpen = false;
 			} else {
-				toasts.error(result.error || 'Failed to delete files');
+				toasts.error(result.error || 'Failed to delete');
 			}
 		} catch {
-			toasts.error('Failed to delete files');
+			toasts.error('Failed to delete');
 		} finally {
 			bulkLoading = false;
 			currentBulkAction = null;

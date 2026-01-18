@@ -6,6 +6,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { unlink, rmdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from '$lib/logging';
+import { deleteAllAlternateTitles } from '$lib/server/services/index.js';
 
 /**
  * PATCH /api/library/series/batch
@@ -73,11 +74,12 @@ export const PUT: RequestHandler = PATCH;
  * Body:
  * - seriesIds: string[] - Array of series IDs to delete files for
  * - deleteFiles?: boolean - Whether to delete files from disk (default: false)
+ * - removeFromLibrary?: boolean - Whether to remove series from library entirely (default: false)
  */
 export const DELETE: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
-		const { seriesIds, deleteFiles = false } = body;
+		const { seriesIds, deleteFiles = false, removeFromLibrary = false } = body;
 
 		if (!seriesIds || !Array.isArray(seriesIds) || seriesIds.length === 0) {
 			return json(
@@ -87,6 +89,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 		}
 
 		let deletedCount = 0;
+		let removedCount = 0;
 		let skippedCount = 0;
 		const errors: Array<{ id: string; error: string }> = [];
 
@@ -115,7 +118,8 @@ export const DELETE: RequestHandler = async ({ request }) => {
 					.from(episodeFiles)
 					.where(eq(episodeFiles.seriesId, seriesId));
 
-				if (files.length === 0) {
+				// Skip if no files and not removing from library
+				if (files.length === 0 && !removeFromLibrary) {
 					skippedCount++;
 					continue;
 				}
@@ -157,18 +161,32 @@ export const DELETE: RequestHandler = async ({ request }) => {
 				}
 
 				// Delete all episode file records from database
-				await db.delete(episodeFiles).where(eq(episodeFiles.seriesId, seriesId));
+				if (files.length > 0) {
+					await db.delete(episodeFiles).where(eq(episodeFiles.seriesId, seriesId));
+				}
 
-				// Update all episodes to hasFile=false
-				await db.update(episodes).set({ hasFile: false }).where(eq(episodes.seriesId, seriesId));
+				if (removeFromLibrary) {
+					// Delete alternate titles (not cascaded automatically)
+					await deleteAllAlternateTitles('series', seriesId);
 
-				// Update all seasons' episode file count to 0
-				await db.update(seasons).set({ episodeFileCount: 0 }).where(eq(seasons.seriesId, seriesId));
+					// Delete the series from database - CASCADE will handle related records
+					await db.delete(series).where(eq(series.id, seriesId));
+					removedCount++;
+				} else {
+					// Update all episodes to hasFile=false
+					await db.update(episodes).set({ hasFile: false }).where(eq(episodes.seriesId, seriesId));
 
-				// Update series episode file count
-				await db.update(series).set({ episodeFileCount: 0 }).where(eq(series.id, seriesId));
+					// Update all seasons' episode file count to 0
+					await db
+						.update(seasons)
+						.set({ episodeFileCount: 0 })
+						.where(eq(seasons.seriesId, seriesId));
 
-				deletedCount++;
+					// Update series episode file count
+					await db.update(series).set({ episodeFileCount: 0 }).where(eq(series.id, seriesId));
+
+					deletedCount++;
+				}
 			} catch (error) {
 				errors.push({
 					id: seriesId,
@@ -180,6 +198,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 		return json({
 			success: errors.length === 0,
 			deletedCount,
+			removedCount,
 			skippedCount,
 			failedCount: errors.length,
 			errors: errors.length > 0 ? errors : undefined

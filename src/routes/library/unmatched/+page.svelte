@@ -94,7 +94,7 @@
 	}
 
 	// Perform deletion with optional file delete
-	async function performDelete(deleteFile: boolean) {
+	async function performDelete(deleteFile: boolean, _removeFromLibrary: boolean) {
 		if (!deletingFileId) return;
 
 		isDeleting = true;

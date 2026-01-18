@@ -118,7 +118,7 @@
 		}
 	}
 
-	async function handleBulkDelete(deleteFiles: boolean) {
+	async function handleBulkDelete(deleteFiles: boolean, removeFromLibrary: boolean) {
 		bulkLoading = true;
 		currentBulkAction = 'delete';
 		try {
@@ -127,27 +127,34 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					seriesIds: [...selectedSeries],
-					deleteFiles
+					deleteFiles,
+					removeFromLibrary
 				})
 			});
 			const result = await response.json();
-			if (result.success || result.deletedCount > 0) {
-				// Update local data - mark as having no files
-				for (const show of data.series) {
-					if (selectedSeries.has(show.id)) {
-						show.episodeFileCount = 0;
-						show.percentComplete = 0;
+			if (result.success || result.deletedCount > 0 || result.removedCount > 0) {
+				if (removeFromLibrary && result.removedCount > 0) {
+					// Remove from local data entirely
+					data.series = data.series.filter((show) => !selectedSeries.has(show.id));
+					toasts.success(`Removed ${result.removedCount} series from library`);
+				} else {
+					// Update local data - mark as having no files
+					for (const show of data.series) {
+						if (selectedSeries.has(show.id)) {
+							show.episodeFileCount = 0;
+							show.percentComplete = 0;
+						}
 					}
+					toasts.success(`Deleted files for ${result.deletedCount} series`);
 				}
-				toasts.success(`Deleted files for ${result.deletedCount} series`);
 				selectedSeries.clear();
 				showCheckboxes = false;
 				isDeleteModalOpen = false;
 			} else {
-				toasts.error(result.error || 'Failed to delete files');
+				toasts.error(result.error || 'Failed to delete');
 			}
 		} catch {
-			toasts.error('Failed to delete files');
+			toasts.error('Failed to delete');
 		} finally {
 			bulkLoading = false;
 			currentBulkAction = null;

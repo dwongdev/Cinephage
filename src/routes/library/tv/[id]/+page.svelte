@@ -292,21 +292,27 @@
 		isDeleteModalOpen = true;
 	}
 
-	async function performDelete(deleteFiles: boolean) {
+	async function performDelete(deleteFiles: boolean, removeFromLibrary: boolean) {
 		isDeleting = true;
 		try {
 			const response = await fetch(
-				`/api/library/series/${data.series.id}?deleteFiles=${deleteFiles}`,
+				`/api/library/series/${data.series.id}?deleteFiles=${deleteFiles}&removeFromLibrary=${removeFromLibrary}`,
 				{ method: 'DELETE' }
 			);
 			const result = await response.json();
 
 			if (result.success) {
-				toasts.success('Series files deleted');
-				// Reload to show updated state (all episodes now missing)
-				window.location.reload();
+				if (removeFromLibrary) {
+					toasts.success('Series removed from library');
+					// Navigate to library since the series no longer exists
+					window.location.href = '/library';
+				} else {
+					toasts.success('Series files deleted');
+					// Reload to show updated state (all episodes now missing)
+					window.location.reload();
+				}
 			} else {
-				toasts.error('Failed to delete series files', { description: result.error });
+				toasts.error('Failed to delete series', { description: result.error });
 			}
 		} catch (error) {
 			console.error('Failed to delete series:', error);

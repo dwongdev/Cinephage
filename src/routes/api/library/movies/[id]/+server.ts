@@ -7,6 +7,7 @@ import { mediaInfoService } from '$lib/server/library/index.js';
 import { getLanguageProfileService } from '$lib/server/subtitles/services/LanguageProfileService.js';
 import { searchSubtitlesForNewMedia } from '$lib/server/subtitles/services/SubtitleImportService.js';
 import { monitoringScheduler } from '$lib/server/monitoring/MonitoringScheduler.js';
+import { deleteAllAlternateTitles } from '$lib/server/services/index.js';
 import { unlink, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from '$lib/logging';
@@ -205,10 +206,12 @@ export const PUT: RequestHandler = PATCH;
 /**
  * DELETE /api/library/movies/[id]
  * Delete files for a movie (keeps metadata, marks as missing)
+ * With removeFromLibrary=true, removes the movie entirely from the database
  */
 export const DELETE: RequestHandler = async ({ params, url }) => {
 	try {
 		const deleteFiles = url.searchParams.get('deleteFiles') === 'true';
+		const removeFromLibrary = url.searchParams.get('removeFromLibrary') === 'true';
 
 		// Get movie with root folder info
 		const [movie] = await db
@@ -230,7 +233,8 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 		// Get all files for this movie
 		const files = await db.select().from(movieFiles).where(eq(movieFiles.movieId, params.id));
 
-		if (files.length === 0) {
+		// Only require files if not removing from library entirely
+		if (files.length === 0 && !removeFromLibrary) {
 			return json({ success: false, error: 'Movie has no files to delete' }, { status: 400 });
 		}
 
@@ -265,13 +269,27 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 		}
 
 		// Delete movie file records from database
-		await db.delete(movieFiles).where(eq(movieFiles.movieId, params.id));
+		if (files.length > 0) {
+			await db.delete(movieFiles).where(eq(movieFiles.movieId, params.id));
+		}
 
-		// Update movie to show as missing
-		await db.update(movies).set({ hasFile: false }).where(eq(movies.id, params.id));
+		if (removeFromLibrary) {
+			// Delete alternate titles (not cascaded automatically)
+			await deleteAllAlternateTitles('movie', params.id);
 
-		// Note: Movie metadata is kept - it will show as "missing"
-		return json({ success: true });
+			// Delete the movie from database - CASCADE will handle:
+			// - subtitles, downloadQueue, pendingReleases, blocklist, etc.
+			await db.delete(movies).where(eq(movies.id, params.id));
+
+			logger.info('[API] Removed movie from library', { movieId: params.id });
+			return json({ success: true, removed: true });
+		} else {
+			// Update movie to show as missing
+			await db.update(movies).set({ hasFile: false }).where(eq(movies.id, params.id));
+
+			// Note: Movie metadata is kept - it will show as "missing"
+			return json({ success: true });
+		}
 	} catch (error) {
 		logger.error('[API] Error deleting movie files', error instanceof Error ? error : undefined);
 		return json(

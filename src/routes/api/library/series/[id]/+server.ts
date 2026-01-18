@@ -17,6 +17,7 @@ import { getLanguageProfileService } from '$lib/server/subtitles/services/Langua
 import { searchSubtitlesForMediaBatch } from '$lib/server/subtitles/services/SubtitleImportService.js';
 import { searchOnAdd } from '$lib/server/library/searchOnAdd.js';
 import { monitoringScheduler } from '$lib/server/monitoring/MonitoringScheduler.js';
+import { deleteAllAlternateTitles } from '$lib/server/services/index.js';
 
 /**
  * GET /api/library/series/[id]
@@ -286,10 +287,12 @@ export const PUT: RequestHandler = PATCH;
 /**
  * DELETE /api/library/series/[id]
  * Delete files for a series (keeps metadata, marks episodes as missing)
+ * With removeFromLibrary=true, removes the series entirely from the database
  */
 export const DELETE: RequestHandler = async ({ params, url }) => {
 	try {
 		const deleteFiles = url.searchParams.get('deleteFiles') === 'true';
+		const removeFromLibrary = url.searchParams.get('removeFromLibrary') === 'true';
 
 		// Get series with root folder info
 		const [seriesItem] = await db
@@ -310,7 +313,8 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 		// Get all episode files for this series
 		const files = await db.select().from(episodeFiles).where(eq(episodeFiles.seriesId, params.id));
 
-		if (files.length === 0) {
+		// Only require files if not removing from library entirely
+		if (files.length === 0 && !removeFromLibrary) {
 			return json({ success: false, error: 'Series has no files to delete' }, { status: 400 });
 		}
 
@@ -357,19 +361,33 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 		}
 
 		// Delete all episode file records from database
-		await db.delete(episodeFiles).where(eq(episodeFiles.seriesId, params.id));
+		if (files.length > 0) {
+			await db.delete(episodeFiles).where(eq(episodeFiles.seriesId, params.id));
+		}
 
-		// Update all episodes in this series to hasFile=false
-		await db.update(episodes).set({ hasFile: false }).where(eq(episodes.seriesId, params.id));
+		if (removeFromLibrary) {
+			// Delete alternate titles (not cascaded automatically)
+			await deleteAllAlternateTitles('series', params.id);
 
-		// Update all seasons' episode file count to 0
-		await db.update(seasons).set({ episodeFileCount: 0 }).where(eq(seasons.seriesId, params.id));
+			// Delete the series from database - CASCADE will handle:
+			// - seasons, episodes, subtitles, downloadQueue, pendingReleases, blocklist, etc.
+			await db.delete(series).where(eq(series.id, params.id));
 
-		// Update series episode file count
-		await db.update(series).set({ episodeFileCount: 0 }).where(eq(series.id, params.id));
+			logger.info('[API] Removed series from library', { seriesId: params.id });
+			return json({ success: true, removed: true });
+		} else {
+			// Update all episodes in this series to hasFile=false
+			await db.update(episodes).set({ hasFile: false }).where(eq(episodes.seriesId, params.id));
 
-		// Note: Series, season, and episode metadata is kept - episodes will show as "missing"
-		return json({ success: true });
+			// Update all seasons' episode file count to 0
+			await db.update(seasons).set({ episodeFileCount: 0 }).where(eq(seasons.seriesId, params.id));
+
+			// Update series episode file count
+			await db.update(series).set({ episodeFileCount: 0 }).where(eq(series.id, params.id));
+
+			// Note: Series, season, and episode metadata is kept - episodes will show as "missing"
+			return json({ success: true });
+		}
 	} catch (error) {
 		logger.error('[API] Error deleting series files', error instanceof Error ? error : undefined);
 		return json(
