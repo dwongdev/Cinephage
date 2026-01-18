@@ -52,7 +52,7 @@ const COMPLETED_GRACE_PERIOD_MS = 300_000; // 5 minutes
 /**
  * Terminal statuses - items that are completely done and hidden from queue UI
  */
-const TERMINAL_STATUSES: QueueStatus[] = ['imported', 'removed'];
+const TERMINAL_STATUSES: QueueStatus[] = ['imported', 'removed', 'failed'];
 
 /**
  * Post-import statuses - items that are imported but still visible in queue (seeding)

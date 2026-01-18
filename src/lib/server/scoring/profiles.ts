@@ -47,6 +47,8 @@ const UNIVERSAL_BANNED_FORMATS: Record<string, number> = {
 	// Unwanted content
 	'banned-extras': BANNED_SCORE,
 	'banned-sample': BANNED_SCORE,
+	'banned-soundtrack': BANNED_SCORE,
+	'banned-game-repack': BANNED_SCORE,
 
 	// Technical issues
 	'banned-upscaled': BANNED_SCORE,

@@ -207,6 +207,7 @@ export class LibrarySchedulerService extends EventEmitter implements BackgroundS
 		}
 
 		this.isInitialized = true;
+		this._status = 'ready';
 		logger.info('[LibraryScheduler] Initialized');
 	}
 

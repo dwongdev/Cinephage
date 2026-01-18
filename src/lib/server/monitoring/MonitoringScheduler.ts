@@ -433,6 +433,7 @@ export class MonitoringScheduler extends EventEmitter implements BackgroundServi
 		}, SCHEDULER_POLL_INTERVAL_MS);
 
 		this.isInitialized = true;
+		this._status = 'ready';
 
 		const gracePeriodMinutes = Math.round(STARTUP_GRACE_PERIOD_MS / 60000);
 		logger.info(
