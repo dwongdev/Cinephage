@@ -1,13 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { subtitleProviderTestSchema } from '$lib/validation/schemas';
-import { SubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { getSubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { ensureProvidersRegistered } from '$lib/server/subtitles/providers/registry';
 
 /**
  * POST /api/subtitles/providers/test
  * Test a subtitle provider configuration.
  */
 export const POST: RequestHandler = async ({ request }) => {
+	// Ensure providers are registered
+	await ensureProvidersRegistered();
+
 	let data: unknown;
 	try {
 		data = await request.json();
@@ -28,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const validated = result.data;
-	const factory = new SubtitleProviderFactory();
+	const factory = getSubtitleProviderFactory();
 
 	// Create a temporary provider config for testing
 	const testConfig = {

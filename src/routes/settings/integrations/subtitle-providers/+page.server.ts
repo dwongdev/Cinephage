@@ -1,8 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getSubtitleProviderManager } from '$lib/server/subtitles/services/SubtitleProviderManager';
+import { ensureProvidersRegistered } from '$lib/server/subtitles/providers/registry';
 
 export const load: PageServerLoad = async () => {
+	// Ensure provider registry is initialized before accessing definitions
+	await ensureProvidersRegistered();
+
 	const manager = getSubtitleProviderManager();
 	const providers = await manager.getProviders();
 	const definitions = manager.getDefinitions();

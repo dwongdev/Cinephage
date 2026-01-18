@@ -85,6 +85,16 @@ export interface ISubtitleProviderFactory {
 }
 
 /**
+ * Provider access type - how authentication/payment works
+ */
+export type ProviderAccessType =
+	| 'free' // No authentication needed
+	| 'free-account' // Free account required (username/password)
+	| 'api-key' // API key required (may be free or paid)
+	| 'paid' // Paid subscription required
+	| 'vip'; // VIP/premium subscription required
+
+/**
  * Provider definition metadata
  */
 export interface ProviderDefinition {
@@ -92,8 +102,12 @@ export interface ProviderDefinition {
 	name: string;
 	description: string;
 	website: string;
+	/** @deprecated Use accessType instead */
 	requiresApiKey: boolean;
+	/** @deprecated Use accessType instead */
 	requiresCredentials: boolean;
+	/** How authentication/payment works for this provider */
+	accessType?: ProviderAccessType;
 	supportedLanguages: LanguageCode[];
 	supportsHashSearch: boolean;
 	features: string[];

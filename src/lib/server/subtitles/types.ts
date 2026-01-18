@@ -168,11 +168,19 @@ export const ISO639_2_TO_1: ReadonlyMap<string, string> = new Map(
  */
 export const PROVIDER_IMPLEMENTATIONS = [
 	'opensubtitles',
+	'opensubtitlesorg',
+	'podnapisi',
+	'subscene',
 	'addic7ed',
 	'subdl',
 	'yifysubtitles',
 	'gestdown',
-	'subf2m'
+	'subf2m',
+	// Regional providers
+	'napiprojekt',
+	'legendasdivx',
+	'betaseries',
+	'assrt'
 ] as const;
 
 /** Provider implementation type (derived from the const array) */
@@ -207,10 +215,12 @@ export interface SubtitleSearchCriteria {
 	filePath?: string;
 	fileSize?: number;
 	videoHash?: string; // OpenSubtitles hash
+	fps?: number; // Video frame rate
 
 	// Media identification
 	imdbId?: string;
 	tmdbId?: number;
+	tvdbId?: number; // For TV show lookups
 	title: string;
 	originalTitle?: string;
 	year?: number;
@@ -275,6 +285,7 @@ export interface SubtitleSearchResult {
 	rating?: number;
 	uploadDate?: string;
 	uploader?: string;
+	pageLink?: string; // Link to subtitle page on provider
 
 	// File info
 	fileSize?: number;

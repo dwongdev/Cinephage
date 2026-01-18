@@ -1,9 +1,66 @@
 <script lang="ts">
-	import { X, Loader2, CheckCircle2, Globe, Key, Hash, Search } from 'lucide-svelte';
+	import { X, Loader2, CheckCircle2, Globe, Key, Hash, Search, User, Crown, CreditCard } from 'lucide-svelte';
 	import type { SubtitleProviderConfig, ProviderImplementation } from '$lib/server/subtitles/types';
-	import type { ProviderDefinition } from '$lib/server/subtitles/providers/interfaces';
+	import type { ProviderDefinition, ProviderAccessType } from '$lib/server/subtitles/providers/interfaces';
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
 	import { SectionHeader, TestResult } from '$lib/components/ui/modal';
+
+	/**
+	 * Get access type info for display
+	 */
+	function getAccessTypeInfo(def: ProviderDefinition): {
+		icon: typeof Globe;
+		iconClass: string;
+		badge: string;
+		badgeClass: string;
+	} {
+		const accessType = def.accessType ?? (def.requiresApiKey ? 'api-key' : def.requiresCredentials ? 'free-account' : 'free');
+
+		switch (accessType) {
+			case 'free':
+				return {
+					icon: Globe,
+					iconClass: 'text-success',
+					badge: 'Free',
+					badgeClass: 'badge-success'
+				};
+			case 'free-account':
+				return {
+					icon: User,
+					iconClass: 'text-info',
+					badge: 'Free Account',
+					badgeClass: 'badge-info'
+				};
+			case 'api-key':
+				return {
+					icon: Key,
+					iconClass: 'text-warning',
+					badge: 'API Key',
+					badgeClass: 'badge-warning'
+				};
+			case 'paid':
+				return {
+					icon: CreditCard,
+					iconClass: 'text-error',
+					badge: 'Paid',
+					badgeClass: 'badge-error'
+				};
+			case 'vip':
+				return {
+					icon: Crown,
+					iconClass: 'text-secondary',
+					badge: 'VIP Only',
+					badgeClass: 'badge-secondary'
+				};
+			default:
+				return {
+					icon: Globe,
+					iconClass: 'text-base-content/50',
+					badge: 'Unknown',
+					badgeClass: 'badge-ghost'
+				};
+		}
+	}
 
 	interface SubtitleProviderFormData {
 		name: string;
@@ -168,17 +225,14 @@
 			<!-- Provider List -->
 			<div class="max-h-[400px] overflow-y-auto rounded-lg border border-base-300">
 				{#each filteredDefinitions() as def (def.implementation)}
+					{@const accessInfo = getAccessTypeInfo(def)}
 					<button
 						type="button"
 						class="flex w-full items-center gap-4 border-b border-base-200 p-4 text-left transition-colors last:border-b-0 hover:bg-base-200"
 						onclick={() => handleImplementationChange(def.implementation as ProviderImplementation)}
 					>
 						<div class="rounded-lg bg-base-300 p-2">
-							{#if def.requiresApiKey}
-								<Key class="h-5 w-5 text-warning" />
-							{:else}
-								<Globe class="h-5 w-5 text-success" />
-							{/if}
+							<svelte:component this={accessInfo.icon} class="h-5 w-5 {accessInfo.iconClass}" />
 						</div>
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
@@ -190,12 +244,8 @@
 							<p class="truncate text-sm text-base-content/60">{def.description}</p>
 						</div>
 						<div class="flex flex-col items-end gap-1">
-							{#if def.requiresApiKey}
-								<span class="badge badge-sm badge-warning">API Key</span>
-							{:else}
-								<span class="badge badge-sm badge-success">Free</span>
-							{/if}
-							{#if def.requiresCredentials}
+							<span class="badge badge-sm {accessInfo.badgeClass}">{accessInfo.badge}</span>
+							{#if def.requiresCredentials && def.accessType !== 'free-account'}
 								<span class="badge badge-ghost badge-xs">Account</span>
 							{/if}
 						</div>
@@ -218,17 +268,17 @@
 	{:else}
 		<!-- Selected provider header (in add mode) -->
 		{#if mode === 'add' && selectedDefinition}
+			{@const selectedAccessInfo = getAccessTypeInfo(selectedDefinition)}
 			<div class="mb-6 flex items-center justify-between rounded-lg bg-base-200 px-4 py-3">
 				<div class="flex items-center gap-3">
 					<div class="rounded-lg bg-base-300 p-2">
-						{#if selectedDefinition.requiresApiKey}
-							<Key class="h-5 w-5 text-warning" />
-						{:else}
-							<Globe class="h-5 w-5 text-success" />
-						{/if}
+						<svelte:component this={selectedAccessInfo.icon} class="h-5 w-5 {selectedAccessInfo.iconClass}" />
 					</div>
 					<div>
-						<div class="font-semibold">{selectedDefinition.name}</div>
+						<div class="flex items-center gap-2">
+							<span class="font-semibold">{selectedDefinition.name}</span>
+							<span class="badge badge-xs {selectedAccessInfo.badgeClass}">{selectedAccessInfo.badge}</span>
+						</div>
 						<div class="text-sm text-base-content/60">{selectedDefinition.description}</div>
 					</div>
 				</div>

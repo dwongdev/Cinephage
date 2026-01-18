@@ -1,5 +1,7 @@
 /**
  * Base Subtitle Provider - Common functionality for all providers
+ *
+ * Based on Bazarr's subliminal_patch Provider pattern with lifecycle management.
  */
 
 import type { ISubtitleProvider, ProviderTestResult } from './interfaces';
@@ -15,14 +17,237 @@ import { logger } from '$lib/logging';
 import { normalizeLanguageCode } from '$lib/shared/languages';
 
 /**
+ * Provider state enum
+ */
+export enum ProviderState {
+	/** Provider not yet initialized */
+	UNINITIALIZED = 'uninitialized',
+	/** Provider is initializing */
+	INITIALIZING = 'initializing',
+	/** Provider is ready for use */
+	READY = 'ready',
+	/** Provider is in error state */
+	ERROR = 'error',
+	/** Provider has been terminated */
+	TERMINATED = 'terminated'
+}
+
+/**
+ * Provider capability flags
+ */
+export interface ProviderCapabilities {
+	/** Whether hash matches can be verified */
+	hashVerifiable: boolean;
+	/** Whether HI status can be verified */
+	hearingImpairedVerifiable: boolean;
+	/** Whether to skip wrong FPS subtitles */
+	skipWrongFps: boolean;
+	/** Whether this provider supports TV shows */
+	supportsTvShows: boolean;
+	/** Whether this provider supports movies */
+	supportsMovies: boolean;
+	/** Whether this provider supports anime */
+	supportsAnime: boolean;
+}
+
+/**
+ * Default provider capabilities
+ */
+export const DEFAULT_CAPABILITIES: ProviderCapabilities = {
+	hashVerifiable: false,
+	hearingImpairedVerifiable: false,
+	skipWrongFps: true,
+	supportsTvShows: true,
+	supportsMovies: true,
+	supportsAnime: false
+};
+
+/**
  * Abstract base class for subtitle providers.
- * Implements common functionality and logging.
+ * Implements common functionality, lifecycle management, and logging.
+ *
+ * Based on Bazarr's subliminal_patch/providers/__init__.py Provider class.
  */
 export abstract class BaseSubtitleProvider implements ISubtitleProvider {
 	protected config: SubtitleProviderConfig;
 
+	/** Current provider state */
+	protected _state: ProviderState = ProviderState.UNINITIALIZED;
+
+	/** Provider capabilities */
+	protected _capabilities: ProviderCapabilities = { ...DEFAULT_CAPABILITIES };
+
+	/** Time when provider was initialized */
+	protected _initializedAt?: Date;
+
+	/** Last error that occurred */
+	protected _lastError?: Error;
+
+	/** Number of consecutive failures */
+	protected _consecutiveFailures = 0;
+
+	/** Maximum consecutive failures before auto-terminate */
+	protected _maxConsecutiveFailures = 5;
+
 	constructor(config: SubtitleProviderConfig) {
 		this.config = config;
+	}
+
+	// ============================================================================
+	// LIFECYCLE METHODS (Bazarr pattern)
+	// ============================================================================
+
+	/**
+	 * Initialize the provider.
+	 *
+	 * Called before first use. Override in subclasses to:
+	 * - Authenticate with API
+	 * - Establish sessions
+	 * - Load cached tokens
+	 */
+	async initialize(): Promise<void> {
+		if (this._state === ProviderState.READY) {
+			return; // Already initialized
+		}
+
+		this._state = ProviderState.INITIALIZING;
+		try {
+			await this.onInitialize();
+			this._state = ProviderState.READY;
+			this._initializedAt = new Date();
+			this._consecutiveFailures = 0;
+			logger.debug(`[${this.name}] Provider initialized`);
+		} catch (error) {
+			this._state = ProviderState.ERROR;
+			this._lastError = error instanceof Error ? error : new Error(String(error));
+			logger.error(`[${this.name}] Failed to initialize`, { error: this._lastError.message });
+			throw error;
+		}
+	}
+
+	/**
+	 * Override in subclasses to perform initialization
+	 */
+	protected async onInitialize(): Promise<void> {
+		// Default: no-op
+	}
+
+	/**
+	 * Terminate the provider.
+	 *
+	 * Called when provider is being shut down. Override in subclasses to:
+	 * - Close sessions
+	 * - Save cached tokens
+	 * - Clean up resources
+	 */
+	async terminate(): Promise<void> {
+		if (this._state === ProviderState.TERMINATED) {
+			return; // Already terminated
+		}
+
+		try {
+			await this.onTerminate();
+			logger.debug(`[${this.name}] Provider terminated`);
+		} catch (error) {
+			logger.warn(`[${this.name}] Error during termination`, {
+				error: error instanceof Error ? error.message : String(error)
+			});
+		} finally {
+			this._state = ProviderState.TERMINATED;
+		}
+	}
+
+	/**
+	 * Override in subclasses to perform cleanup
+	 */
+	protected async onTerminate(): Promise<void> {
+		// Default: no-op
+	}
+
+	/**
+	 * Check if the provider is alive/healthy.
+	 *
+	 * Quick health check - should be fast and not count against rate limits.
+	 */
+	async ping(): Promise<boolean> {
+		if (this._state !== ProviderState.READY) {
+			return false;
+		}
+
+		try {
+			return await this.onPing();
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Override in subclasses for custom health check
+	 */
+	protected async onPing(): Promise<boolean> {
+		// Default: provider is alive if in READY state
+		return this._state === ProviderState.READY;
+	}
+
+	/**
+	 * Reinitialize provider after error.
+	 *
+	 * Terminates and re-initializes the provider.
+	 */
+	async reinitialize(): Promise<void> {
+		logger.info(`[${this.name}] Reinitializing provider`);
+		await this.terminate();
+		await this.initialize();
+	}
+
+	// ============================================================================
+	// STATE ACCESSORS
+	// ============================================================================
+
+	/** Get current provider state */
+	get state(): ProviderState {
+		return this._state;
+	}
+
+	/** Check if provider is ready for use */
+	get isReady(): boolean {
+		return this._state === ProviderState.READY;
+	}
+
+	/** Get provider capabilities */
+	get capabilities(): ProviderCapabilities {
+		return this._capabilities;
+	}
+
+	/** Get last error */
+	get lastError(): Error | undefined {
+		return this._lastError;
+	}
+
+	/** Get consecutive failure count */
+	get consecutiveFailures(): number {
+		return this._consecutiveFailures;
+	}
+
+	/**
+	 * Record a failure.
+	 * If max consecutive failures reached, auto-terminate.
+	 */
+	protected recordFailure(error: Error): void {
+		this._consecutiveFailures++;
+		this._lastError = error;
+
+		if (this._consecutiveFailures >= this._maxConsecutiveFailures) {
+			logger.warn(`[${this.name}] Max consecutive failures reached, terminating`);
+			this.terminate().catch(() => {});
+		}
+	}
+
+	/**
+	 * Record a success (resets failure counter)
+	 */
+	protected recordSuccess(): void {
+		this._consecutiveFailures = 0;
 	}
 
 	/** Provider ID from config */

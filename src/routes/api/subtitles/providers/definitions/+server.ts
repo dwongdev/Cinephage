@@ -1,14 +1,47 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { SubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { getSubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { ensureProvidersRegistered } from '$lib/server/subtitles/providers/registry';
 
 /**
  * GET /api/subtitles/providers/definitions
  * Get all available subtitle provider definitions.
+ * These are the provider types that can be configured, not configured instances.
  */
-export const GET: RequestHandler = async () => {
-	const factory = new SubtitleProviderFactory();
-	const definitions = factory.getDefinitions();
+export const GET: RequestHandler = async ({ url }) => {
+	// Ensure providers are registered
+	await ensureProvidersRegistered();
 
-	return json(definitions);
+	const factory = getSubtitleProviderFactory();
+	let definitions = factory.getDefinitions();
+
+	// Apply optional filters
+	const filterFree = url.searchParams.get('free') === 'true';
+	const filterHash = url.searchParams.get('hash') === 'true';
+	const searchQuery = url.searchParams.get('search')?.toLowerCase();
+
+	if (filterFree) {
+		definitions = definitions.filter((d) => !d.requiresApiKey);
+	}
+
+	if (filterHash) {
+		definitions = definitions.filter((d) => d.supportsHashSearch);
+	}
+
+	if (searchQuery) {
+		definitions = definitions.filter(
+			(d) =>
+				d.name.toLowerCase().includes(searchQuery) ||
+				d.description.toLowerCase().includes(searchQuery) ||
+				d.implementation.toLowerCase().includes(searchQuery)
+		);
+	}
+
+	// Sort by name
+	definitions.sort((a, b) => a.name.localeCompare(b.name));
+
+	return json({
+		definitions,
+		totalCount: definitions.length
+	});
 };

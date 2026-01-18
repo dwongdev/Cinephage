@@ -8,6 +8,30 @@
 // Core types
 export * from './types';
 
+// Video objects (Bazarr-style)
+export * from './video';
+
+// Language handling (Bazarr-style)
+export * from './language';
+
+// Subtitle class (Bazarr-style)
+export * from './subtitle';
+
+// Scoring system
+export * from './score';
+
+// Provider pool
+export * from './pool';
+
+// Encoding handling
+export * from './encoding';
+
+// Subtitle modifications
+export * from './modifications';
+
+// Release parsing
+export * from './refiners';
+
 // Provider layer
 export * from './providers';
 

@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSubtitleProviderManager } from '$lib/server/subtitles/services/SubtitleProviderManager';
-import { SubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { getSubtitleProviderFactory } from '$lib/server/subtitles/providers/SubtitleProviderFactory';
+import { ensureProvidersRegistered } from '$lib/server/subtitles/providers/registry';
 import { subtitleProviderCreateSchema } from '$lib/validation/schemas';
 
 /**
@@ -10,7 +11,10 @@ import { subtitleProviderCreateSchema } from '$lib/validation/schemas';
  * Note: API keys and passwords are redacted for security.
  */
 export const GET: RequestHandler = async () => {
-	const manager = await getSubtitleProviderManager();
+	// Ensure providers are registered
+	await ensureProvidersRegistered();
+
+	const manager = getSubtitleProviderManager();
 	const providers = await manager.getProviders();
 
 	// Redact sensitive fields
@@ -67,7 +71,8 @@ export const POST: RequestHandler = async ({ request }) => {
 	const manager = await getSubtitleProviderManager();
 
 	// Verify the implementation is supported
-	const factory = new SubtitleProviderFactory();
+	await ensureProvidersRegistered();
+	const factory = getSubtitleProviderFactory();
 	const definition = factory.getDefinition(validated.implementation);
 	if (!definition) {
 		return json(
