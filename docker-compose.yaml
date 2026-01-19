@@ -19,6 +19,7 @@ services:
     # build: .  # Uncomment to build locally (requires cloning the repo)
     container_name: cinephage
     restart: unless-stopped
+    init: true # Use tini to prevent zombie browser processes
 
     # -------------------------------------------------------------------------
     # USER PERMISSIONS

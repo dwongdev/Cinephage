@@ -57,7 +57,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     libdbus-glib-1-2 \
     libxt6 \
+    # GLX/Mesa libraries for Camoufox GPU detection (glxtest)
+    xvfb \
+    libgl1-mesa-dri \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
+
+# Install all Firefox browser dependencies (same approach as Byparr)
+RUN npx playwright install-deps firefox
 
 # Create necessary directories with correct ownership (node user is UID 1000)
 RUN mkdir -p data logs && chown -R node:node data logs

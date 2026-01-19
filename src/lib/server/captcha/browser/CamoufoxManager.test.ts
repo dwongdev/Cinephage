@@ -137,7 +137,7 @@ describe('CamoufoxManager', () => {
 
 			expect(Camoufox).toHaveBeenCalledWith(
 				expect.objectContaining({
-					headless: true,
+					headless: 'virtual', // Uses virtual display mode in Docker
 					geoip: true,
 					humanize: true
 				})

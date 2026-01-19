@@ -6,7 +6,7 @@
  * at the C++ level, making it highly effective against Cloudflare and similar protections.
  */
 
-import { Camoufox } from 'camoufox-js';
+import { Camoufox, type LaunchOptions } from 'camoufox-js';
 import type { Browser, BrowserContext, Page, Cookie } from 'playwright-core';
 import { logger } from '$lib/logging';
 import type { ProxyConfig } from '../types';
@@ -42,10 +42,11 @@ export class CamoufoxManager {
 	private async checkAvailability(): Promise<void> {
 		try {
 			// Try to launch a quick browser to verify availability
+			// Use "virtual" headless mode which spawns an internal Xvfb display
 			const browser = await Camoufox({
-				headless: true,
-				geoip: false // Skip geoip for quick test
-			});
+				headless: 'virtual' as unknown as boolean,
+				geoip: false
+			} as LaunchOptions);
 			await browser.close();
 			this.isAvailable = true;
 			this.availabilityError = undefined;
@@ -107,8 +108,10 @@ export class CamoufoxManager {
 
 		try {
 			// Build Camoufox options
-			const camoufoxOptions: Parameters<typeof Camoufox>[0] = {
-				headless: options.headless,
+			// Use "virtual" headless mode which spawns an internal Xvfb display
+			// This properly satisfies Firefox's display requirements in Docker
+			const camoufoxOptions: LaunchOptions = {
+				headless: options.headless ? ('virtual' as unknown as boolean) : false,
 				geoip: true, // Auto-detect IP and set matching locale/timezone
 				humanize: true // Human-like mouse movements
 			};
