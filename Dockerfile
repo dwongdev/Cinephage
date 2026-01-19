@@ -17,13 +17,21 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Build-time version for UI display (PUBLIC_ vars are embedded at build time)
+ARG APP_VERSION=dev
+ENV PUBLIC_APP_VERSION=${APP_VERSION}
+
 # Build the SvelteKit application
 RUN npm run build
 
+# Remove devDependencies to reduce runtime image size
+RUN npm prune --omit=dev
+
 # Download Camoufox browser at build time (avoids runtime permission issues)
-# Set HOME to /app so camoufox caches to /app/.cache/camoufox
+# Store cache in app directory for non-standard UID/GID compatibility
 ENV HOME=/app
-RUN mkdir -p /app/.cache && npx camoufox-js fetch
+ENV CAMOUFOX_CACHE_DIR=/app/camoufox
+RUN mkdir -p /app/camoufox && npx camoufox-js fetch --path /app/camoufox
 
 # ==========================================
 # Runtime Stage
@@ -32,6 +40,10 @@ FROM node:22-slim AS runner
 
 WORKDIR /app
 
+# Runtime version (useful for diagnostics)
+ARG APP_VERSION=dev
+ENV PUBLIC_APP_VERSION=${APP_VERSION}
+
 # Install runtime dependencies:
 # - ffmpeg: for ffprobe media analysis
 # - Camoufox browser dependencies (Firefox/GTK libs)
@@ -39,6 +51,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     wget \
+    gosu \
     libgtk-3-0 \
     libx11-xcb1 \
     libasound2 \
@@ -67,21 +80,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npx playwright install-deps firefox
 
 # Create necessary directories with correct ownership (node user is UID 1000)
-RUN mkdir -p data logs && chown -R node:node data logs
+RUN mkdir -p data logs camoufox && chown -R node:node data logs camoufox
 
 # Set HOME to /app for consistent cache location regardless of runtime UID
-# This ensures camoufox-js finds the browser at /app/.cache/camoufox
+# This ensures camoufox-js finds the browser at /app/camoufox
 ENV HOME=/app
+ENV CAMOUFOX_CACHE_DIR=/app/camoufox
 
 # Copy pre-downloaded Camoufox browser from builder
-COPY --from=builder --chown=node:node /app/.cache ./.cache
+COPY --from=builder --chown=node:node /app/camoufox ./camoufox
 
 # Copy production dependencies and built artifacts from builder
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/server.js ./server.js
-COPY --from=builder --chown=node:node /app/src ./src
+# COPY --from=builder --chown=node:node /app/src ./src
 
 # Copy bundled indexers to separate location (not shadowed by volume mount)
 COPY --from=builder --chown=node:node /app/data/indexers ./bundled-indexers
@@ -102,9 +116,6 @@ EXPOSE 3000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
-
-# Run as non-root user (rootless) - node user is UID 1000
-USER node
 
 # Start the application
 ENTRYPOINT ["./docker-entrypoint.sh"]

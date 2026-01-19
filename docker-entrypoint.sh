@@ -4,6 +4,29 @@ set -e
 # Ensure we're in the app directory
 cd /app
 
+# Optional UID/GID remap for non-standard hosts
+if [ "$(id -u)" = "0" ] && [ -z "${CINEPHAGE_REEXEC:-}" ]; then
+  TARGET_UID="${PUID:-1000}"
+  TARGET_GID="${PGID:-1000}"
+
+  echo "Configuring runtime UID/GID: ${TARGET_UID}:${TARGET_GID}"
+
+  if [ "$TARGET_GID" != "$(id -g node)" ]; then
+    groupmod -o -g "$TARGET_GID" node
+  fi
+
+  if [ "$TARGET_UID" != "$(id -u node)" ]; then
+    usermod -o -u "$TARGET_UID" -g "$TARGET_GID" node
+  fi
+
+  chown -R node:node /app/data /app/logs /app/camoufox 2>/dev/null || true
+
+  export CINEPHAGE_REEXEC=1
+  exec gosu node "$0" "$@"
+fi
+
+echo "Running as UID=$(id -u) GID=$(id -g)"
+
 # Verify write access to critical directories
 # This catches UID/GID mismatches early with helpful error messages
 check_permissions() {
@@ -70,15 +93,16 @@ else
 fi
 
 # Verify Camoufox browser is present (downloaded at build time)
-# HOME is set to /app in Dockerfile, so cache is at /app/.cache/camoufox
-CAMOUFOX_MARKER="$HOME/.cache/camoufox/version.json"
+# Cache is stored in /app/camoufox for non-standard UID/GID compatibility
+CAMOUFOX_CACHE_DIR="${CAMOUFOX_CACHE_DIR:-/app/camoufox}"
+CAMOUFOX_MARKER="$CAMOUFOX_CACHE_DIR/version.json"
 if [ -f "$CAMOUFOX_MARKER" ]; then
   echo "Camoufox browser ready"
 else
   # Fallback: attempt runtime download if somehow missing
   echo "Warning: Camoufox browser not found, attempting download..."
-  mkdir -p "$HOME/.cache/camoufox"
-  if ./node_modules/.bin/camoufox-js fetch; then
+  mkdir -p "$CAMOUFOX_CACHE_DIR"
+  if ./node_modules/.bin/camoufox-js fetch --path "$CAMOUFOX_CACHE_DIR"; then
     echo "Camoufox browser installed successfully"
   else
     echo "Warning: Failed to download Camoufox browser. Captcha solving will be unavailable."
