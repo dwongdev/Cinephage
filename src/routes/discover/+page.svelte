@@ -3,6 +3,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { resolvePath } from '$lib/utils/routing';
+	import type { TmdbMediaItem } from '$lib/types/tmdb';
 	import { tick } from 'svelte';
 	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import MediaCard from '$lib/components/tmdb/MediaCard.svelte';
@@ -15,7 +16,6 @@
 	import { parseProviderIds, parseGenreIds, extractYear } from '$lib/utils/discoverParams';
 	import { Search } from 'lucide-svelte';
 	import { getMediaTypeLabel } from '$lib/types/tmdb-guards';
-	import type { TmdbMediaItem } from '$lib/types/tmdb';
 
 	let { data } = $props();
 
@@ -232,8 +232,13 @@
 		isFilterOpen = false;
 	}
 
-	// Infinite Scroll Logic - use NonNullable to ensure the array type is always defined
-	type ResultsType = NonNullable<typeof data.results>;
+	type MediaItemWithLibraryStatus = TmdbMediaItem & {
+		inLibrary?: boolean;
+		hasFile?: boolean;
+		libraryId?: string;
+		media_type?: string;
+	};
+	type ResultsType = MediaItemWithLibraryStatus[];
 	let allResults = $state<ResultsType>([]);
 	let currentPage = $state(1);
 	let isLoadingMore = $state(false);
@@ -244,7 +249,7 @@
 		if (data.results) {
 			// Reset when filters change (page resets to 1) or on initial load
 			if (data.pagination?.page === 1 || allResults.length === 0) {
-				allResults = data.results;
+				allResults = data.results as ResultsType;
 				currentPage = data.pagination?.page ?? 1;
 			}
 		}
@@ -274,14 +279,15 @@
 			if (!newData.results || newData.results.length === 0) return;
 
 			// Filter out duplicates based on ID and media_type
-			type ResultItem = { id: number; media_type?: string };
-			const existingIds = new Set(allResults.map((i: ResultItem) => i.id + (i.media_type || '')));
+			const getResultKey = (item: { id: number; media_type?: string | null }) =>
+				`${item.id}-${item.media_type ?? ''}`;
+			const existingIds = new Set(allResults.map((i) => getResultKey(i)));
 			const uniqueNewResults = newData.results.filter(
-				(i: ResultItem) => !existingIds.has(i.id + (i.media_type || ''))
+				(i: { id: number; media_type?: string | null }) => !existingIds.has(getResultKey(i))
 			);
 
 			if (uniqueNewResults.length > 0) {
-				allResults = [...allResults, ...uniqueNewResults];
+				allResults = [...allResults, ...(uniqueNewResults as ResultsType)];
 			}
 			currentPage = nextPage;
 		} catch (e) {
@@ -322,7 +328,9 @@
 
 <div class="min-h-screen bg-base-100 pb-20">
 	<!-- Header -->
-	<div class="sticky top-0 z-30 border-b border-base-200 bg-base-100/80 backdrop-blur-md">
+	<div
+		class="sticky top-16 z-30 -mx-4 border-b border-base-200 bg-base-100/80 backdrop-blur-md lg:top-0 lg:mx-0"
+	>
 		<div class="flex h-16 w-full items-center justify-between gap-4 px-4 lg:px-8">
 			<h1
 				class="shrink-0 bg-gradient-to-r from-primary to-secondary bg-clip-text text-2xl font-bold text-transparent"
@@ -416,7 +424,7 @@
 					</h2>
 				</div>
 
-				<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 sm:gap-4">
+				<div class="grid grid-cols-3 gap-2 sm:gap-4 lg:grid-cols-9">
 					{#each searchResults as item (item.id + (item.media_type || ''))}
 						<MediaCard
 							item={item as unknown as TmdbMediaItem}
@@ -450,12 +458,14 @@
 				<SectionRow
 					title="Trending Today"
 					items={data.sections.trendingDay}
+					link="/discover?trending=day"
 					endpoint="trending/all/day"
 					onAddToLibrary={handleAddToLibrary}
 				/>
 				<SectionRow
 					title="Trending This Week"
 					items={data.sections.trendingWeek}
+					link="/discover?trending=week"
 					endpoint="trending/all/week"
 					onAddToLibrary={handleAddToLibrary}
 				/>
@@ -490,8 +500,8 @@
 					</h2>
 				</div>
 
-				<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 sm:gap-4">
-					{#each allResults as item (item.id + (item.media_type || ''))}
+				<div class="grid grid-cols-3 gap-2 sm:gap-4 lg:grid-cols-9">
+					{#each allResults as item (`${item.id}-${item.media_type ?? ''}`)}
 						<MediaCard {item} onAddToLibrary={handleAddToLibrary} />
 					{/each}
 				</div>

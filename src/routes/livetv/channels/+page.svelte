@@ -82,6 +82,18 @@
 	// EPG state (now/next programs)
 	let epgData = new SvelteMap<string, NowNextEntry>();
 	let epgInterval: ReturnType<typeof setInterval> | null = null;
+	let channelSearch = $state('');
+
+	const normalizedSearch = $derived(channelSearch.trim().toLowerCase());
+	const filteredLineup = $derived(
+		normalizedSearch
+			? lineup.filter((item) => {
+					const name = item.displayName.toLowerCase();
+					const channelName = item.channel.name.toLowerCase();
+					return name.includes(normalizedSearch) || channelName.includes(normalizedSearch);
+				})
+			: lineup
+	);
 
 	// Derived: Group channels by category
 	const groupedChannels = $derived.by(() => {
@@ -94,7 +106,7 @@
 		groups.set(null, []); // Uncategorized
 
 		// Populate groups
-		for (const item of lineup) {
+		for (const item of filteredLineup) {
 			const catId = item.categoryId;
 			const existing = groups.get(catId);
 			if (existing) {
@@ -595,7 +607,7 @@
 			<h1 class="text-2xl font-bold">Channels</h1>
 			<p class="mt-1 text-base-content/60">Organize your channel lineup</p>
 		</div>
-		<div class="flex gap-2">
+		<div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
 			<button
 				class="btn btn-ghost btn-sm"
 				onclick={refreshData}
@@ -629,7 +641,12 @@
 						onclick={closeExportDropdown}
 						onkeydown={(e) => e.key === 'Escape' && closeExportDropdown()}
 					></div>
-					<div class="dropdown-content menu z-50 mt-1 w-80 rounded-box bg-base-200 p-4 shadow-lg">
+					<div
+						class="dropdown-content menu pointer-events-auto left-1/2 z-50 mt-1
+							w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-box bg-base-200 p-4
+							shadow-lg sm:right-0 sm:left-auto sm:w-80 sm:max-w-none
+							sm:translate-x-0"
+					>
 						<div class="space-y-4">
 							<div class="text-sm font-medium">Playlist URLs for Plex/Jellyfin/Emby</div>
 
@@ -645,7 +662,10 @@
 									/>
 									<button
 										class="btn btn-ghost btn-sm"
-										onclick={() => copyToClipboard('m3u')}
+										onclick={(e) => {
+											e.stopPropagation();
+											copyToClipboard('m3u');
+										}}
 										title="Copy M3U URL"
 									>
 										{#if copiedField === 'm3u'}
@@ -669,7 +689,10 @@
 									/>
 									<button
 										class="btn btn-ghost btn-sm"
-										onclick={() => copyToClipboard('epg')}
+										onclick={(e) => {
+											e.stopPropagation();
+											copyToClipboard('epg');
+										}}
 										title="Copy EPG URL"
 									>
 										{#if copiedField === 'epg'}
@@ -688,11 +711,30 @@
 					</div>
 				{/if}
 			</div>
-			<button class="btn btn-sm btn-primary" onclick={openChannelBrowser}>
+			<button class="btn w-full btn-sm btn-primary sm:w-auto" onclick={openChannelBrowser}>
 				<Search class="h-4 w-4" />
 				Browse Channels
 			</button>
 		</div>
+	</div>
+
+	<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+		<div class="relative w-full sm:max-w-sm">
+			<Search
+				class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-base-content/40"
+			/>
+			<input
+				type="text"
+				placeholder="Search channels..."
+				class="input-bordered input input-sm w-full pl-9"
+				bind:value={channelSearch}
+			/>
+		</div>
+		{#if channelSearch}
+			<div class="text-sm text-base-content/60">
+				Showing {filteredLineup.length} of {lineup.length}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Content -->

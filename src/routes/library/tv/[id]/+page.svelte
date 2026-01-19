@@ -164,7 +164,10 @@
 			});
 
 			if (response.ok) {
-				data.series.monitored = newValue;
+				data = {
+					...data,
+					series: { ...data.series, monitored: newValue }
+				};
 			}
 		} catch (error) {
 			console.error('Failed to update monitored status:', error);
@@ -432,14 +435,18 @@
 			});
 
 			if (response.ok) {
-				const season = data.seasons.find((s) => s.id === seasonId);
-				if (season) {
-					season.monitored = newValue;
-					// Also update all episodes in the season
-					for (const ep of season.episodes) {
-						ep.monitored = newValue;
-					}
-				}
+				data = {
+					...data,
+					seasons: data.seasons.map((season) =>
+						season.id === seasonId
+							? {
+									...season,
+									monitored: newValue,
+									episodes: season.episodes.map((ep) => ({ ...ep, monitored: newValue }))
+								}
+							: season
+					)
+				};
 			}
 		} catch (error) {
 			console.error('Failed to update season monitored status:', error);
@@ -455,13 +462,15 @@
 			});
 
 			if (response.ok) {
-				for (const season of data.seasons) {
-					const episode = season.episodes.find((e) => e.id === episodeId);
-					if (episode) {
-						episode.monitored = newValue;
-						break;
-					}
-				}
+				data = {
+					...data,
+					seasons: data.seasons.map((season) => ({
+						...season,
+						episodes: season.episodes.map((ep) =>
+							ep.id === episodeId ? { ...ep, monitored: newValue } : ep
+						)
+					}))
+				};
 			}
 		} catch (error) {
 			console.error('Failed to update episode monitored status:', error);
@@ -864,7 +873,7 @@
 	<title>{data.series.title} - Library - Cinephage</title>
 </svelte:head>
 
-<div class="flex w-full flex-col gap-4 overflow-x-hidden px-4 pb-20 md:gap-6 md:px-6 lg:px-8">
+<div class="flex w-full flex-col gap-4 px-4 pb-20 md:gap-6 md:overflow-x-hidden md:px-6 lg:px-8">
 	<!-- Header -->
 	<LibrarySeriesHeader
 		series={data.series}
@@ -887,7 +896,7 @@
 	<!-- Main Content -->
 	<div class="grid gap-4 lg:grid-cols-2 lg:gap-6 xl:grid-cols-3">
 		<!-- Seasons (takes 2 columns) -->
-		<div class="space-y-4 md:col-span-2 lg:col-span-2">
+		<div class="min-w-0 space-y-4 md:col-span-2 lg:col-span-2">
 			<div class="flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Seasons</h2>
 				<div class="flex gap-1">
@@ -919,8 +928,7 @@
 					<SeasonAccordion
 						{season}
 						seriesMonitored={data.series.monitored ?? false}
-						defaultOpen={data.seasons.length === 1 ||
-							season.seasonNumber === data.seasons[data.seasons.length - 1].seasonNumber}
+						defaultOpen={false}
 						{selectedEpisodes}
 						{showCheckboxes}
 						{downloadingEpisodeIds}

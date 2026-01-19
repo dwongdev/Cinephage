@@ -96,8 +96,10 @@
 			});
 
 			if (response.ok) {
-				// Update local state
-				data.movie.monitored = newValue;
+				data = {
+					...data,
+					movie: { ...data.movie, monitored: newValue }
+				};
 			}
 		} catch (error) {
 			console.error('Failed to update monitored status:', error);

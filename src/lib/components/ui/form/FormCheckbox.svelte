@@ -39,7 +39,7 @@
 	<div class="min-w-0">
 		<span class="text-sm">{label}</span>
 		{#if description}
-			<p class="text-xs text-base-content/60">{description}</p>
+			<p class="text-xs break-words whitespace-normal text-base-content/60">{description}</p>
 		{/if}
 	</div>
 </label>

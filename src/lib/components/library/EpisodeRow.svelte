@@ -238,24 +238,191 @@
 	<!-- Title -->
 	<td class="min-w-0">
 		<div class="flex min-w-0 flex-col">
-			<span class={`truncate font-medium ${!episode.title ? 'text-base-content/60' : ''}`}>
-				{episode.title || 'TBA'}
-			</span>
+			<div class="flex items-start justify-between gap-2">
+				<span
+					class={`min-w-0 flex-1 font-medium break-words ${!episode.title ? 'text-base-content/60' : ''}`}
+				>
+					{episode.title || 'TBA'}
+				</span>
+				<div class="ml-auto flex shrink-0 items-center gap-1 sm:hidden">
+					<button
+						class="btn btn-ghost btn-xs {episode.monitored
+							? 'text-success'
+							: 'text-base-content/40'}"
+						onclick={handleMonitorClick}
+						title={episode.monitored ? 'Monitored' : 'Not monitored'}
+					>
+						{#if episode.monitored}
+							<Eye size={14} />
+						{:else}
+							<EyeOff size={14} />
+						{/if}
+					</button>
+					<AutoSearchStatus
+						status={autoSearchStatus}
+						releaseName={autoSearchResult?.releaseName}
+						error={autoSearchResult?.error}
+						size="xs"
+					/>
+					<div class="dropdown dropdown-end">
+						<button
+							class="btn btn-ghost btn-xs"
+							disabled={autoSearching || subtitleAutoSearching}
+							title="Search options"
+						>
+							{#if autoSearching || subtitleAutoSearching}
+								<Loader2 size={14} class="animate-spin" />
+							{:else}
+								<Search size={14} />
+							{/if}
+							<ChevronDown size={10} />
+						</button>
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<ul
+							tabindex="0"
+							class="dropdown-content menu z-50 w-52 rounded-box bg-base-200 p-2 shadow-lg"
+						>
+							<li class="menu-title">
+								<span>Media</span>
+							</li>
+							<li>
+								<button onclick={handleAutoSearchClick} disabled={autoSearching}>
+									<Download size={14} />
+									Auto-grab best
+								</button>
+							</li>
+							<li>
+								<button onclick={handleSearchClick}>
+									<Search size={14} />
+									Interactive search
+								</button>
+							</li>
+							{#if episode.hasFile && (onSubtitleSearch || onSubtitleAutoSearch)}
+								<li class="menu-title">
+									<span>Subtitles</span>
+								</li>
+								{#if onSubtitleAutoSearch}
+									<li>
+										<button
+											onclick={handleSubtitleAutoSearchClick}
+											disabled={subtitleAutoSearching}
+										>
+											<Subtitles size={14} />
+											Auto-download subs
+										</button>
+									</li>
+								{/if}
+								{#if onSubtitleSearch}
+									<li>
+										<button onclick={handleSubtitleSearchClick}>
+											<Search size={14} />
+											Search subtitles
+										</button>
+									</li>
+								{/if}
+							{/if}
+						</ul>
+					</div>
+					{#if episode.file?.mediaInfo}
+						<div class="dropdown dropdown-end">
+							<button class="btn btn-ghost btn-xs">
+								<Info size={14} />
+							</button>
+							<div
+								tabindex="0"
+								role="dialog"
+								class="dropdown-content z-50 w-64 rounded-lg bg-base-200 p-3 text-xs shadow-xl"
+							>
+								<div class="space-y-1">
+									{#if episode.file.mediaInfo.videoCodec}
+										<div>Video: {episode.file.mediaInfo.videoCodec}</div>
+									{/if}
+									{#if episode.file.mediaInfo.audioCodec}
+										<div>
+											Audio: {episode.file.mediaInfo.audioCodec}
+											{#if episode.file.mediaInfo.audioChannels}
+												({episode.file.mediaInfo.audioChannels === 6
+													? '5.1'
+													: episode.file.mediaInfo.audioChannels === 8
+														? '7.1'
+														: `${episode.file.mediaInfo.audioChannels}ch`})
+											{/if}
+										</div>
+									{/if}
+									{#if episode.file.mediaInfo.audioLanguages?.length}
+										<div>Languages: {episode.file.mediaInfo.audioLanguages.join(', ')}</div>
+									{/if}
+									{#if episode.file.mediaInfo.subtitleLanguages?.length}
+										<div>Subs: {episode.file.mediaInfo.subtitleLanguages.join(', ')}</div>
+									{/if}
+									{#if episode.file.releaseGroup}
+										<div>Group: {episode.file.releaseGroup}</div>
+									{/if}
+								</div>
+							</div>
+						</div>
+					{/if}
+					{#if onDelete}
+						<button
+							class="btn text-error btn-ghost btn-xs"
+							onclick={handleDeleteClick}
+							title="Delete episode"
+						>
+							<Trash2 size={14} />
+						</button>
+					{/if}
+				</div>
+			</div>
 			{#if episode.file}
-				<span class="truncate text-xs text-base-content/50" title={episode.file.relativePath}>
+				<span
+					class="block max-w-full text-xs break-words text-base-content/50 sm:truncate"
+					title={episode.file.relativePath}
+				>
 					{episode.file.relativePath.split('/').pop()}
 				</span>
+			{/if}
+			<div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60 sm:hidden">
+				<span>{formatAirDate(episode.airDate)}</span>
+				<span class="text-base-content/40">•</span>
+				{#if episode.hasFile && episode.file}
+					<span class="text-success">Downloaded</span>
+				{:else if isDownloading}
+					<span class="text-warning">Downloading</span>
+				{:else if isAired(episode.airDate)}
+					<span class="text-error">Missing</span>
+				{:else}
+					<span class="text-base-content/50">Not aired</span>
+				{/if}
+				<span class="text-base-content/40">•</span>
+				<span>
+					{#if episode.file?.size}
+						{formatBytes(episode.file.size)}
+					{:else}
+						—
+					{/if}
+				</span>
+			</div>
+			{#if episode.hasFile && episode.file}
+				<div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60 sm:hidden">
+					<QualityBadge quality={episode.file.quality} mediaInfo={null} size="sm" />
+					{#if allSubtitles.length > 0}
+						<div class="flex items-center gap-1">
+							<Subtitles size={12} class="text-base-content/50" />
+							<SubtitleDisplay subtitles={allSubtitles} maxDisplay={3} size="xs" />
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</td>
 
 	<!-- Air date -->
-	<td class="text-sm text-base-content/70">
+	<td class="hidden text-sm text-base-content/70 sm:table-cell">
 		{formatAirDate(episode.airDate)}
 	</td>
 
 	<!-- Status -->
-	<td>
+	<td class="hidden sm:table-cell">
 		{#if episode.hasFile && episode.file}
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
@@ -285,7 +452,7 @@
 	</td>
 
 	<!-- Size -->
-	<td class="text-sm text-base-content/70">
+	<td class="hidden text-sm text-base-content/70 sm:table-cell">
 		{#if episode.file?.size}
 			{formatBytes(episode.file.size)}
 		{:else}
@@ -294,13 +461,12 @@
 	</td>
 
 	<!-- Actions -->
-	<td>
+	<td class="hidden sm:table-cell">
 		<div class="flex flex-wrap items-center gap-1">
 			<!-- Monitor toggle -->
 			<button
 				class="btn btn-ghost btn-xs {episode.monitored ? 'text-success' : 'text-base-content/40'}"
 				onclick={handleMonitorClick}
-				disabled={!seriesMonitored}
 				title={episode.monitored ? 'Monitored' : 'Not monitored'}
 			>
 				{#if episode.monitored}

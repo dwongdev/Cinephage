@@ -2,7 +2,7 @@
 	import type { LibraryMovie, LibrarySeries } from '$lib/types/library';
 	import { isLibraryMovie, getBestQualityFromFiles } from '$lib/types/library';
 	import TmdbImage from '$lib/components/tmdb/TmdbImage.svelte';
-	import { Eye, EyeOff, Check, X } from 'lucide-svelte';
+	import { Eye, EyeOff, Check, X, Download } from 'lucide-svelte';
 	import { resolvePath } from '$lib/utils/routing';
 
 	type LibraryItem = LibraryMovie | LibrarySeries;
@@ -86,7 +86,7 @@
 	{/if}
 
 	<!-- Top-right badges: Monitored + Type -->
-	<div class="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
+	<div class="absolute top-2 right-2 z-10 flex max-w-[48%] flex-col items-end gap-1">
 		<!-- Monitored status -->
 		<div
 			class="badge border-none badge-sm shadow-sm backdrop-blur-sm {item.monitored
@@ -103,7 +103,7 @@
 
 		<!-- Media type badge -->
 		<div
-			class="badge border-none badge-sm font-semibold shadow-sm backdrop-blur-sm {isMovie
+			class="badge truncate border-none badge-xs font-semibold shadow-sm backdrop-blur-sm sm:badge-sm {isMovie
 				? 'bg-primary/80 text-primary-content'
 				: 'bg-secondary/80 text-secondary-content'}"
 		>
@@ -112,7 +112,9 @@
 	</div>
 
 	<!-- Top-left: File status (movies) or Progress indicator (series) -->
-	<div class="absolute left-2 z-10 flex flex-col gap-1 {selectable ? 'top-10' : 'top-2'}">
+	<div
+		class="absolute left-2 z-10 flex max-w-[48%] flex-col gap-1 {selectable ? 'top-10' : 'top-2'}"
+	>
 		{#if isMovie}
 			<!-- File status for movies -->
 			<div
@@ -140,7 +142,7 @@
 		<!-- Quality badge for movies with files -->
 		{#if isMovie && hasFile && qualityBadge()}
 			<div
-				class="badge border-none bg-primary/80 badge-sm font-medium text-primary-content shadow-sm backdrop-blur-sm"
+				class="badge truncate border-none bg-primary/80 badge-xs font-medium text-primary-content shadow-sm backdrop-blur-sm sm:badge-sm"
 			>
 				{qualityBadge()}
 			</div>
@@ -171,12 +173,15 @@
 			<h3 class="line-clamp-2 text-sm leading-tight font-bold text-white">
 				{item.title}
 			</h3>
-			<div class="mt-1 flex items-center justify-between">
+			<div class="mt-1 flex items-center justify-between gap-2">
 				{#if item.year}
 					<span class="text-xs text-white/70">{item.year}</span>
 				{/if}
 				{#if !isMovie}
-					<span class="text-xs text-white/70">{seriesProgress}% complete</span>
+					<span class="flex items-center gap-1 text-xs whitespace-nowrap text-white/70">
+						<Download class="h-3 w-3" />
+						{seriesProgress}%
+					</span>
 				{/if}
 			</div>
 		</div>

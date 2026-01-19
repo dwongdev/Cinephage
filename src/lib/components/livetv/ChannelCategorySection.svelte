@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { ChevronRight, ChevronDown, FolderOpen } from 'lucide-svelte';
+	import {
+		ChevronRight,
+		ChevronDown,
+		FolderOpen,
+		GripVertical,
+		Info,
+		Pencil,
+		Trash2,
+		Tv
+	} from 'lucide-svelte';
 	import ChannelLineupRow from './ChannelLineupRow.svelte';
 	import type {
 		ChannelLineupItemWithDetails,
@@ -179,7 +188,108 @@
 
 	<!-- Channel Rows -->
 	{#if isExpanded && channels.length > 0}
-		<div class="overflow-x-auto">
+		<!-- Mobile cards -->
+		<div class="space-y-3 sm:hidden">
+			{#each channels as channel, index (channel.id)}
+				{@const nowNext = epgData.get(channel.channelId)}
+				<div
+					class="rounded-xl bg-base-200 p-3 transition-colors
+						{isDragging && draggedItemId === channel.id ? 'bg-base-300/70' : ''}
+						{dragOverIndex === index && draggedItemId !== channel.id ? 'bg-primary/10' : ''}
+						{selectedIds.has(channel.id) ? 'bg-base-300/50' : ''}"
+					draggable="true"
+					ondragstart={(e) => onDragStart(e, channel.id)}
+					ondragover={(e) => handleRowDragOver(e, index)}
+					ondragleave={handleRowDragLeave}
+					ondrop={(e) => handleRowDrop(e, index)}
+					ondragend={onDragEnd}
+				>
+					<div class="flex items-start gap-3">
+						<input
+							type="checkbox"
+							class="checkbox mt-1 checkbox-sm"
+							checked={selectedIds.has(channel.id)}
+							onchange={(e) => onSelect(channel.id, e.currentTarget.checked)}
+						/>
+						<div
+							class="mt-1 flex h-10 w-4 cursor-grab items-center justify-center text-base-content/30"
+						>
+							<GripVertical class="h-4 w-4" />
+						</div>
+						{#if channel.displayLogo}
+							<img
+								src={channel.displayLogo}
+								alt={channel.displayName}
+								class="h-10 w-10 rounded bg-base-100 object-contain"
+								onerror={(e) => {
+									const target = e.currentTarget as HTMLImageElement;
+									target.style.display = 'none';
+								}}
+							/>
+						{:else}
+							<div class="flex h-10 w-10 items-center justify-center rounded bg-base-300">
+								<Tv class="h-4 w-4 text-base-content/30" />
+							</div>
+						{/if}
+						<div class="min-w-0 flex-1">
+							<div class="flex items-start justify-between gap-2">
+								<div class="min-w-0">
+									<div class="truncate font-medium" title={channel.displayName}>
+										{channel.displayName}
+									</div>
+									<div class="mt-0.5 text-xs text-base-content/60">
+										#{channel.channelNumber ?? channel.position}
+										<span class="text-base-content/40">•</span>
+										{channel.accountName}
+									</div>
+								</div>
+								<div class="flex items-center gap-1">
+									<button class="btn btn-ghost btn-xs" onclick={() => onEdit(channel)}>
+										<Pencil class="h-3.5 w-3.5" />
+									</button>
+									<button
+										class="btn text-error btn-ghost btn-xs hover:bg-error/10"
+										onclick={() => onRemove(channel)}
+									>
+										<Trash2 class="h-3.5 w-3.5" />
+									</button>
+								</div>
+							</div>
+
+							{#if nowNext?.now}
+								<button
+									type="button"
+									class="mt-2 flex w-full flex-col gap-0.5 rounded px-1 py-1 text-left transition-colors hover:bg-base-300"
+									onclick={() => onShowSchedule?.(channel)}
+								>
+									<span class="truncate text-xs font-medium" title={nowNext.now.title}>
+										{nowNext.now.title}
+									</span>
+									<div class="flex items-center gap-2">
+										<progress
+											class="progress h-1.5 w-20 progress-primary"
+											value={nowNext.now.progress * 100}
+											max="100"
+										></progress>
+										<span class="text-xs text-base-content/50">
+											{nowNext.now.remainingMinutes}m left
+										</span>
+									</div>
+								</button>
+							{:else}
+								<div class="mt-2 flex items-center gap-1 text-xs text-base-content/50">
+									<Info class="h-3 w-3" />
+									No EPG
+								</div>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop table -->
+		<div class="hidden overflow-x-auto sm:block">
 			<table class="table table-sm">
 				<thead>
 					<tr class="text-xs text-base-content/50">

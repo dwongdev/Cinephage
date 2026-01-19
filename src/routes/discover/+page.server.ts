@@ -13,6 +13,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		type,
 		page,
 		sortBy,
+		trending,
 		withWatchProviders,
 		watchRegion,
 		withGenres,
@@ -33,6 +34,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			filters: {
 				type,
 				sort_by: sortBy,
+				trending,
 				with_watch_providers: withWatchProviders,
 				with_genres: withGenres
 			}
@@ -59,6 +61,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				filters: {
 					type,
 					sort_by: sortBy,
+					trending,
 					with_watch_providers: withWatchProviders,
 					with_genres: withGenres
 				}
@@ -79,6 +82,34 @@ export const load: PageServerLoad = async ({ url }) => {
 			page: number;
 			total_pages: number;
 			total_results: number;
+		}
+
+		if (trending === 'day' || trending === 'week') {
+			const trendingResults = (await tmdb.fetch(
+				`/trending/all/${trending}?page=${page}`
+			)) as TmdbPaginatedResult;
+
+			const enrichedResults = await enrichWithLibraryStatus(trendingResults.results);
+
+			return {
+				viewType: 'grid',
+				tmdbConfigured: true,
+				results: enrichedResults,
+				pagination: {
+					page: trendingResults.page,
+					total_pages: trendingResults.total_pages,
+					total_results: trendingResults.total_results
+				},
+				providers,
+				genres,
+				filters: {
+					type,
+					sort_by: sortBy,
+					trending,
+					with_watch_providers: withWatchProviders,
+					with_genres: withGenres
+				}
+			};
 		}
 
 		if (isDefaultViewCheck && page === '1') {
@@ -122,6 +153,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				filters: {
 					type,
 					sort_by: sortBy,
+					trending,
 					with_watch_providers: withWatchProviders,
 					with_genres: withGenres
 				}
@@ -154,6 +186,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				filters: {
 					type,
 					sort_by: sortBy,
+					trending,
 					with_watch_providers: withWatchProviders,
 					with_genres: withGenres
 				}
@@ -170,6 +203,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			filters: {
 				type,
 				sort_by: sortBy,
+				trending,
 				with_watch_providers: withWatchProviders,
 				with_genres: withGenres
 			}

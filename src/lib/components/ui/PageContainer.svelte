@@ -26,7 +26,9 @@
 <div class="min-h-screen bg-base-100" class:pb-20={bottomPadding}>
 	{#if header && showHeader}
 		<!-- Sticky Header -->
-		<div class="sticky top-0 z-30 border-b border-base-200 bg-base-100/80 backdrop-blur-md">
+		<div
+			class="sticky top-16 z-30 border-b border-base-200 bg-base-100/80 backdrop-blur-md lg:top-0"
+		>
 			<div class="flex h-16 w-full items-center justify-between px-4 lg:px-8">
 				{@render header()}
 			</div>

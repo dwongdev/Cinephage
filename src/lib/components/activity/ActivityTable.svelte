@@ -86,10 +86,10 @@
 	// Get media link
 	function getMediaLink(activity: UnifiedActivity): string {
 		if (activity.mediaType === 'movie') {
-			return resolvePath(`/movies/${activity.mediaId}`);
+			return resolvePath(`/library/movie/${activity.mediaId}`);
 		}
 		// For episodes, link to the series
-		return resolvePath(`/tv/${activity.seriesId || activity.mediaId}`);
+		return resolvePath(`/library/tv/${activity.seriesId || activity.mediaId}`);
 	}
 
 	// Protocol labels
@@ -120,7 +120,134 @@
 		<p class="mt-1 text-sm">Download and search activity will appear here</p>
 	</div>
 {:else}
-	<div class="overflow-x-auto">
+	<!-- Mobile: Card View -->
+	<div class="space-y-3 lg:hidden">
+		{#each activities as activity (activity.id)}
+			{@const config = statusConfig[activity.status] || statusConfig.no_results}
+			{@const StatusIcon = config.icon}
+			{@const isExpanded = expandedRows.has(activity.id)}
+			<div class="rounded-xl bg-base-200 p-4">
+				<div class="flex items-start justify-between gap-2">
+					<span class="badge gap-1 {config.variant}">
+						<StatusIcon
+							class="h-3 w-3 {activity.status === 'downloading' || activity.status === 'searching'
+								? 'animate-spin'
+								: ''}"
+						/>
+						{#if activity.status === 'downloading' && activity.downloadProgress !== undefined}
+							{activity.downloadProgress}%
+						{:else}
+							{config.label}
+						{/if}
+					</span>
+					<span class="text-xs text-base-content/60" title={activity.startedAt}>
+						{formatRelativeTime(activity.startedAt)}
+					</span>
+				</div>
+
+				<div class="mt-2">
+					<a href={getMediaLink(activity)} class="flex items-center gap-2 hover:text-primary">
+						{#if activity.mediaType === 'movie'}
+							<Clapperboard class="h-4 w-4 shrink-0" />
+						{:else}
+							<Tv class="h-4 w-4 shrink-0" />
+						{/if}
+						<span class="min-w-0 flex-1 truncate" title={activity.mediaTitle}>
+							{activity.mediaTitle}
+							{#if activity.mediaYear}
+								<span class="text-base-content/60">({activity.mediaYear})</span>
+							{/if}
+						</span>
+					</a>
+					{#if activity.releaseTitle}
+						<div
+							class="mt-1 line-clamp-2 text-xs text-base-content/60"
+							title={activity.releaseTitle}
+						>
+							{activity.releaseTitle}
+						</div>
+					{/if}
+				</div>
+
+				{#if !compact}
+					<div class="mt-2 flex flex-wrap items-center gap-1">
+						{#if activity.quality?.resolution}
+							<span class="badge badge-outline badge-xs">{activity.quality.resolution}</span>
+						{/if}
+						{#if activity.quality?.source}
+							<span class="badge badge-outline badge-xs">{activity.quality.source}</span>
+						{/if}
+						{#if activity.quality?.codec}
+							<span class="badge badge-outline badge-xs">{activity.quality.codec}</span>
+						{/if}
+						{#if activity.quality?.hdr}
+							<span class="badge badge-outline badge-xs">{activity.quality.hdr}</span>
+						{/if}
+					</div>
+					<div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+						<span>{formatBytes(activity.size) || '-'}</span>
+						<span class="text-base-content/40">•</span>
+						<span>{activity.releaseGroup || '-'}</span>
+						{#if activity.indexerName}
+							<span class="text-base-content/40">•</span>
+							<span>
+								{activity.indexerName}
+								{#if activity.protocol}
+									<span class="text-base-content/50">
+										({protocolLabels[activity.protocol] || activity.protocol})
+									</span>
+								{/if}
+							</span>
+						{/if}
+					</div>
+				{/if}
+
+				<div class="mt-2">
+					{#if activity.status === 'downloading' && activity.downloadProgress !== undefined}
+						<progress
+							class="progress w-full progress-info"
+							value={activity.downloadProgress}
+							max="100"
+						></progress>
+					{:else if activity.statusReason}
+						<div class="text-xs text-base-content/60">{activity.statusReason}</div>
+					{/if}
+				</div>
+
+				{#if activity.timeline.length > 0}
+					<button
+						class="mt-2 flex items-center gap-1 text-xs text-base-content/60 hover:text-base-content"
+						onclick={() => toggleRow(activity.id)}
+					>
+						{#if isExpanded}
+							<ChevronUp class="h-3 w-3" />
+							Hide timeline
+						{:else}
+							<ChevronDown class="h-3 w-3" />
+							Show timeline
+						{/if}
+					</button>
+				{/if}
+
+				{#if isExpanded && activity.timeline.length > 0}
+					<div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+						{#each activity.timeline as event, i (event.timestamp + event.type)}
+							<span class="flex items-center gap-1 rounded bg-base-300 px-2 py-1">
+								<span class="capitalize">{event.type}</span>
+								<span class="text-base-content/50">({formatTimestamp(event.timestamp)})</span>
+							</span>
+							{#if i < activity.timeline.length - 1}
+								<span class="text-base-content/30">→</span>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/each}
+	</div>
+
+	<!-- Desktop: Table View -->
+	<div class="hidden overflow-x-auto lg:block">
 		<table class="table table-sm">
 			<thead>
 				<tr>
