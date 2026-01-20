@@ -44,6 +44,7 @@ ENV PUBLIC_APP_VERSION=${APP_VERSION}
 # - wget: for health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    xvfb \
     wget \
     gosu \
     libgtk-3-0 \
@@ -65,7 +66,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdbus-glib-1-2 \
     libxt6 \
     # GLX/Mesa libraries for Camoufox GPU detection (glxtest)
-    xvfb \
     libgl1-mesa-dri \
     libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
@@ -85,6 +85,11 @@ COPY --from=builder --chown=node:node /app/data/indexers ./bundled-indexers
 # Copy and set up entrypoint script
 COPY --chown=node:node docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
+
+# Pre-fetch Camoufox browser binaries into the node user's cache
+RUN mkdir -p /home/node/.cache && chown -R node:node /home/node/.cache
+USER node
+RUN ./node_modules/.bin/camoufox-js fetch
 
 # Set environment variables
 ENV NODE_ENV=production
