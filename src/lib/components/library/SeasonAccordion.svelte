@@ -194,89 +194,93 @@
 	}
 </script>
 
-<div class="overflow-hidden rounded-lg border border-base-300 bg-base-100">
+<div class="max-w-full overflow-hidden rounded-lg border border-base-300 bg-base-100">
 	<!-- Header -->
 	<div
-		class="flex w-full items-center justify-between gap-4 p-4 transition-colors hover:bg-base-200"
+		class="flex w-full flex-col gap-3 p-4 transition-colors hover:bg-base-200 sm:flex-row sm:items-center sm:justify-between"
 	>
 		<!-- Clickable area for expand/collapse -->
-		<button class="flex flex-1 items-center gap-3 text-left" onclick={() => (isOpen = !isOpen)}>
-			{#if isOpen}
-				<ChevronDown size={20} class="text-base-content/50" />
-			{:else}
-				<ChevronRight size={20} class="text-base-content/50" />
-			{/if}
+		<div class="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
+			<button
+				class="flex min-w-0 flex-1 items-center gap-3 text-left"
+				onclick={() => (isOpen = !isOpen)}
+			>
+				{#if isOpen}
+					<ChevronDown size={20} class="text-base-content/50" />
+				{:else}
+					<ChevronRight size={20} class="text-base-content/50" />
+				{/if}
 
-			<div>
-				<h3 class="font-semibold">{getSeasonName()}</h3>
-				<div class="flex items-center gap-2 text-sm text-base-content/60">
-					<span>{downloadedCount}/{totalCount} episodes</span>
-					{#if percentComplete === 100}
-						<span class="badge badge-xs badge-success">Complete</span>
-					{:else if percentComplete > 0}
-						<span class="badge badge-xs badge-primary">{percentComplete}%</span>
-					{/if}
+				<div class="min-w-0">
+					<h3 class="font-semibold">{getSeasonName()}</h3>
+					<div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-base-content/60">
+						<span>{downloadedCount}/{totalCount} episodes</span>
+						{#if percentComplete === 100}
+							<span class="badge badge-xs badge-success">Complete</span>
+						{:else if percentComplete > 0}
+							<span class="badge badge-xs badge-primary">{percentComplete}%</span>
+						{/if}
+					</div>
 				</div>
-			</div>
-		</button>
-
-		<!-- Action buttons -->
-		<div class="flex items-center gap-2">
-			<!-- Season monitor toggle -->
-			<button
-				class="btn btn-ghost btn-sm {season.monitored ? 'text-success' : 'text-base-content/40'}"
-				onclick={handleSeasonMonitorToggle}
-				disabled={!seriesMonitored}
-				title={season.monitored ? 'Season monitored' : 'Season not monitored'}
-			>
-				{#if season.monitored}
-					<Eye size={16} />
-				{:else}
-					<EyeOff size={16} />
-				{/if}
 			</button>
 
-			<!-- Auto-search status indicator -->
-			<AutoSearchStatus
-				status={autoSearchSeasonStatus}
-				releaseName={autoSearchSeasonResult?.releaseName}
-				error={autoSearchSeasonResult?.error}
-				size="sm"
-			/>
-
-			<!-- Auto-grab season pack -->
-			<button
-				class="btn btn-ghost btn-sm"
-				onclick={handleAutoSearchSeason}
-				disabled={autoSearchingSeason}
-				title="Auto-grab season pack"
-			>
-				{#if autoSearchingSeason}
-					<Loader2 size={16} class="animate-spin" />
-				{:else}
-					<Download size={16} />
-				{/if}
-			</button>
-
-			<!-- Interactive search season -->
-			<button
-				class="btn btn-ghost btn-sm"
-				onclick={handleSeasonSearch}
-				title="Interactive search for season"
-			>
-				<Search size={16} />
-			</button>
-
-			<!-- Delete season -->
-			{#if onSeasonDelete}
+			<!-- Action buttons -->
+			<div class="flex shrink-0 items-center gap-2">
+				<!-- Season monitor toggle -->
 				<button
-					class="btn text-error btn-ghost btn-sm"
-					onclick={handleSeasonDelete}
-					title="Delete season"
+					class="btn btn-ghost btn-sm {season.monitored ? 'text-success' : 'text-base-content/40'}"
+					onclick={handleSeasonMonitorToggle}
+					title={season.monitored ? 'Season monitored' : 'Season not monitored'}
 				>
-					<Trash2 size={16} />
+					{#if season.monitored}
+						<Eye size={16} />
+					{:else}
+						<EyeOff size={16} />
+					{/if}
 				</button>
-			{/if}
+
+				<!-- Auto-search status indicator -->
+				<AutoSearchStatus
+					status={autoSearchSeasonStatus}
+					releaseName={autoSearchSeasonResult?.releaseName}
+					error={autoSearchSeasonResult?.error}
+					size="sm"
+				/>
+
+				<!-- Auto-grab season pack -->
+				<button
+					class="btn btn-ghost btn-sm"
+					onclick={handleAutoSearchSeason}
+					disabled={autoSearchingSeason}
+					title="Auto-grab season pack"
+				>
+					{#if autoSearchingSeason}
+						<Loader2 size={16} class="animate-spin" />
+					{:else}
+						<Download size={16} />
+					{/if}
+				</button>
+
+				<!-- Interactive search season -->
+				<button
+					class="btn btn-ghost btn-sm"
+					onclick={handleSeasonSearch}
+					title="Interactive search for season"
+				>
+					<Search size={16} />
+				</button>
+
+				<!-- Delete season -->
+				{#if onSeasonDelete}
+					<button
+						class="btn text-error btn-ghost btn-sm"
+						onclick={handleSeasonDelete}
+						title="Delete season"
+					>
+						<Trash2 size={16} />
+					</button>
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -286,8 +290,8 @@
 			{#if season.episodes.length === 0}
 				<div class="p-8 text-center text-base-content/60">No episodes in this season</div>
 			{:else}
-				<div class="overflow-x-auto">
-					<table class="table table-sm">
+				<div class="w-full max-w-full overflow-x-hidden sm:overflow-x-auto">
+					<table class="table w-full table-sm sm:min-w-[640px] sm:table-auto">
 						<thead>
 							<tr class="text-xs text-base-content/60">
 								{#if showCheckboxes}
@@ -304,10 +308,10 @@
 								{/if}
 								<th class="w-12 text-center">#</th>
 								<th>Title</th>
-								<th class="w-24">Air Date</th>
-								<th class="w-32">Status</th>
-								<th class="w-20">Size</th>
-								<th class="w-28">Actions</th>
+								<th class="hidden w-24 sm:table-cell">Air Date</th>
+								<th class="hidden w-32 sm:table-cell">Status</th>
+								<th class="hidden w-20 sm:table-cell">Size</th>
+								<th class="hidden w-28 sm:table-cell">Actions</th>
 							</tr>
 						</thead>
 						<tbody>

@@ -123,7 +123,7 @@
 			/>
 		{/if}
 		<div
-			class="absolute inset-0 bg-gradient-to-r from-base-200 via-base-200/95 to-base-200/80"
+			class="absolute inset-0 bg-gradient-to-r from-base-200/80 via-base-200/75 to-base-200/60 sm:from-base-200 sm:via-base-200/95 sm:to-base-200/80"
 		></div>
 	</div>
 
@@ -144,7 +144,7 @@
 		<!-- Info -->
 		<div class="flex min-w-0 flex-1 flex-col justify-between gap-4">
 			<!-- Top row: Title and actions -->
-			<div class="flex flex-wrap items-start justify-between gap-2 md:gap-4">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:gap-4">
 				<div class="min-w-0 flex-1">
 					<h1 class="text-2xl font-bold md:text-3xl">
 						{series.title}
@@ -166,14 +166,14 @@
 							<span>{series.network}</span>
 						{/if}
 						{#if series.genres && series.genres.length > 0}
-							<span class="hidden sm:inline">•</span>
-							<span class="hidden sm:inline">{series.genres.slice(0, 3).join(', ')}</span>
+							<span>•</span>
+							<span class="min-w-0 truncate">{series.genres.slice(0, 3).join(', ')}</span>
 						{/if}
 					</div>
 				</div>
 
 				<!-- Action buttons -->
-				<div class="flex flex-wrap items-center gap-1 sm:gap-2">
+				<div class="flex flex-wrap items-center gap-1 sm:justify-end sm:gap-2">
 					<MonitorToggle
 						monitored={series.monitored ?? false}
 						onToggle={onMonitorToggle}

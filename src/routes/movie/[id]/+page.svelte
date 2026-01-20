@@ -26,7 +26,11 @@
 
 	<!-- Cast Section -->
 	{#if data.movie.credits.cast.length > 0}
-		<SectionRow title="Top Cast" items={data.movie.credits.cast.slice(0, 15)}>
+		<SectionRow
+			title="Top Cast"
+			items={data.movie.credits.cast.slice(0, 15)}
+			itemClass="w-[30vw] sm:w-36 md:w-44"
+		>
 			{#snippet cardSnippet(person)}
 				<PersonCard {person} />
 			{/snippet}

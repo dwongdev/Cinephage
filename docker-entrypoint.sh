@@ -1,29 +1,32 @@
 #!/bin/sh
 set -e
 
-# ==========================================
-# Fix for custom UID support (e.g., Synology)
-# ==========================================
-# Node.js os.homedir() uses $HOME if set, otherwise looks up UID in /etc/passwd.
-# When running with arbitrary UIDs (user: '1026:100'), the UID doesn't exist in
-# /etc/passwd, causing os.homedir() to return '/' or fail.
-# camoufox-js uses os.homedir() to find its cache, so we must ensure HOME is set.
-
-# Explicitly export HOME to /app (this is also set in Dockerfile but we ensure it here)
-export HOME="${HOME:-/app}"
-
-# Create /etc/passwd entry for current UID if it doesn't exist
-# This helps libraries that use getpwuid() instead of $HOME
-CURRENT_UID=$(id -u)
-if ! getent passwd "$CURRENT_UID" > /dev/null 2>&1; then
-  # Try to add entry (may fail in read-only /etc, that's OK since we have $HOME)
-  if [ -w /etc/passwd ]; then
-    echo "cinephage:x:$CURRENT_UID:$(id -g):Cinephage User:$HOME:/bin/sh" >> /etc/passwd 2>/dev/null || true
-  fi
-fi
-
 # Ensure we're in the app directory
 cd /app
+
+# Optional UID/GID remap for non-standard hosts
+if [ "$(id -u)" = "0" ] && [ -z "${CINEPHAGE_REEXEC:-}" ]; then
+  TARGET_UID="${PUID:-1000}"
+  TARGET_GID="${PGID:-1000}"
+
+  echo "Configuring runtime UID/GID: ${TARGET_UID}:${TARGET_GID}"
+
+  if [ "$TARGET_GID" != "$(id -g node)" ]; then
+    groupmod -o -g "$TARGET_GID" node
+  fi
+
+  if [ "$TARGET_UID" != "$(id -u node)" ]; then
+    usermod -o -u "$TARGET_UID" -g "$TARGET_GID" node
+  fi
+
+  mkdir -p /home/node/.cache
+  chown -R node:node /app/data /app/logs /home/node/.cache 2>/dev/null || true
+
+  export CINEPHAGE_REEXEC=1
+  exec gosu node "$0" "$@"
+fi
+
+echo "Running as UID=$(id -u) GID=$(id -g)"
 
 # Verify write access to critical directories
 # This catches UID/GID mismatches early with helpful error messages
@@ -41,7 +44,7 @@ check_permissions() {
       echo "To fix this, ensure the host directory has correct ownership:"
       echo "  sudo chown -R $(id -u):$(id -g) $(dirname $dir)"
       echo ""
-      echo "Or set CINEPHAGE_UID and CINEPHAGE_GID in your .env file to match"
+      echo "Or set PUID and PGID in your .env file to match"
       echo "your host user (run 'id -u' and 'id -g' to find your IDs)."
       exit 1
     fi
@@ -56,7 +59,7 @@ check_permissions() {
     echo "To fix this, update the host directory ownership:"
     echo "  sudo chown -R $(id -u):$(id -g) $dir"
     echo ""
-    echo "Or set CINEPHAGE_UID and CINEPHAGE_GID in your .env file to match"
+    echo "Or set PUID and PGID in your .env file to match"
     echo "your host user (run 'id -u' and 'id -g' to find your IDs)."
     exit 1
   fi
@@ -90,20 +93,20 @@ else
   echo "Warning: Bundled indexers directory not found at $BUNDLED_DIR"
 fi
 
-# Verify Camoufox browser is present (downloaded at build time)
-# HOME is set to /app in Dockerfile, so cache is at /app/.cache/camoufox
-CAMOUFOX_MARKER="$HOME/.cache/camoufox/version.json"
-if [ -f "$CAMOUFOX_MARKER" ]; then
-  echo "Camoufox browser ready"
-else
-  # Fallback: attempt runtime download if somehow missing
-  echo "Warning: Camoufox browser not found, attempting download..."
-  mkdir -p "$HOME/.cache/camoufox"
+# Download Camoufox browser if not already present
+# This is done at runtime to reduce image size and allow updates
+CAMOUFOX_CACHE_DIR="/home/node/.cache/camoufox"
+CAMOUFOX_MARKER="$CAMOUFOX_CACHE_DIR/version.json"
+if [ ! -f "$CAMOUFOX_MARKER" ]; then
+  echo "Downloading Camoufox browser (first run only, ~80MB)..."
+  mkdir -p "$CAMOUFOX_CACHE_DIR"
   if ./node_modules/.bin/camoufox-js fetch; then
     echo "Camoufox browser installed successfully"
   else
     echo "Warning: Failed to download Camoufox browser. Captcha solving will be unavailable."
   fi
+else
+  echo "Camoufox browser already installed"
 fi
 
 echo "Starting Cinephage..."

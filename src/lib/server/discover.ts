@@ -35,6 +35,7 @@ export interface DiscoverParams {
 	type: string;
 	page: string;
 	sortBy: string;
+	trending?: string | null;
 	withWatchProviders: string;
 	watchRegion: string;
 	withGenres: string;
@@ -48,6 +49,7 @@ export async function getDiscoverResults(params: DiscoverParams) {
 		type,
 		page,
 		sortBy,
+		trending = null,
 		withWatchProviders,
 		watchRegion,
 		withGenres,
@@ -107,7 +109,14 @@ export async function getDiscoverResults(params: DiscoverParams) {
 	let totalPages = 0;
 	let totalResults = 0;
 
-	if (type === 'movie') {
+	if (trending === 'day' || trending === 'week') {
+		const trendingEndpoint = `/trending/all/${trending}`;
+		const url = `${trendingEndpoint}?page=${encodeURIComponent(page)}`;
+		const data = (await tmdb.fetch(url)) as PaginatedResponse<Movie | TVShow>;
+		results = data.results;
+		totalPages = data.total_pages;
+		totalResults = data.total_results;
+	} else if (type === 'movie') {
 		const data = (await fetchMovies()) as PaginatedResponse<Movie>;
 		results = data.results.map((m) => ({ ...m, media_type: 'movie' }));
 		totalPages = data.total_pages;

@@ -99,7 +99,7 @@
 						<div class="text-sm text-base-content/70">Movies</div>
 					</div>
 				</div>
-				<div class="mt-2 flex gap-2 text-xs">
+				<div class="mt-2 flex flex-wrap gap-2 text-xs">
 					<span class="badge badge-sm badge-success">{data.stats.movies.withFile} files</span>
 					{#if data.stats.movies.missing > 0}
 						<span class="badge badge-sm badge-warning">{data.stats.movies.missing} missing</span>
@@ -120,8 +120,8 @@
 						<div class="text-sm text-base-content/70">TV Shows</div>
 					</div>
 				</div>
-				<div class="mt-2 flex gap-2 text-xs">
-					<span class="badge badge-sm badge-info">{data.stats.episodes.withFile} episodes</span>
+				<div class="mt-2 flex flex-wrap gap-2 text-xs">
+					<span class="badge badge-sm badge-info">{data.stats.episodes.withFile} files</span>
 					{#if data.stats.episodes.missing > 0}
 						<span class="badge badge-sm badge-warning">{data.stats.episodes.missing} missing</span>
 					{/if}
@@ -219,7 +219,9 @@
 							</h2>
 							<a href={resolve('/movies')} class="btn btn-ghost btn-sm">View All</a>
 						</div>
-						<div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2 sm:gap-3">
+						<div
+							class="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6"
+						>
 							{#each data.recentlyAdded.movies as movie (movie.id)}
 								<a
 									href={resolve(`/library/movie/${movie.id}`)}
@@ -262,7 +264,9 @@
 							</h2>
 							<a href={resolve('/tv')} class="btn btn-ghost btn-sm">View All</a>
 						</div>
-						<div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2 sm:gap-3">
+						<div
+							class="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6"
+						>
 							{#each data.recentlyAdded.series as show (show.id)}
 								<a
 									href={resolve(`/library/tv/${show.id}`)}

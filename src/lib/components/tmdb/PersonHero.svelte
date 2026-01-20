@@ -57,8 +57,8 @@
 	<!-- Content -->
 	<div class="relative z-10 flex flex-col gap-6 p-6 md:flex-row md:p-8">
 		<!-- Profile Photo -->
-		<div class="hidden shrink-0 sm:block">
-			<div class="w-40 overflow-hidden rounded-lg shadow-lg md:w-48">
+		<div class="shrink-0">
+			<div class="w-28 overflow-hidden rounded-lg shadow-lg sm:w-40 md:w-48">
 				{#if person.profile_path}
 					<TmdbImage
 						path={person.profile_path}

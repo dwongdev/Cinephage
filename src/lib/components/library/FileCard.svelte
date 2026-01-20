@@ -92,12 +92,14 @@
 				<div class="font-mono text-sm break-all sm:truncate" title={file.relativePath}>
 					{getFileName(file.relativePath)}
 				</div>
-				<div
-					class="mt-1 text-xs break-all text-base-content/50 sm:truncate"
-					title={file.relativePath}
-				>
-					{file.relativePath}
-				</div>
+				{#if file.relativePath !== getFileName(file.relativePath)}
+					<div
+						class="mt-1 text-xs break-all text-base-content/50 sm:truncate"
+						title={file.relativePath}
+					>
+						{file.relativePath}
+					</div>
+				{/if}
 			</div>
 		</div>
 

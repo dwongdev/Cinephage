@@ -147,7 +147,7 @@
 				{/each}
 			</select>
 			<div class="label">
-				<span class="label-text-alt text-base-content/60">
+				<span class="label-text-alt break-words whitespace-normal text-base-content/60">
 					{#if currentProfile}
 						{currentProfile.description}
 					{:else}
@@ -178,7 +178,7 @@
 				{/each}
 			</select>
 			<div class="label">
-				<span class="label-text-alt text-base-content/60">
+				<span class="label-text-alt break-words whitespace-normal text-base-content/60">
 					Where downloaded files will be stored
 				</span>
 			</div>
@@ -199,7 +199,7 @@
 				{/each}
 			</select>
 			<div class="label">
-				<span class="label-text-alt text-base-content/60">
+				<span class="label-text-alt break-words whitespace-normal text-base-content/60">
 					{availabilityOptions.find((o) => o.value === minimumAvailability)?.description}
 				</span>
 			</div>

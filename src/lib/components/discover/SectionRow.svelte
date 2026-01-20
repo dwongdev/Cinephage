@@ -5,14 +5,19 @@
 	import { fade } from 'svelte/transition';
 	import { resolvePath } from '$lib/utils/routing';
 
-	let { title, items, link, endpoint, cardSnippet, onAddToLibrary } = $props<{
+	let { title, items, link, endpoint, cardSnippet, onAddToLibrary, itemClass } = $props<{
 		title: string;
 		items: T[];
 		link?: string;
 		endpoint?: string;
 		cardSnippet?: Snippet<[T]>;
 		onAddToLibrary?: (item: T) => void;
+		itemClass?: string;
 	}>();
+
+	const resolvedItemClass = $derived(
+		itemClass ?? 'w-[calc((100%-2*0.75rem)/3)] sm:w-36 md:w-40 lg:w-44'
+	);
 
 	// Initialize with empty array, effect syncs from props
 	let displayedItems = $state<T[]>([]);
@@ -134,10 +139,10 @@
 		<div
 			bind:this={container}
 			onscroll={handleScroll}
-			class="custom-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-1 pb-4"
+			class="custom-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 pb-4 sm:gap-4"
 		>
 			{#each displayedItems as item (item.id)}
-				<div class="w-32 flex-none snap-start sm:w-36 md:w-40 lg:w-44">
+				<div class={`flex-none snap-start ${resolvedItemClass}`}>
 					{#if cardSnippet}
 						{@render cardSnippet(item)}
 					{:else}

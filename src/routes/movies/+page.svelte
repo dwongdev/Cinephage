@@ -268,61 +268,86 @@
 	});
 
 	import { enhance } from '$app/forms';
-	import { ChevronDown } from 'lucide-svelte';
+	import { Eye } from 'lucide-svelte';
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="min-h-screen bg-base-100 pb-20">
 	<!-- Header -->
-	<div class="sticky top-0 z-30 border-b border-base-200 bg-base-100/80 backdrop-blur-md">
-		<div class="flex h-16 w-full items-center justify-between px-4 lg:px-8">
-			<div class="flex items-center gap-3">
+	<div
+		class="sticky top-16 z-30 -mx-4 border-b border-base-200 bg-base-100/80 backdrop-blur-md lg:top-0 lg:mx-0"
+	>
+		<div class="flex h-16 w-full flex-nowrap items-center justify-between gap-2 px-4 lg:px-8">
+			<div class="flex min-w-0 items-center gap-2 sm:gap-3">
 				<h1
-					class="bg-gradient-to-r from-primary to-secondary bg-clip-text text-2xl font-bold text-transparent"
+					class="min-w-0 bg-gradient-to-r from-primary to-secondary bg-clip-text text-xl font-bold text-transparent sm:text-2xl"
 				>
 					Movies
 				</h1>
-				<span class="badge badge-ghost badge-lg">{data.total}</span>
+				<span class="badge badge-ghost badge-sm sm:badge-lg">{data.total}</span>
 				{#if data.total !== data.totalUnfiltered}
-					<span class="text-sm text-base-content/50">of {data.totalUnfiltered}</span>
+					<span class="hidden text-sm text-base-content/50 sm:inline">
+						of {data.totalUnfiltered}
+					</span>
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-2">
+			<div class="flex shrink-0 items-center gap-2 sm:gap-2">
 				{#if showCheckboxes}
-					<button class="btn gap-1.5 btn-ghost btn-sm" onclick={selectAll}> Select All </button>
-					<button class="btn gap-1.5 btn-ghost btn-sm" onclick={toggleSelectionMode}>
+					<button class="btn gap-1.5 btn-ghost btn-xs sm:btn-sm" onclick={selectAll}>
+						<span class="hidden sm:inline">Select All</span>
+						<span class="sm:hidden">All</span>
+					</button>
+					<button class="btn gap-1.5 btn-ghost btn-xs sm:btn-sm" onclick={toggleSelectionMode}>
 						<X class="h-4 w-4" />
-						Done
+						<span class="hidden sm:inline">Done</span>
 					</button>
 				{:else}
-					<button class="btn gap-1.5 btn-ghost btn-sm" onclick={toggleSelectionMode}>
+					<button class="btn gap-1.5 btn-ghost btn-xs sm:btn-sm" onclick={toggleSelectionMode}>
 						<CheckSquare class="h-4 w-4" />
-						Select
+						<span class="hidden sm:inline">Select</span>
 					</button>
 
 					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn gap-2 btn-ghost">
-							Actions
-							<ChevronDown class="h-4 w-4" />
+						<div tabindex="0" role="button" class="btn gap-1.5 btn-ghost btn-xs sm:btn-sm">
+							<Eye class="h-4 w-4" />
+							<span class="hidden sm:inline">Monitor</span>
 						</div>
+						<form
+							id="movies-monitor-all"
+							action="?/toggleAllMonitored"
+							method="POST"
+							use:enhance
+							class="hidden"
+							aria-hidden="true"
+						>
+							<input type="hidden" name="monitored" value="true" />
+						</form>
+						<form
+							id="movies-unmonitor-all"
+							action="?/toggleAllMonitored"
+							method="POST"
+							use:enhance
+							class="hidden"
+							aria-hidden="true"
+						>
+							<input type="hidden" name="monitored" value="false" />
+						</form>
 						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 						<ul
 							tabindex="0"
 							class="dropdown-content menu z-[2] w-52 rounded-box border border-base-content/10 bg-base-200 p-2 shadow-lg"
 						>
 							<li>
-								<form action="?/toggleAllMonitored" method="POST" use:enhance>
-									<input type="hidden" name="monitored" value="true" />
-									<button type="submit" class="w-full text-left">Monitor All</button>
-								</form>
+								<button type="submit" class="w-full text-left" form="movies-monitor-all">
+									Monitor All
+								</button>
 							</li>
 							<li>
-								<form action="?/toggleAllMonitored" method="POST" use:enhance>
-									<input type="hidden" name="monitored" value="false" />
-									<button type="submit" class="w-full text-left">Unmonitor All</button>
-								</form>
+								<button type="submit" class="w-full text-left" form="movies-unmonitor-all">
+									Unmonitor All
+								</button>
 							</li>
 						</ul>
 					</div>
@@ -379,7 +404,7 @@
 		{:else}
 			<!-- Movies Grid -->
 			<div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-				<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 sm:gap-4">
+				<div class="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-9">
 					{#each data.movies as movie (movie.id)}
 						<LibraryMediaCard
 							item={movie}

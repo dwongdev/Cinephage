@@ -214,13 +214,13 @@
 
 		<!-- Grid -->
 		{#if loading}
-			<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 sm:gap-4">
+			<div class="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-9">
 				{#each Array(14) as _, i (i)}
 					<div class="aspect-[2/3] animate-pulse rounded-lg bg-base-300"></div>
 				{/each}
 			</div>
 		{:else if activeCredits.length > 0}
-			<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 sm:gap-4">
+			<div class="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-9">
 				{#each activeCredits as credit (credit.id)}
 					<FilmographyCard {credit} showRole={activeTab === 'crew'} />
 				{/each}

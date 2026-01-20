@@ -52,11 +52,12 @@ function toChannelResponse(
 	record: StalkerChannelRecord,
 	categoryTitle: string | null
 ): CachedChannel {
+	const normalizedName = record.name.replace(/#+/g, ' ').replace(/\s+/g, ' ').trim();
 	return {
 		id: record.id,
 		accountId: record.accountId,
 		stalkerId: record.stalkerId,
-		name: record.name,
+		name: normalizedName,
 		number: record.number,
 		logo: record.logo,
 		categoryId: record.categoryId,
@@ -101,7 +102,7 @@ function toLineupItem(
 		channel: channelData,
 		accountName,
 		category: toCategoryResponse(category),
-		displayName: record.customName || channel.name,
+		displayName: record.customName || channelData.name,
 		displayLogo: record.customLogo || channel.logo,
 		epgSourceChannel: epgSourceChannel
 			? toChannelResponse(epgSourceChannel, epgSourceCategoryTitle)

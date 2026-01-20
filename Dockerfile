@@ -17,13 +17,15 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Build-time version for UI display (PUBLIC_ vars are embedded at build time)
+ARG APP_VERSION=dev
+ENV PUBLIC_APP_VERSION=${APP_VERSION}
+
 # Build the SvelteKit application
 RUN npm run build
 
-# Download Camoufox browser at build time (avoids runtime permission issues)
-# Set HOME to /app so camoufox caches to /app/.cache/camoufox
-ENV HOME=/app
-RUN mkdir -p /app/.cache && npx camoufox-js fetch
+# Remove devDependencies to reduce runtime image size
+RUN npm prune --omit=dev
 
 # ==========================================
 # Runtime Stage
@@ -32,6 +34,10 @@ FROM node:22-slim AS runner
 
 WORKDIR /app
 
+# Runtime version (useful for diagnostics)
+ARG APP_VERSION=dev
+ENV PUBLIC_APP_VERSION=${APP_VERSION}
+
 # Install runtime dependencies:
 # - ffmpeg: for ffprobe media analysis
 # - Camoufox browser dependencies (Firefox/GTK libs)
@@ -39,6 +45,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     wget \
+    gosu \
     libgtk-3-0 \
     libx11-xcb1 \
     libasound2 \
@@ -63,27 +70,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
-# Install all Firefox browser dependencies (same approach as Byparr)
-RUN npx playwright install-deps firefox
-
 # Create necessary directories with correct ownership (node user is UID 1000)
 RUN mkdir -p data logs && chown -R node:node data logs
-
-# Set HOME to /app for consistent cache location regardless of runtime UID
-# This ensures camoufox-js finds the browser at /app/.cache/camoufox
-# XDG_CACHE_HOME is set for libraries that respect XDG Base Directory spec
-ENV HOME=/app
-ENV XDG_CACHE_HOME=/app/.cache
-
-# Copy pre-downloaded Camoufox browser from builder
-COPY --from=builder --chown=node:node /app/.cache ./.cache
 
 # Copy production dependencies and built artifacts from builder
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/server.js ./server.js
-COPY --from=builder --chown=node:node /app/src ./src
 
 # Copy bundled indexers to separate location (not shadowed by volume mount)
 COPY --from=builder --chown=node:node /app/data/indexers ./bundled-indexers
@@ -105,7 +99,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-# Run as non-root user (rootless) - node user is UID 1000
+  # Run as non-root user (rootless) - node user is UID 1000
 USER node
 
 # Start the application

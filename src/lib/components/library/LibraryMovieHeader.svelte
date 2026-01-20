@@ -106,7 +106,7 @@
 			/>
 		{/if}
 		<div
-			class="absolute inset-0 bg-gradient-to-r from-base-200 via-base-200/95 to-base-200/80"
+			class="absolute inset-0 bg-gradient-to-r from-base-200/80 via-base-200/75 to-base-200/60 sm:from-base-200 sm:via-base-200/95 sm:to-base-200/80"
 		></div>
 	</div>
 
@@ -127,7 +127,7 @@
 		<!-- Info -->
 		<div class="flex min-w-0 flex-1 flex-col justify-between gap-4">
 			<!-- Top row: Title and actions -->
-			<div class="flex flex-wrap items-start justify-between gap-2 md:gap-4">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:gap-4">
 				<div class="min-w-0 flex-1">
 					<h1 class="text-2xl font-bold md:text-3xl">
 						{movie.title}
@@ -144,14 +144,14 @@
 							<span>{formatRuntime(movie.runtime)}</span>
 						{/if}
 						{#if movie.genres && movie.genres.length > 0}
-							<span class="hidden sm:inline">•</span>
-							<span class="hidden sm:inline">{movie.genres.slice(0, 3).join(', ')}</span>
+							<span>•</span>
+							<span class="min-w-0 truncate">{movie.genres.slice(0, 3).join(', ')}</span>
 						{/if}
 					</div>
 				</div>
 
 				<!-- Action buttons -->
-				<div class="flex flex-wrap items-center gap-1 sm:gap-2">
+				<div class="flex flex-wrap items-center gap-1 sm:justify-end sm:gap-2">
 					<MonitorToggle
 						monitored={movie.monitored ?? false}
 						onToggle={onMonitorToggle}
@@ -211,8 +211,8 @@
 			</div>
 
 			<!-- Bottom row: Status and external links -->
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<div class="flex items-center gap-4">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div class="flex flex-wrap items-center gap-2 sm:gap-4">
 					<StatusIndicator
 						status={fileStatus}
 						qualityText={bestQuality.quality
@@ -242,7 +242,7 @@
 				</div>
 
 				<!-- External links -->
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 sm:shrink-0">
 					{#if movie.tmdbId}
 						<a
 							href="https://www.themoviedb.org/movie/{movie.tmdbId}"

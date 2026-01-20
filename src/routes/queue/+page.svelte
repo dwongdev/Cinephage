@@ -287,6 +287,19 @@
 				<option value="movie">Movies</option>
 				<option value="tv">TV Shows</option>
 			</select>
+
+			{#if data.clients.length > 0}
+				<select
+					class="select-bordered select select-sm"
+					value={data.filters.clientId || 'all'}
+					onchange={(e) => updateFilters('clientId', e.currentTarget.value)}
+				>
+					<option value="all">All Clients</option>
+					{#each data.clients as client (client.id)}
+						<option value={client.id}>{client.name}</option>
+					{/each}
+				</select>
+			{/if}
 		</div>
 
 		<!-- History Table or Empty State -->

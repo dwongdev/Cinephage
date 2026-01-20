@@ -7,6 +7,7 @@ export interface DiscoverParams {
 	type: string;
 	page: string;
 	sortBy: string;
+	trending: string | null;
 	withWatchProviders: string;
 	watchRegion: string;
 	withGenres: string;
@@ -23,6 +24,7 @@ export function parseDiscoverParams(searchParams: URLSearchParams): DiscoverPara
 		type: searchParams.get('type') || 'all',
 		page: searchParams.get('page') || '1',
 		sortBy: searchParams.get('sort_by') || 'popularity.desc',
+		trending: searchParams.get('trending'),
 		withWatchProviders: searchParams.get('with_watch_providers') || '',
 		watchRegion: searchParams.get('watch_region') || 'US',
 		withGenres: searchParams.get('with_genres') || '',
@@ -37,6 +39,7 @@ export function parseDiscoverParams(searchParams: URLSearchParams): DiscoverPara
  */
 export function isDefaultView(searchParams: URLSearchParams, params: DiscoverParams): boolean {
 	return (
+		!searchParams.has('trending') &&
 		(!searchParams.has('type') || searchParams.get('type') === 'all') &&
 		!searchParams.has('with_watch_providers') &&
 		!searchParams.has('with_genres') &&

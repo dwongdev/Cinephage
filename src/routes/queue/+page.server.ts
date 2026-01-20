@@ -43,6 +43,7 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	const statusParam = url.searchParams.get('status') as QueueStatus | 'all' | null;
 	const mediaType = url.searchParams.get('mediaType') as 'movie' | 'tv' | 'all' | null;
 	const clientId = url.searchParams.get('clientId');
+	const normalizedClientId = clientId && clientId !== 'all' ? clientId : null;
 
 	// Parse history filters
 	const historyStatus = url.searchParams.get('historyStatus') as HistoryStatus | 'all' | null;
@@ -64,8 +65,8 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	} else if (mediaType === 'tv') {
 		queueConditions.push(and(isNotNull(downloadQueue.seriesId), isNull(downloadQueue.movieId)));
 	}
-	if (clientId) {
-		queueConditions.push(eq(downloadQueue.downloadClientId, clientId));
+	if (normalizedClientId) {
+		queueConditions.push(eq(downloadQueue.downloadClientId, normalizedClientId));
 	}
 
 	const queueWhereClause = queueConditions.length > 0 ? and(...queueConditions) : undefined;
@@ -180,6 +181,9 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 			and(isNotNull(downloadHistory.seriesId), isNull(downloadHistory.movieId))
 		);
 	}
+	if (normalizedClientId) {
+		historyConditions.push(eq(downloadHistory.downloadClientId, normalizedClientId));
+	}
 
 	const historyWhereClause = historyConditions.length > 0 ? and(...historyConditions) : undefined;
 
@@ -252,7 +256,7 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 		filters: {
 			status: statusParam || 'all',
 			mediaType: mediaType || 'all',
-			clientId: clientId || null,
+			clientId: normalizedClientId,
 			historyStatus: historyStatus || 'all',
 			historyMediaType: historyMediaType || 'all'
 		}
