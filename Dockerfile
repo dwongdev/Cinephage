@@ -83,6 +83,9 @@ COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/server.js ./server.js
 
+# Copy script to fix TV subtitle paths to be used with cmd 'npm run fix:tv-subtitles' - Temporary fix
+COPY --from=builder --chown=node:node /app/scripts/fix-tv-subtitle-paths.js ./scripts/fix-tv-subtitle-paths.js
+
 # Copy bundled indexers to separate location (not shadowed by volume mount)
 COPY --from=builder --chown=node:node /app/data/indexers ./bundled-indexers
 
