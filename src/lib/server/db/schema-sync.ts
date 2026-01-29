@@ -65,8 +65,9 @@ interface MigrationDefinition {
  * Version 38: Add alternate_titles table for multi-title search support
  * Version 39: Add release_group column to download_queue and download_history
  * Version 40: Add captcha_solver_settings table for anti-bot configuration
+ * Version 41: Add default_monitored to root_folders for unmonitor-by-default on scan (Issue #81)
  */
-export const CURRENT_SCHEMA_VERSION = 40;
+export const CURRENT_SCHEMA_VERSION = 43;
 
 /**
  * All table definitions with CREATE TABLE IF NOT EXISTS
@@ -198,6 +199,7 @@ const TABLE_DEFINITIONS: string[] = [
 		"is_default" integer DEFAULT false,
 		"read_only" integer DEFAULT false,
 		"preserve_symlinks" integer DEFAULT false,
+		"default_monitored" integer DEFAULT 1,
 		"free_space_bytes" integer,
 		"last_checked_at" text,
 		"created_at" text
@@ -2912,6 +2914,87 @@ const MIGRATIONS: MigrationDefinition[] = [
 					.run();
 				logger.info('[SchemaSync] Created captcha_solver_settings table');
 			}
+		}
+	},
+	// Version 41: Add default_monitored to root_folders for unmonitor-by-default on scan (Issue #81)
+	{
+		version: 41,
+		name: 'add_root_folders_default_monitored',
+		apply: (sqlite) => {
+			if (!columnExists(sqlite, 'root_folders', 'default_monitored')) {
+				sqlite
+					.prepare(`ALTER TABLE root_folders ADD COLUMN default_monitored INTEGER DEFAULT 1`)
+					.run();
+				logger.info('[SchemaSync] Added default_monitored column to root_folders');
+			}
+		}
+	},
+	// Version 42: Add external list source support for smart lists
+	{
+		version: 42,
+		name: 'add_smart_list_external_source_support',
+		apply: (sqlite) => {
+			// Add list_source_type column
+			if (!columnExists(sqlite, 'smart_lists', 'list_source_type')) {
+				sqlite
+					.prepare(
+						`ALTER TABLE smart_lists ADD COLUMN list_source_type TEXT DEFAULT 'tmdb-discover' NOT NULL`
+					)
+					.run();
+				logger.info('[SchemaSync] Added list_source_type column to smart_lists');
+			}
+
+			// Add external_source_config column
+			if (!columnExists(sqlite, 'smart_lists', 'external_source_config')) {
+				sqlite
+					.prepare(
+						`ALTER TABLE smart_lists ADD COLUMN external_source_config TEXT DEFAULT '{}' NOT NULL`
+					)
+					.run();
+				logger.info('[SchemaSync] Added external_source_config column to smart_lists');
+			}
+
+			// Add last_external_sync_time column
+			if (!columnExists(sqlite, 'smart_lists', 'last_external_sync_time')) {
+				sqlite.prepare(`ALTER TABLE smart_lists ADD COLUMN last_external_sync_time TEXT`).run();
+				logger.info('[SchemaSync] Added last_external_sync_time column to smart_lists');
+			}
+
+			// Add external_sync_error column
+			if (!columnExists(sqlite, 'smart_lists', 'external_sync_error')) {
+				sqlite.prepare(`ALTER TABLE smart_lists ADD COLUMN external_sync_error TEXT`).run();
+				logger.info('[SchemaSync] Added external_sync_error column to smart_lists');
+			}
+
+			logger.info('[SchemaSync] Added external list source support to smart_lists');
+		}
+	},
+	// Version 43: Add preset fields for curated external list support
+	{
+		version: 43,
+		name: 'add_smart_list_preset_fields',
+		apply: (sqlite) => {
+			// Add preset_id column
+			if (!columnExists(sqlite, 'smart_lists', 'preset_id')) {
+				sqlite.prepare(`ALTER TABLE smart_lists ADD COLUMN preset_id TEXT`).run();
+				logger.info('[SchemaSync] Added preset_id column to smart_lists');
+			}
+
+			// Add preset_provider column
+			if (!columnExists(sqlite, 'smart_lists', 'preset_provider')) {
+				sqlite.prepare(`ALTER TABLE smart_lists ADD COLUMN preset_provider TEXT`).run();
+				logger.info('[SchemaSync] Added preset_provider column to smart_lists');
+			}
+
+			// Add preset_settings column
+			if (!columnExists(sqlite, 'smart_lists', 'preset_settings')) {
+				sqlite
+					.prepare(`ALTER TABLE smart_lists ADD COLUMN preset_settings TEXT DEFAULT '{}' NOT NULL`)
+					.run();
+				logger.info('[SchemaSync] Added preset_settings column to smart_lists');
+			}
+
+			logger.info('[SchemaSync] Added preset fields to smart_lists');
 		}
 	}
 ];

@@ -448,6 +448,8 @@ export const rootFolders = sqliteTable('root_folders', {
 	readOnly: integer('read_only', { mode: 'boolean' }).default(false),
 	// Preserve symlinks during import (for NZBDav/rclone - recreate symlinks instead of copying content)
 	preserveSymlinks: integer('preserve_symlinks', { mode: 'boolean' }).default(false),
+	// When true, content added by scan or manual match is monitored; when false, unmonitored (Issue #81)
+	defaultMonitored: integer('default_monitored', { mode: 'boolean' }).default(true),
 	// Cached free space in bytes (updated periodically)
 	freeSpaceBytes: integer('free_space_bytes'),
 	// Last time free space was checked
@@ -1822,6 +1824,31 @@ export const smartLists = sqliteTable(
 		// Language profile for auto-added items
 		languageProfileId: text('language_profile_id'),
 
+		// === LIST SOURCE TYPE ===
+		// Source of list items: 'tmdb-discover', 'external-json', 'trakt-list', 'custom-manual'
+		listSourceType: text('list_source_type', {
+			enum: ['tmdb-discover', 'external-json', 'trakt-list', 'custom-manual']
+		})
+			.default('tmdb-discover')
+			.notNull(),
+
+		// === EXTERNAL SOURCE CONFIGURATION ===
+		// Configuration for external list sources (URL, auth headers, list IDs, etc.)
+		externalSourceConfig: text('external_source_config', { mode: 'json' })
+			.$type<{
+				url?: string;
+				headers?: Record<string, string>;
+				listId?: string;
+				username?: string;
+			}>()
+			.default({}),
+
+		// === PRESET CONFIGURATION ===
+		// For external lists using curated presets (e.g., 'stevenlu:standard')
+		presetId: text('preset_id'),
+		presetProvider: text('preset_provider'),
+		presetSettings: text('preset_settings', { mode: 'json' }).default({}),
+
 		// === REFRESH CONFIGURATION ===
 		// Refresh interval in hours (1-168)
 		refreshIntervalHours: integer('refresh_interval_hours').default(24).notNull(),
@@ -1831,6 +1858,11 @@ export const smartLists = sqliteTable(
 		lastRefreshStatus: text('last_refresh_status'), // 'success' | 'partial' | 'failed'
 		lastRefreshError: text('last_refresh_error'),
 		nextRefreshTime: text('next_refresh_time'),
+
+		// === EXTERNAL SYNC STATE ===
+		// Tracking for external list synchronization
+		lastExternalSyncTime: text('last_external_sync_time'),
+		externalSyncError: text('external_sync_error'),
 
 		// === CACHED STATS ===
 		cachedItemCount: integer('cached_item_count').default(0),
