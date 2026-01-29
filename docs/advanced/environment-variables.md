@@ -42,6 +42,12 @@ environment:
 | `DATA_DIR` | Database and data location | data                  |
 | `LOG_DIR`  | Log file directory         | logs                  |
 
+Docker image defaults:
+
+- `DATA_DIR=/config/data`
+- `LOG_DIR=/config/logs`
+- `INDEXER_DEFINITIONS_PATH=/config/data/indexers/definitions`
+
 ### Important: ORIGIN Variable
 
 The `ORIGIN` variable is critical for:
@@ -305,8 +311,7 @@ services:
       PROXY_FETCH_TIMEOUT_MS: 60000
 
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ./config:/config
       - /path/to/media:/media
     ports:
       - '3000:3000'
