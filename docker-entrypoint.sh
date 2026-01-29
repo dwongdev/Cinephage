@@ -190,9 +190,8 @@ if [ ! -f "$CAMOUFOX_MARKER" ]; then
   echo "Downloading Camoufox (first run only, ~80MB)..."
   mkdir -p "$CAMOUFOX_CACHE_DIR"
   
-  if ./node_modules/.bin/camoufox-js fetch; then
-  else
-    echo "Warning: Failed to download Camoufox. Captcha solving will be unavailable."
+  if ! ./node_modules/.bin/camoufox-js fetch; then
+    echo "Warning: Failed to download Camoufox browser. Captcha solving will be unavailable."
   fi
 else
   echo "Camoufox already installed"
