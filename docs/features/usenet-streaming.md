@@ -172,7 +172,7 @@ Configure in **Settings > Integrations > NNTP Servers**:
 
 ```
 Default: data/nzb_cache/
-Docker: /app/data/nzb_cache/
+Docker: /config/data/nzb_cache/
 ```
 
 ---

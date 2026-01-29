@@ -67,17 +67,19 @@ rm data/cinephage.db
 # Restart Cinephage (recreates database)
 ```
 
+Docker: remove `/config/data/cinephage.db` from your mounted config directory.
+
 ### Can I run multiple instances?
 
 Not recommended. SQLite doesn't handle multiple writers well.
 
 ### Where is data stored?
 
-| Data            | Location                     |
-| --------------- | ---------------------------- |
-| Database        | `data/cinephage.db`          |
-| Logs            | `logs/`                      |
-| Custom indexers | `data/indexers/definitions/` |
+| Data            | Location                                                                    |
+| --------------- | --------------------------------------------------------------------------- |
+| Database        | `data/cinephage.db` (Docker: `/config/data/cinephage.db`)                   |
+| Logs            | `logs/` (Docker: `/config/logs/`)                                           |
+| Custom indexers | `data/indexers/definitions/` (Docker: `/config/data/indexers/definitions/`) |
 
 ---
 
