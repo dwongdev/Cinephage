@@ -77,10 +77,29 @@ export class ResponseParser {
 				releases.push(...results);
 			}
 		} catch (error) {
-			errors.push(`Parse error: ${error instanceof Error ? error.message : String(error)}`);
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			errors.push(`Parse error: ${errorMsg}`);
+			logger.warn('[ResponseParser] Parse failed', {
+				indexer: context.indexerName,
+				error: errorMsg,
+				responseType
+			});
 		}
 
-		return { releases, errors };
+		// Log parse summary for debugging
+		if (releases.length === 0 || errors.length > 0) {
+			logger.debug('[ResponseParser] Parse completed', {
+				indexer: context.indexerName,
+				releases: releases.length,
+				errors: errors.length,
+				responseType
+			});
+		}
+
+		return {
+			releases,
+			errors
+		};
 	}
 
 	/**
@@ -123,7 +142,19 @@ export class ResponseParser {
 
 		// Skip rows if 'after' is specified
 		const skipCount = search.rows.after ?? 0;
-		const filteredRows = rows.slice(skipCount);
+		let filteredRows = rows.slice(skipCount);
+
+		// Apply row-level filters if specified (e.g., rowandmatch)
+		const rowFilters = search.rows?.filters;
+		if (rowFilters && rowFilters.length > 0) {
+			filteredRows = filteredRows.filter((row) => {
+				if (typeof row === 'object' && row !== null) {
+					const rowStr = JSON.stringify(row);
+					return this.filterEngine.applyFilters(rowStr, rowFilters) !== '';
+				}
+				return true;
+			});
+		}
 
 		// Check for 'multiple' directive - used when each row has a nested array
 		// (e.g., YTS where each movie has multiple torrents)
@@ -224,9 +255,11 @@ export class ResponseParser {
 						// Ignore parent error
 					}
 				}
-				// Only log at debug level to reduce noise
+				// Log required field errors at warn level
 				if (!this.isOptionalField(fieldName, fieldDef)) {
-					logger.debug(`Field ${fieldName} extraction failed`, {
+					logger.warn(`[ResponseParser] Required field extraction failed`, {
+						indexer: context.indexerName,
+						field: fieldName,
 						error: error instanceof Error ? error.message : String(error)
 					});
 				}
@@ -291,7 +324,17 @@ export class ResponseParser {
 
 		// Skip rows if 'after' is specified
 		const skipCount = search.rows.after ?? 0;
-		const filteredRows = rows.slice(skipCount);
+		let filteredRows = rows.slice(skipCount);
+
+		// Apply row-level filters if specified (e.g., rowandmatch)
+		const rowFilters = search.rows?.filters;
+		if (rowFilters && rowFilters.length > 0) {
+			filteredRows = filteredRows.filter((row) => {
+				// Get the HTML of the row and apply filters
+				const rowHtml = row.html() ?? '';
+				return this.filterEngine.applyFilters(rowHtml, rowFilters) !== '';
+			});
+		}
 
 		// Handle date headers (sticky dates)
 		let currentDate: string | null = null;
@@ -348,8 +391,9 @@ export class ResponseParser {
 				values[fieldName.toLowerCase()] = result.value;
 			} catch (error) {
 				if (!this.isOptionalField(fieldName, fieldDef)) {
-					logger.warn('Required field extraction failed', {
-						fieldName,
+					logger.warn('[ResponseParser] Required field extraction failed', {
+						indexer: context.indexerName,
+						field: fieldName,
 						error: error instanceof Error ? error.message : String(error)
 					});
 				}
@@ -502,6 +546,38 @@ export class ResponseParser {
 			if (!isNaN(grabs)) result.grabs = grabs;
 		}
 
+		// Ratio/volumefactor fields (download/upload factor)
+		const downloadVolumeFactor = values['downloadvolumefactor'];
+		const uploadVolumeFactor = values['uploadvolumefactor'];
+		if (downloadVolumeFactor !== null || uploadVolumeFactor !== null) {
+			// Initialize torrent object if needed
+			if (!result.torrent) {
+				result.torrent = {
+					seeders: result.seeders ?? 0,
+					leechers: result.leechers ?? 0
+				};
+			}
+
+			if (downloadVolumeFactor !== null) {
+				const dvf = parseFloat(downloadVolumeFactor);
+				if (!isNaN(dvf)) {
+					result.torrent.downloadFactor = dvf;
+					// Freeleech if download factor is 0
+					if (dvf === 0) {
+						result.torrent.freeleech = true;
+						result.torrent.isFreeleech = true;
+					}
+				}
+			}
+
+			if (uploadVolumeFactor !== null) {
+				const uvf = parseFloat(uploadVolumeFactor);
+				if (!isNaN(uvf)) {
+					result.torrent.uploadFactor = uvf;
+				}
+			}
+		}
+
 		// External IDs
 		const imdbId = values['imdb'] || values['imdbid'];
 		if (imdbId) {
@@ -539,10 +615,17 @@ export class ResponseParser {
 		// Try to parse as category ID
 		const catId = parseInt(catValue, 10);
 		if (!isNaN(catId)) {
-			// Category enum values are numbers, so just use the number
-			categories.push(catId as Category);
+			// Check if this is a tracker-specific ID that needs mapping
+			// (e.g., OldToons returns "1" which should map to "2000" for Movies)
+			const mappedCat = this.findCategoryMapping(catValue);
+			if (mappedCat !== null) {
+				categories.push(mappedCat);
+			} else {
+				// It's already a Newznab category ID, use it directly
+				categories.push(catId as Category);
+			}
 		} else {
-			// Use category mapping from definition
+			// Use category mapping from definition for string values
 			const mappedCat = this.findCategoryMapping(catValue);
 			if (mappedCat !== null) {
 				categories.push(mappedCat);

@@ -1,84 +1,110 @@
 ---
 id: eztv
 name: EZTV
-description: TV show torrents via JSON API
-type: public
+description: 'EZTV is a Public torrent site for TV shows'
 language: en-US
+type: public
 encoding: UTF-8
 requestdelay: 2
-
 links:
-  - https://eztv.yt
+  - https://eztvx.to/
+  - https://eztv.wf/
+  - https://eztv.tf/
+  - https://eztv.yt/
+  - https://eztv1.xyz/
 legacylinks:
-  - https://eztvx.to
-  - https://eztv.re
-  - https://eztv.wf
-  - https://eztv.tf
-  - https://eztv.ch
+  - https://eztv.ag/
+  - https://eztv.it/
+  - https://eztv.ch/
+  - https://eztv.io/
+  - https://eztv.re/
+  - https://eztv.li/
+  - https://eztv.mrunblock.bond/
+  - https://eztv.nocensor.cloud/
+  - https://eztv.unblockninja.com/
+  - https://eztv.ninjaproxy1.com/
+  - https://eztv.proxyninja.org/
+  - https://eztv.abcproxy.org/
+  - https://eztv.unblockit.download/
 
 caps:
-  modes:
-    search: [q]
-    tv-search: [q, imdbid]
   categories:
     '5000': TV
+
   categorymappings:
-    - id: TV
+    - id: '1'
       cat: '5000'
-      desc: TV Shows
+      desc: TV
       default: true
+
+  modes:
+    search: [q]
+    tv-search: [q, season, ep]
+
+settings: []
 
 search:
   paths:
-    # IMDB lookup via API - if imdb_id is empty, returns recent torrents
-    - path: /api/get-torrents
-      method: get
-      inputs:
-        imdb_id: '{{ .Query.IMDBIDShort }}'
-        limit: '100'
-        page: '1'
-    - path: /api/get-torrents
-      method: get
-      inputs:
-        imdb_id: '{{ .Query.IMDBIDShort }}'
-        limit: '100'
-        page: '2'
+    - path: '{{ if .Keywords }}search/{{ .Keywords }}{{ else }}home{{ end }}'
 
-  response:
-    type: json
+  keywordsfilters:
+    - name: re_replace
+      args: ["\\bS\\d{2,3}\\b", '']
+    - name: trim
+    - name: replace
+      args: ['-', '']
+    - name: replace
+      args: [' ', '-']
+    - name: replace
+      args: ['&', '']
+
+  headers:
+    cookie:
+      [
+        'sort_no=100; q_filter=all; q_filter_web=on; q_filter_reality=on; q_filter_x265=on; layout=def_wlinks'
+      ]
 
   rows:
-    selector: torrents
+    selector: "table.forum_header_border:contains('Latest') tr[name='hover'].forum_header_border:has(a.magnet), table.forum_header_border:contains('Releases') tr[name='hover'].forum_header_border:has(a.magnet)"
+    filters:
+      - name: andmatch
 
   fields:
-    title:
-      selector: title
-    details:
-      selector: id
-      filters:
-        - name: prepend
-          args: 'https://eztv.yt/ep/'
-    download:
-      selector: torrent_url
-    magnet:
-      selector: magnet_url
-    infohash:
-      selector: hash
-    date:
-      selector: date_released_unix
-      filters:
-        - name: dateparse
-          args: unix
-    size:
-      selector: size_bytes
-    seeders:
-      selector: seeds
-    leechers:
-      selector: peers
-    imdbid:
-      selector: imdb_id
-      filters:
-        - name: prepend
-          args: 'tt'
     category:
-      text: TV
+      text: '1'
+    title:
+      selector: td:nth-child(2) a
+      attribute: title
+      filters:
+        - name: replace
+          args: ['[eztv]', '']
+        - name: re_replace
+          args: ["\\(.*\\)$", '']
+        - name: trim
+    details:
+      selector: td:nth-child(2) a
+      attribute: href
+    magnet:
+      selector: td:nth-child(3) a.magnet
+      attribute: href
+    download:
+      selector: td:nth-child(3) a.magnet
+      attribute: href
+    size:
+      selector: td:nth-child(4)
+      optional: true
+      default: '512 MB'
+    date:
+      selector: td:nth-child(5)
+      filters:
+        - name: append
+          args: ' ago'
+        - name: fuzzytime
+    seeders:
+      selector: td:nth-child(6)
+    leechers:
+      text: '0'
+    downloadvolumefactor:
+      text: '0'
+    uploadvolumefactor:
+      text: '1'

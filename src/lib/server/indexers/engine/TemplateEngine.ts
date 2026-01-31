@@ -19,6 +19,12 @@ export type TemplateVariables = Map<string, unknown>;
 
 export class TemplateEngine {
 	private variables: TemplateVariables = new Map();
+	/** Cache for compiled template functions */
+	private templateCache: Map<string, { result: string; timestamp: number }> = new Map();
+	/** Maximum cache size to prevent unbounded memory growth */
+	private static readonly MAX_CACHE_SIZE = 1000;
+	/** Cache TTL in milliseconds (5 minutes) */
+	private static readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
 	// Supported logic functions
 	private static readonly LOGIC_FUNCTIONS = [
@@ -589,24 +595,26 @@ export class TemplateEngine {
 
 			switch (functionName) {
 				case 'and': {
-					// Returns first null/empty, else last variable
+					// Returns first null/empty, else last value
 					for (const param of params) {
-						functionResult = param;
 						const value = this.resolveParamValue(param);
 						if (!value || (typeof value === 'string' && value.trim() === '')) {
+							functionResult = String(value ?? '');
 							break;
 						}
+						functionResult = String(value);
 					}
 					break;
 				}
 				case 'or': {
-					// Returns first not null/empty, else last variable
+					// Returns first not null/empty, else last value
 					for (const param of params) {
-						functionResult = param;
 						const value = this.resolveParamValue(param);
 						if (value && (typeof value !== 'string' || value.trim() !== '')) {
+							functionResult = String(value);
 							break;
 						}
+						functionResult = String(value ?? '');
 					}
 					break;
 				}

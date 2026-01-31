@@ -546,6 +546,8 @@ export type DownloadBlock = z.infer<typeof downloadBlockSchema>;
 export const yamlDefinitionSchema = z.object({
 	// Metadata
 	id: z.string(),
+	// Indexer IDs this definition replaces (for migration purposes)
+	replaces: z.array(z.string()).optional(),
 	name: z.string(),
 	description: z.string().optional(),
 	type: z.enum(['public', 'semi-private', 'private']).default('public'),

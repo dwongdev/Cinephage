@@ -17,6 +17,12 @@
 		protocol: string;
 		commentsUrl?: string;
 		sourceIndexers?: string[];
+		// Torrent ratio fields
+		torrent?: {
+			freeleech?: boolean;
+			downloadFactor?: number;
+			uploadFactor?: number;
+		};
 		// Enhanced fields
 		parsed?: {
 			resolution?: string;
@@ -78,6 +84,29 @@
 		return badges;
 	}
 
+	function getRatioBadges(release: Release): { text: string; class: string }[] {
+		const badges: { text: string; class: string }[] = [];
+
+		// Freeleech badge
+		if (release.torrent?.freeleech || release.torrent?.downloadFactor === 0) {
+			badges.push({ text: 'Freeleech', class: 'badge-success' });
+		} else if (
+			release.torrent?.downloadFactor !== undefined &&
+			release.torrent.downloadFactor < 1
+		) {
+			// Partial freeleech (e.g., 50% = 0.5)
+			const percentage = Math.round((1 - release.torrent.downloadFactor) * 100);
+			badges.push({ text: `${percentage}% Freeleech`, class: 'badge-success badge-outline' });
+		}
+
+		// Upload multiplier badge (if > 1x)
+		if (release.torrent?.uploadFactor !== undefined && release.torrent.uploadFactor > 1) {
+			badges.push({ text: `${release.torrent.uploadFactor}x Upload`, class: 'badge-info' });
+		}
+
+		return badges;
+	}
+
 	async function handleGrab() {
 		await onGrab(release, false);
 	}
@@ -106,6 +135,9 @@
 				{#if release.parsed?.releaseGroup}
 					<span class="badge badge-ghost badge-xs">{release.parsed.releaseGroup}</span>
 				{/if}
+				{#each getRatioBadges(release) as badge (badge.text)}
+					<span class="badge badge-xs {badge.class}">{badge.text}</span>
+				{/each}
 			</div>
 		</div>
 	</td>
