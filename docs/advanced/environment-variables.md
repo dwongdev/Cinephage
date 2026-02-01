@@ -315,14 +315,14 @@ services:
 Variables are loaded in this order (later overrides earlier):
 
 1. **Default values** — Hardcoded application defaults
-2. **.env file** — Loaded automatically when running manually with npm/node, or in Docker Compose when using `env_file` directive or mounting the file
+2. **.env file** — Applied only when explicitly loaded by your runtime (for example, via a library like `dotenv` when running with npm/node) or when Docker Compose uses the `env_file` directive
 3. **Environment variables** — System environment variables or those passed directly via Docker Compose `environment:` section or `docker run -e`
 
 **Note for Docker users:**
 
-- If using `env_file: .env` in `docker-compose.yml`, the `.env` file is loaded into the container
-- If passing variables directly via `environment:` in the compose file or `-e` flags in `docker run`, those take precedence over `.env`
-- The `.env` file is NOT automatically available inside the container unless explicitly mounted or loaded via `env_file`
+- If using `env_file: .env` in `docker-compose.yml`, Docker Compose reads the `.env` file and injects its variables into the container environment
+- If passing variables directly via `environment:` in the compose file or `-e` flags in `docker run`, those take precedence over variables loaded from `.env`
+- Mounting a `.env` file as a volume only makes the file available inside the container; it does **not** populate environment variables unless you also use `env_file` or explicitly load the file from your entrypoint/runtime
 
 ---
 
