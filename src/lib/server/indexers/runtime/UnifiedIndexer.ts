@@ -24,6 +24,7 @@ import type {
 	IndexerDownloadResult
 } from '../types';
 import type { YamlDefinition } from '../schema/yamlDefinition';
+import { resolveCategoryId } from '../schema/yamlDefinition';
 import type { IndexerRecord, ProtocolSettings } from '$lib/server/db/schema';
 import { TemplateEngine, createTemplateEngine } from '../engine/TemplateEngine';
 import { FilterEngine, createFilterEngine } from '../engine/FilterEngine';
@@ -293,10 +294,8 @@ export class UnifiedIndexer implements IIndexer {
 		if (caps.categorymappings) {
 			for (const mapping of caps.categorymappings) {
 				if (mapping.cat) {
-					const numId = parseInt(mapping.cat, 10);
-					if (!isNaN(numId)) {
-						categories.set(numId, mapping.desc ?? mapping.cat);
-					}
+					const numId = resolveCategoryId(mapping.cat);
+					categories.set(numId, mapping.desc ?? mapping.cat);
 				}
 			}
 		}

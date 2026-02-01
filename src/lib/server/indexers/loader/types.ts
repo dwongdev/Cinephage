@@ -10,6 +10,7 @@
  */
 
 import type { IndexerCapabilities, IndexerProtocol, IndexerAccessType } from '../types';
+import { resolveCategoryId } from '../schema/yamlDefinition';
 
 // ============================================================================
 // Settings Field Types
@@ -24,7 +25,10 @@ export type SettingFieldType =
 	| 'info'
 	| 'info_cookie'
 	| 'info_cloudflare'
-	| 'info_useragent';
+	| 'info_flaresolverr' // Prowlarr's name for Cloudflare/FlareSolverr warning
+	| 'info_useragent'
+	| 'info_category_8000'
+	| 'cardigannCaptcha';
 
 /** A single settings field for an indexer */
 export interface SettingField {
@@ -32,8 +36,8 @@ export interface SettingField {
 	name: string;
 	/** Display type for the field */
 	type: SettingFieldType;
-	/** Human-readable label */
-	label: string;
+	/** Human-readable label (optional for info_* types) */
+	label?: string;
 	/** Help text to show below the field */
 	helpText?: string;
 	/** Default value */
@@ -256,7 +260,7 @@ export type UISettingType =
  */
 export interface UIDefinitionSetting {
 	name: string;
-	label: string;
+	label?: string; // Optional for info_* types
 	type: UISettingType;
 	required?: boolean;
 	default?: string;
@@ -306,7 +310,10 @@ export function yamlToUnifiedDefinition(
 			info: 'info',
 			info_cookie: 'info_cookie',
 			info_cloudflare: 'info_cloudflare',
-			info_useragent: 'info_useragent'
+			info_flaresolverr: 'info_flaresolverr',
+			info_useragent: 'info_useragent',
+			info_category_8000: 'info_category_8000',
+			cardigannCaptcha: 'cardigannCaptcha'
 		};
 		return map[type] ?? 'text';
 	};
@@ -412,7 +419,7 @@ export function yamlToUnifiedDefinition(
 	// Convert category mappings
 	const categories: CategoryMapping[] = (def.caps.categorymappings ?? []).map((cm) => ({
 		trackerId: cm.id,
-		newznabId: parseInt(cm.cat ?? '8000', 10),
+		newznabId: resolveCategoryId(cm.cat),
 		description: cm.desc ?? cm.id,
 		default: cm.default
 	}));
@@ -459,7 +466,10 @@ export function toUIDefinition(def: IndexerDefinition): UIIndexerDefinition {
 			info: 'info',
 			info_cookie: 'info_cookie',
 			info_cloudflare: 'info_cloudflare',
-			info_useragent: 'info_useragent'
+			info_flaresolverr: 'info_cloudflare', // Map to info_cloudflare for UI (same purpose)
+			info_useragent: 'info_useragent',
+			info_category_8000: 'info_category_8000',
+			cardigannCaptcha: 'cardigannCaptcha'
 		};
 		return typeMap[type] ?? 'text';
 	};

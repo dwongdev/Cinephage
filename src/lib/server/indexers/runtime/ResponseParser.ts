@@ -10,6 +10,7 @@ import type {
 	FieldDefinition,
 	SearchPathBlock
 } from '../schema/yamlDefinition';
+import { resolveCategoryId } from '../schema/yamlDefinition';
 import type { ReleaseResult, Category, IndexerProtocol } from '../types';
 import { parseSize } from '../types';
 import { TemplateEngine } from '../engine/TemplateEngine';
@@ -602,6 +603,8 @@ export class ResponseParser {
 	/**
 	 * Parse categories from extracted values.
 	 * Returns category IDs as numeric values (Category enum values).
+	 * A single tracker category can map to multiple Newznab categories
+	 * (e.g., Nyaa.si's "1_2" maps to both TV/Anime and Movies/Other).
 	 */
 	private parseCategories(values: Record<string, string | null>): Category[] {
 		const categories: Category[] = [];
@@ -617,19 +620,17 @@ export class ResponseParser {
 		if (!isNaN(catId)) {
 			// Check if this is a tracker-specific ID that needs mapping
 			// (e.g., OldToons returns "1" which should map to "2000" for Movies)
-			const mappedCat = this.findCategoryMapping(catValue);
-			if (mappedCat !== null) {
-				categories.push(mappedCat);
+			const mappedCats = this.findAllCategoryMappings(catValue);
+			if (mappedCats.length > 0) {
+				categories.push(...mappedCats);
 			} else {
 				// It's already a Newznab category ID, use it directly
 				categories.push(catId as Category);
 			}
 		} else {
 			// Use category mapping from definition for string values
-			const mappedCat = this.findCategoryMapping(catValue);
-			if (mappedCat !== null) {
-				categories.push(mappedCat);
-			}
+			const mappedCats = this.findAllCategoryMappings(catValue);
+			categories.push(...mappedCats);
 		}
 
 		return categories;
@@ -645,7 +646,7 @@ export class ResponseParser {
 		if (caps.categorymappings) {
 			for (const mapping of caps.categorymappings) {
 				if (mapping.default && mapping.cat) {
-					const catId = parseInt(mapping.cat, 10);
+					const catId = resolveCategoryId(mapping.cat);
 					return [catId as Category];
 				}
 			}
@@ -664,27 +665,36 @@ export class ResponseParser {
 	}
 
 	/**
-	 * Find category mapping by tracker-specific ID.
-	 * Returns category ID as a numeric value.
+	 * Find all category mappings by tracker-specific ID.
+	 * Returns all matching Newznab category IDs as an array.
+	 * A single tracker category can map to multiple Newznab categories
+	 * (e.g., Nyaa.si's "1_2" maps to both TV/Anime and Movies/Other).
 	 */
-	private findCategoryMapping(trackerId: string): Category | null {
+	private findAllCategoryMappings(trackerId: string): Category[] {
 		const caps = this.definition.caps;
+		const categories: Category[] = [];
 
-		// Check categorymappings
+		// Check categorymappings - collect ALL matches, not just the first
 		if (caps.categorymappings) {
 			for (const mapping of caps.categorymappings) {
 				if (mapping.id === trackerId && mapping.cat) {
-					return parseInt(mapping.cat, 10) as Category;
+					const catId = resolveCategoryId(mapping.cat) as Category;
+					if (!categories.includes(catId)) {
+						categories.push(catId);
+					}
 				}
 			}
 		}
 
-		// Check simple categories
-		if (caps.categories && caps.categories[trackerId]) {
-			return parseInt(trackerId, 10) as Category;
+		// Check simple categories (only if no mappings found)
+		if (categories.length === 0 && caps.categories && caps.categories[trackerId]) {
+			const catId = parseInt(trackerId, 10) as Category;
+			if (!isNaN(catId)) {
+				categories.push(catId);
+			}
 		}
 
-		return null;
+		return categories;
 	}
 
 	/**

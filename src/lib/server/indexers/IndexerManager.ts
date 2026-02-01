@@ -27,6 +27,7 @@ import type {
 } from './types';
 import { YamlDefinitionLoader, YamlIndexerFactory } from './loader';
 import type { YamlDefinition } from './schema/yamlDefinition';
+import { resolveCategoryId } from './schema/yamlDefinition';
 import {
 	getSearchOrchestrator,
 	type SearchOrchestratorOptions,
@@ -592,10 +593,8 @@ export class IndexerManager {
 		if (caps.categorymappings) {
 			for (const mapping of caps.categorymappings) {
 				if (mapping.cat) {
-					const numId = parseInt(mapping.cat, 10);
-					if (!isNaN(numId)) {
-						categories.set(numId, mapping.desc ?? mapping.cat);
-					}
+					const numId = resolveCategoryId(mapping.cat);
+					categories.set(numId, mapping.desc ?? mapping.cat);
 				}
 			}
 		}

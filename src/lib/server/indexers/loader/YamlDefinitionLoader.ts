@@ -121,6 +121,16 @@ export class YamlDefinitionLoader {
 			const content = fs.readFileSync(filePath, 'utf-8');
 			const parsed = yaml.load(content);
 
+			// Normalize Prowlarr field names to Cinephage conventions
+			if (parsed && typeof parsed === 'object') {
+				const obj = parsed as Record<string, unknown>;
+				// requestDelay -> requestdelay (case normalization for Prowlarr compatibility)
+				if ('requestDelay' in obj && !('requestdelay' in obj)) {
+					obj.requestdelay = obj.requestDelay;
+					delete obj.requestDelay;
+				}
+			}
+
 			const validationResult = safeValidateCardigannDefinition(parsed);
 
 			if (!validationResult.success) {
