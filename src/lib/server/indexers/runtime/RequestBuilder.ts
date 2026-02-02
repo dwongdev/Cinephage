@@ -8,6 +8,7 @@ import type {
 	SearchBlock,
 	SearchPathBlock
 } from '../schema/yamlDefinition';
+import { resolveCategoryId } from '../schema/yamlDefinition';
 import type { SearchCriteria } from '../types';
 import { isMovieSearch } from '../types';
 import { TemplateEngine } from '../engine/TemplateEngine';
@@ -57,17 +58,8 @@ export class CategoryMapper {
 		if (caps.categorymappings) {
 			for (const mapping of caps.categorymappings) {
 				if (mapping.cat) {
-					// cat is the Newznab category name or ID
-					let newznabId: number;
-					if (/^\d+$/.test(mapping.cat)) {
-						newznabId = parseInt(mapping.cat, 10);
-					} else {
-						newznabId = this.getNewznabIdByName(mapping.cat) ?? parseInt(mapping.cat, 10);
-					}
-
-					if (!isNaN(newznabId)) {
-						this.addMapping(mapping.id, newznabId);
-					}
+					const newznabId = resolveCategoryId(mapping.cat);
+					this.addMapping(mapping.id, newznabId);
 				}
 
 				if (mapping.default) {
@@ -183,6 +175,15 @@ export class CategoryMapper {
 	 */
 	getDefaults(): string[] {
 		return this.defaultCategories;
+	}
+
+	/**
+	 * Map a tracker-specific category ID to all matching Newznab category IDs.
+	 * Returns an array because a single tracker category can map to multiple Newznab categories
+	 * (e.g., Nyaa.si's "1_2" anime category maps to both TV/Anime and Movies/Other).
+	 */
+	mapFromTracker(trackerId: string): number[] {
+		return this.trackerToNewznab.get(trackerId) ?? [];
 	}
 }
 
