@@ -104,7 +104,7 @@
 		return item.title ?? item.name ?? 'Unknown';
 	}
 
-	function getYear(item: PreviewItem): string {
+	function _getYear(item: PreviewItem): string {
 		const date = item.release_date ?? item.first_air_date;
 		if (!date) return '';
 		return date.substring(0, 4);
