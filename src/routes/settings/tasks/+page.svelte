@@ -1,17 +1,14 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import { CheckCircle, XCircle, Calendar, Wrench } from 'lucide-svelte';
 	import type { PageData } from './$types';
-	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
+	import TasksTable from '$lib/components/tasks/TasksTable.svelte';
+	import CreateTaskPlaceholder from '$lib/components/tasks/CreateTaskPlaceholder.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	let errorMessage = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
-
-	// Separate tasks by category
-	const scheduledTasks = $derived(data.tasks.filter((t) => t.category === 'scheduled'));
-	const maintenanceTasks = $derived(data.tasks.filter((t) => t.category === 'maintenance'));
+	let showCreateModal = $state(false);
 
 	// Check if any task is running for polling
 	const hasRunningTask = $derived(data.tasks.some((t) => t.isRunning));
@@ -59,74 +56,111 @@
 			errorMessage = error instanceof Error ? error.message : 'Task failed';
 		}
 	}
+
+	/**
+	 * Handle task cancellation
+	 */
+	async function handleCancelTask(taskId: string): Promise<void> {
+		try {
+			const response = await fetch(`/api/tasks/${taskId}/cancel`, { method: 'POST' });
+			const result = await response.json();
+
+			if (!response.ok || !result.success) {
+				throw new Error(result.error || 'Failed to cancel task');
+			}
+
+			successMessage = 'Task cancelled successfully';
+			await invalidate('app:tasks');
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Failed to cancel task';
+		}
+	}
 </script>
 
 <div class="w-full space-y-6">
 	<!-- Header -->
-	<div>
-		<h1 class="text-2xl font-bold">Tasks</h1>
-		<p class="mt-1 text-base-content/60">
-			Scheduled and maintenance tasks for your Cinephage instance
-		</p>
+	<div class="flex items-center justify-between">
+		<div>
+			<h1 class="text-2xl font-bold">Tasks</h1>
+			<p class="mt-1 text-base-content/60">
+				Scheduled and maintenance tasks for your Cinephage instance
+			</p>
+		</div>
+		<button class="btn gap-2 btn-sm btn-primary" onclick={() => (showCreateModal = true)}>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<line x1="12" y1="5" x2="12" y2="19" />
+				<line x1="5" y1="12" x2="19" y2="12" />
+			</svg>
+			Create Task
+		</button>
 	</div>
 
 	<!-- Alerts -->
 	{#if errorMessage}
-		<div class="alert alert-error">
-			<XCircle class="h-5 w-5" />
+		<div class="alert-sm alert alert-error">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<circle cx="12" cy="12" r="10" />
+				<line x1="15" y1="9" x2="9" y2="15" />
+				<line x1="9" y1="9" x2="15" y2="15" />
+			</svg>
 			<span>{errorMessage}</span>
-			<button class="btn btn-ghost btn-sm" onclick={() => (errorMessage = null)}>Dismiss</button>
+			<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (errorMessage = null)}
+				>Dismiss</button
+			>
 		</div>
 	{/if}
 
 	{#if successMessage}
-		<div class="alert alert-success">
-			<CheckCircle class="h-5 w-5" />
+		<div class="alert-sm alert alert-success">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+				<polyline points="22 4 12 14.01 9 11.01" />
+			</svg>
 			<span>{successMessage}</span>
-			<button class="btn btn-ghost btn-sm" onclick={() => (successMessage = null)}>Dismiss</button>
+			<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (successMessage = null)}
+				>Dismiss</button
+			>
 		</div>
 	{/if}
 
-	<!-- Scheduled Tasks Section -->
-	{#if scheduledTasks.length > 0}
-		<section>
-			<div class="mb-3 flex items-center gap-2">
-				<Calendar class="h-5 w-5 text-base-content/60" />
-				<h2 class="text-lg font-semibold">Scheduled Tasks</h2>
-				<span class="badge badge-ghost badge-sm">{scheduledTasks.length}</span>
-			</div>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-				{#each scheduledTasks as task (task.id)}
-					<TaskCard {task} history={data.taskHistory[task.id] ?? []} onRunTask={handleRunTask} />
-				{/each}
-			</div>
-		</section>
-	{/if}
+	<!-- Tasks Table -->
+	<TasksTable
+		tasks={data.tasks}
+		taskHistory={data.taskHistory}
+		onRunTask={handleRunTask}
+		onCancelTask={handleCancelTask}
+	/>
 
-	<!-- Maintenance Tasks Section -->
-	{#if maintenanceTasks.length > 0}
-		<section>
-			<div class="mb-3 flex items-center gap-2">
-				<Wrench class="h-5 w-5 text-base-content/60" />
-				<h2 class="text-lg font-semibold">Maintenance Tasks</h2>
-				<span class="badge badge-ghost badge-sm">{maintenanceTasks.length}</span>
-			</div>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-				{#each maintenanceTasks as task (task.id)}
-					<TaskCard {task} history={data.taskHistory[task.id] ?? []} onRunTask={handleRunTask} />
-				{/each}
-			</div>
-		</section>
-	{/if}
-
-	<!-- Empty State -->
-	{#if data.tasks.length === 0}
-		<div class="card bg-base-200">
-			<div class="card-body items-center text-center">
-				<Calendar class="h-12 w-12 text-base-content/40" />
-				<h3 class="card-title">No Tasks Available</h3>
-				<p class="text-base-content/60">No tasks are currently configured.</p>
-			</div>
-		</div>
-	{/if}
+	<!-- Create Task Modal -->
+	<CreateTaskPlaceholder isOpen={showCreateModal} onClose={() => (showCreateModal = false)} />
 </div>
