@@ -91,7 +91,7 @@
 		isSearching = true;
 		try {
 			const res = await fetch(
-				`/api/discover/search?query=${encodeURIComponent(normalizedQuery)}&type=${type}`
+				`/api/discover/search?query=${encodeURIComponent(normalizedQuery)}&type=${type}${excludeInLibrary ? '&exclude_in_library=true' : ''}`
 			);
 			if (!res.ok) throw new Error('Search failed');
 
@@ -114,7 +114,7 @@
 		try {
 			const nextPage = searchPagination.page + 1;
 			const res = await fetch(
-				`/api/discover/search?query=${encodeURIComponent(normalizedSearchQuery)}&type=${type}&page=${nextPage}`
+				`/api/discover/search?query=${encodeURIComponent(normalizedSearchQuery)}&type=${type}&page=${nextPage}${excludeInLibrary ? '&exclude_in_library=true' : ''}`
 			);
 			if (!res.ok) return;
 
@@ -132,9 +132,10 @@
 		}
 	}
 
-	// Re-run search when type filter changes
+	// Re-run search when type or excludeInLibrary filter changes
 	$effect(() => {
 		if (searchQuery && type) {
+			void excludeInLibrary;
 			handleSearch(searchQuery);
 		}
 	});
@@ -481,6 +482,7 @@
 					link="/discover?trending=day"
 					endpoint="trending/all/day"
 					onAddToLibrary={handleAddToLibrary}
+					{excludeInLibrary}
 				/>
 				<SectionRow
 					title="Trending This Week"
@@ -488,6 +490,7 @@
 					link="/discover?trending=week"
 					endpoint="trending/all/week"
 					onAddToLibrary={handleAddToLibrary}
+					{excludeInLibrary}
 				/>
 				<SectionRow
 					title="Popular Movies"
@@ -495,6 +498,7 @@
 					link="/discover?type=movie&sort_by=popularity.desc"
 					endpoint="movie/popular"
 					onAddToLibrary={handleAddToLibrary}
+					{excludeInLibrary}
 				/>
 				<SectionRow
 					title="Popular TV Shows"
@@ -502,6 +506,7 @@
 					link="/discover?type=tv&sort_by=popularity.desc"
 					endpoint="tv/popular"
 					onAddToLibrary={handleAddToLibrary}
+					{excludeInLibrary}
 				/>
 				<SectionRow
 					title="Top Rated Movies"
@@ -509,6 +514,7 @@
 					link="/discover?type=movie&sort_by=vote_average.desc"
 					endpoint="movie/top_rated"
 					onAddToLibrary={handleAddToLibrary}
+					{excludeInLibrary}
 				/>
 			</div>
 		{:else if data.viewType === 'grid' && data.results}
