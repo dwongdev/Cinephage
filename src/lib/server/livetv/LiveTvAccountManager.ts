@@ -12,7 +12,7 @@ import { createChildLogger } from '$lib/logging';
 import { randomUUID } from 'crypto';
 import { getProvider, getProviderForAccount } from './providers';
 import type { BackgroundService, ServiceStatus } from '$lib/server/services/background-service.js';
-import { ValidationError, NotFoundError, ExternalServiceError } from '$lib/errors';
+import { ExternalServiceError } from '$lib/errors';
 import type {
 	LiveTvAccount,
 	LiveTvAccountInput,

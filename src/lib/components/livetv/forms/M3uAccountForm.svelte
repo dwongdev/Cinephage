@@ -28,7 +28,7 @@
 		name,
 		inputMode,
 		url,
-		fileContent,
+		fileContent: _fileContent,
 		fileName,
 		selectedCountries,
 		epgUrl,

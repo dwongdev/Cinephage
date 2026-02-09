@@ -8,13 +8,13 @@
 
 import { createChildLogger } from '$lib/logging';
 import { channelLineupService } from '$lib/server/livetv/lineup/ChannelLineupService';
-import { getProvider, getProviderForAccount } from '$lib/server/livetv/providers';
+import { getProvider } from '$lib/server/livetv/providers';
 import { db } from '$lib/server/db';
 import { livetvAccounts, type LivetvAccountRecord } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { isUrlSafe } from '$lib/server/http/ssrf-protection';
 import type { BackgroundService, ServiceStatus } from '$lib/server/services/background-service.js';
-import { NotFoundError, ValidationError, ExternalServiceError } from '$lib/errors';
+import { ValidationError, ExternalServiceError } from '$lib/errors';
 import type { FetchStreamResult, StreamError, LiveTvAccount } from '$lib/types/livetv';
 
 const logger = createChildLogger({ module: 'LiveTvStreamService' });

@@ -18,7 +18,7 @@ const approveSchema = z.object({
 /**
  * Approve scan results and create accounts
  */
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 

@@ -9,19 +9,13 @@
 	}
 
 	let { onSelect, onCancel }: Props = $props();
-
-	const iconMap = {
-		Tv: Tv,
-		Radio: Radio,
-		List: List
-	};
 </script>
 
 <div class="space-y-4">
 	<p class="text-base-content/70">Select the type of Live TV provider you want to add:</p>
 
 	<div class="space-y-2">
-		{#each providerDefinitions as provider}
+		{#each providerDefinitions as provider (provider.id)}
 			<button
 				type="button"
 				class="card w-full cursor-pointer border-2 border-transparent bg-base-200 text-left transition-all hover:border-primary hover:bg-primary/5"

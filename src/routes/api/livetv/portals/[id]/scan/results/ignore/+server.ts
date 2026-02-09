@@ -18,7 +18,7 @@ const ignoreSchema = z.object({
 /**
  * Ignore scan results
  */
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 

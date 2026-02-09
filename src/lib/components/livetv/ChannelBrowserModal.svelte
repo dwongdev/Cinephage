@@ -13,13 +13,7 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import type { LiveTvProviderType } from '$lib/types/livetv';
-	import type {
-		LiveTvAccount,
-		LiveTvCategory,
-		LiveTvChannel,
-		CachedChannel,
-		PaginatedChannelResponse
-	} from '$lib/types/livetv';
+	import type { LiveTvAccount, LiveTvCategory, CachedChannel } from '$lib/types/livetv';
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
 
 	type BrowserMode = 'add-to-lineup' | 'select-backup';

@@ -10,12 +10,9 @@ import {
 	livetvAccounts,
 	livetvChannels,
 	livetvCategories,
-	epgPrograms,
-	type LivetvAccountRecord,
-	type LivetvChannelRecord,
-	type LivetvCategoryRecord
+	type LivetvAccountRecord
 } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { logger } from '$lib/logging';
 import { randomUUID } from 'crypto';
 import type {
@@ -97,8 +94,6 @@ export class StalkerProvider implements LiveTvProvider {
 			const client = new StalkerPortalClient(config);
 			await client.start();
 
-			// Get account info
-			const accountInfo = await client.getAccountInfo();
 			const profile = await client.getProfile();
 
 			// Parse status from profile
@@ -540,7 +535,7 @@ export class StalkerProvider implements LiveTvProvider {
 		account: LiveTvAccount,
 		channel: CachedChannel,
 		startTime: Date,
-		duration: number
+		_duration: number
 	): Promise<StreamResolutionResult> {
 		try {
 			const client = await this.getClient(account);

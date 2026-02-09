@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { X, Loader2, XCircle, Tv, Radio, List } from 'lucide-svelte';
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
-	import { SectionHeader, TestResult } from '$lib/components/ui/modal';
+	import { TestResult } from '$lib/components/ui/modal';
 	import LiveTvProviderPicker from './LiveTvProviderPicker.svelte';
 	import StalkerAccountForm from './forms/StalkerAccountForm.svelte';
 	import XstreamAccountForm from './forms/XstreamAccountForm.svelte';
@@ -258,19 +258,6 @@
 	function handleProviderSelect(type: LiveTvProviderType) {
 		selectedProvider = type;
 		testResult = null;
-	}
-
-	function getIconForProvider(type: LiveTvProviderType) {
-		switch (type) {
-			case 'stalker':
-				return Tv;
-			case 'xstream':
-				return Radio;
-			case 'm3u':
-				return List;
-			default:
-				return Tv;
-		}
 	}
 </script>
 

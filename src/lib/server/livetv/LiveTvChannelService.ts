@@ -11,8 +11,7 @@ import {
 	livetvAccounts,
 	livetvChannels,
 	livetvCategories,
-	type LivetvChannelRecord,
-	type LivetvAccountRecord
+	type LivetvChannelRecord
 } from '$lib/server/db/schema';
 import { createChildLogger } from '$lib/logging';
 import { getProvider } from './providers';
@@ -22,7 +21,6 @@ import type {
 	LiveTvChannel,
 	LiveTvCategory,
 	CachedChannel,
-	LiveTvProviderType,
 	ChannelQueryOptions,
 	PaginatedChannelResponse,
 	AccountSyncStatus,

@@ -22,7 +22,7 @@
 		macAddress,
 		epgUrl,
 		enabled,
-		mode,
+		mode: _mode,
 		onNameChange,
 		onPortalUrlChange,
 		onMacAddressChange,

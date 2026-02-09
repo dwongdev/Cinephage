@@ -809,7 +809,7 @@ export interface StalkerAccountUpdate {
 }
 
 /** @deprecated Use LiveTvAccountTestResult instead */
-export interface StalkerAccountTestResult extends LiveTvAccountTestResult {}
+export type StalkerAccountTestResult = LiveTvAccountTestResult;
 
 /** @deprecated Use LiveTvAccountInput with providerType='stalker' for testing */
 export interface StalkerAccountTestConfig {
@@ -853,13 +853,13 @@ export interface StalkerChannelData {
 }
 
 /** @deprecated Use ChannelSyncResult instead */
-export interface StalkerChannelSyncResult extends ChannelSyncResult {}
+export type StalkerChannelSyncResult = ChannelSyncResult;
 
 /** @deprecated Use XstreamChannelData instead */
-export interface XstreamChannelInfo extends XstreamChannelData {}
+export type XstreamChannelInfo = XstreamChannelData;
 
 /** @deprecated Use M3uChannelData instead */
-export interface M3uChannelInfo extends M3uChannelData {}
+export type M3uChannelInfo = M3uChannelData;
 
 /** @deprecated Use CachedChannel['externalId'] instead of stalkerId */
 export type StalkerId = string;
@@ -893,4 +893,4 @@ export interface StalkerRawProfile {
 }
 
 /** @deprecated Use ChannelSyncResult instead */
-export interface StalkerChannelSyncResult extends ChannelSyncResult {}
+export type StalkerChannelSyncResultDuplicate = ChannelSyncResult;

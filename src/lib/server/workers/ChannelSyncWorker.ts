@@ -63,13 +63,7 @@ export class ChannelSyncWorker extends TaskWorker<ChannelSyncWorkerMetadata> {
 			`Starting channel sync for ${this._metadata.accountName} (${this._metadata.providerType})`
 		);
 
-		try {
-			// Wait for the sync to complete
-			await this.resolvePromise;
-		} catch (error) {
-			// Error was already logged by fail()
-			throw error;
-		}
+		await this.resolvePromise;
 	}
 
 	/**

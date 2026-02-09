@@ -72,15 +72,6 @@ interface IptvOrgBlocklistEntry {
 	ref: string;
 }
 
-interface IptvOrgGuide {
-	channel?: string | null;
-	feed?: string | null;
-	site: string;
-	site_id: string;
-	site_name: string;
-	lang: string;
-}
-
 export class IptvOrgProvider implements LiveTvProvider {
 	readonly type = 'iptvorg';
 
@@ -436,7 +427,7 @@ export class IptvOrgProvider implements LiveTvProvider {
 		return true;
 	}
 
-	async fetchEpg(account: LiveTvAccount, startTime: Date, endTime: Date): Promise<EpgProgram[]> {
+	async fetchEpg(account: LiveTvAccount, _startTime: Date, _endTime: Date): Promise<EpgProgram[]> {
 		try {
 			// IPTV-Org provides guide metadata but not actual EPG data
 			// The guides point to external EPG sources that would need to be fetched separately
