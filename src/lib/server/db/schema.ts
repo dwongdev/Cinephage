@@ -95,7 +95,6 @@ export interface TorrentProtocolSettings {
 	seedRatio: string | null;
 	seedTime: number | null;
 	packSeedTime: number | null;
-	preferMagnetUrl: boolean;
 	rejectDeadTorrents: boolean;
 }
 
