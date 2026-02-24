@@ -5,27 +5,39 @@
  * helps media servers (Jellyfin/Plex/Emby) auto-detect the format as
  * MPEG-TS rather than forcing HLS format detection.
  *
- * All requests are forwarded to the main [lineupId] handler.
+ * All requests are forwarded to the shared stream handler.
  */
 
 import type { RequestHandler } from './$types';
-import { GET as baseGET, HEAD as baseHEAD } from '../[lineupId]/+server.js';
+import {
+	handleStreamGet,
+	handleStreamHead,
+	handleStreamOptions
+} from '$lib/server/livetv/streaming/StreamRequestHandler.js';
 
-export const GET: RequestHandler = async (event) => {
-	return baseGET(event);
+export const GET: RequestHandler = async ({ params, request, url }) => {
+	const { lineupId } = params;
+
+	if (!lineupId) {
+		return new Response(JSON.stringify({ error: 'Missing lineup ID' }), {
+			status: 400,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+
+	return handleStreamGet(lineupId, request, url);
 };
 
-export const HEAD: RequestHandler = async (event) => {
-	return baseHEAD(event);
+export const HEAD: RequestHandler = async ({ params, url }) => {
+	const { lineupId } = params;
+
+	if (!lineupId) {
+		return new Response(null, { status: 400 });
+	}
+
+	return handleStreamHead(lineupId, url);
 };
 
 export const OPTIONS: RequestHandler = async () => {
-	return new Response(null, {
-		status: 200,
-		headers: {
-			'Access-Control-Allow-Origin': '*',
-			'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-			'Access-Control-Allow-Headers': 'Range, Content-Type'
-		}
-	});
+	return handleStreamOptions();
 };
