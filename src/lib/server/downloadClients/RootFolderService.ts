@@ -362,9 +362,9 @@ export class RootFolderService {
 	 * This is more reliable than fs.access() which only checks permission bits.
 	 */
 	private async testWriteAccess(dirPath: string): Promise<boolean> {
-		const testDir = path.join(dirPath, `.cinephage-write-test-${Date.now()}`);
+		let testDir: string | null = null;
 		try {
-			await fs.mkdir(testDir);
+			testDir = await fs.mkdtemp(path.join(dirPath, '.cinephage-write-test-'));
 			await fs.rmdir(testDir);
 			return true;
 		} catch (err) {
@@ -376,10 +376,12 @@ export class RootFolderService {
 				errorMessage: errObj.message
 			});
 			// Attempt cleanup in case mkdir succeeded but rmdir failed
-			try {
-				await fs.rmdir(testDir);
-			} catch {
-				// Ignore cleanup errors
+			if (testDir) {
+				try {
+					await fs.rmdir(testDir);
+				} catch {
+					// Ignore cleanup errors
+				}
 			}
 			return false;
 		}

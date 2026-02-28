@@ -804,8 +804,12 @@ export class MediaMatcherService {
 		}
 
 		// Determine season and episode from parsed info
-		const seasonNumber = file.parsedSeason || 1;
-		const episodeNumber = file.parsedEpisode || 1;
+		if (file.parsedSeason === null || file.parsedEpisode === null) {
+			throw new Error('Could not determine season/episode from filename');
+		}
+
+		const seasonNumber = file.parsedSeason;
+		const episodeNumber = file.parsedEpisode;
 
 		// Fetch season details from TMDB (needed for both season and episode metadata)
 		let tmdbSeason: Awaited<ReturnType<typeof tmdb.getSeason>> | null = null;
