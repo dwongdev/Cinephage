@@ -25,6 +25,10 @@ import { ReleaseParser } from '$lib/server/indexers/parser/ReleaseParser.js';
 import { EventEmitter } from 'events';
 import { logger } from '$lib/logging';
 import { DOWNLOAD } from '$lib/config/constants';
+import {
+	findOverlappingRootFolder,
+	getRootFolderOverlapMessage
+} from '$lib/server/filesystem/root-folder-overlap.js';
 import { libraryMediaEvents } from './LibraryMediaEvents.js';
 import {
 	getMediaParseStem,
@@ -114,6 +118,7 @@ export interface ScanResult {
 	success: boolean;
 	scanId: string;
 	rootFolderId: string;
+	rootFolderPath: string;
 	filesScanned: number;
 	filesAdded: number;
 	filesUpdated: number;
@@ -345,6 +350,7 @@ export class DiskScanService extends EventEmitter {
 
 		try {
 			this.emit('progress', progress);
+			await this.assertNoRootFolderOverlap(rootFolderId, rootFolder.path);
 
 			// Discover files
 			const discoveredFiles = await this.discoverFiles(rootFolder.path);
@@ -430,6 +436,7 @@ export class DiskScanService extends EventEmitter {
 				success: true,
 				scanId: scanRecord.id,
 				rootFolderId,
+				rootFolderPath: rootFolder.path,
 				filesScanned: progress.filesFound,
 				filesAdded: progress.filesAdded,
 				filesUpdated: progress.filesUpdated,
@@ -458,6 +465,7 @@ export class DiskScanService extends EventEmitter {
 				success: false,
 				scanId: scanRecord.id,
 				rootFolderId,
+				rootFolderPath: rootFolder.path,
 				filesScanned: progress.filesFound,
 				filesAdded: progress.filesAdded,
 				filesUpdated: progress.filesUpdated,
@@ -482,6 +490,23 @@ export class DiskScanService extends EventEmitter {
 			chunks.push(values.slice(i, i + chunkSize));
 		}
 		return chunks;
+	}
+
+	private async assertNoRootFolderOverlap(
+		rootFolderId: string,
+		rootFolderPath: string
+	): Promise<void> {
+		const existingFolders = await db
+			.select({
+				id: rootFolders.id,
+				path: rootFolders.path,
+				name: rootFolders.name
+			})
+			.from(rootFolders);
+		const overlap = await findOverlappingRootFolder(rootFolderPath, existingFolders, rootFolderId);
+		if (overlap) {
+			throw new Error(getRootFolderOverlapMessage(rootFolderPath, overlap));
+		}
 	}
 
 	/**

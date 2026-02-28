@@ -150,12 +150,16 @@
 		folderSaveError = null;
 	}
 
-	async function handleValidatePath(path: string, readOnly = false): Promise<PathValidationResult> {
+	async function handleValidatePath(
+		path: string,
+		readOnly = false,
+		folderId?: string
+	): Promise<PathValidationResult> {
 		try {
 			const response = await fetch('/api/root-folders/validate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ path, readOnly })
+				body: JSON.stringify({ path, readOnly, folderId })
 			});
 			const payload = await readResponsePayload<PathValidationResult>(response);
 

@@ -6,13 +6,13 @@
 	import { getResponseErrorMessage, readResponsePayload } from '$lib/utils/http';
 	import { toasts } from '$lib/stores/toast.svelte';
 	import {
-		ArrowLeft,
 		ArrowUp,
 		Check,
 		ChevronRight,
 		Clapperboard,
 		FileVideo,
 		Folder,
+		Home,
 		Loader2,
 		Search,
 		Sparkles,
@@ -1726,8 +1726,13 @@
 
 			<div class="mt-4 overflow-hidden rounded-lg border border-base-300">
 				<div class="flex items-center gap-2 border-b border-base-300 bg-base-200 p-3">
-					<button class="btn btn-square btn-ghost btn-sm" onclick={() => browse()}>
-						<ArrowLeft class="h-4 w-4" />
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-sm"
+						onclick={() => browse('/')}
+						title="Go to /"
+					>
+						<Home class="h-4 w-4" />
 					</button>
 					<button
 						class="btn btn-square btn-ghost btn-sm"
