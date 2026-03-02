@@ -6,6 +6,7 @@ import { settings } from '$lib/server/db/schema';
 import { globalTmdbFiltersSchema } from '$lib/validation/schemas';
 import { eq } from 'drizzle-orm';
 import { logger } from '$lib/logging';
+import { tmdb } from '$lib/server/tmdb';
 import type { GlobalTmdbFilters } from '$lib/types/tmdb';
 
 const DEFAULT_FILTERS: GlobalTmdbFilters = {
@@ -79,6 +80,8 @@ export const PUT: RequestHandler = async (event) => {
 			target: settings.key,
 			set: { value: JSON.stringify(result.data) }
 		});
+
+	tmdb.invalidateSettings();
 
 	return json({ success: true, filters: result.data });
 };

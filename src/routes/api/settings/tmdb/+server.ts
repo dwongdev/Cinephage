@@ -5,6 +5,7 @@ import { db } from '$lib/server/db';
 import { settings } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { tmdbApiKeySchema } from '$lib/validation/schemas';
+import { tmdb } from '$lib/server/tmdb';
 import { z } from 'zod';
 
 const tmdbSettingsSchema = z.object({
@@ -69,6 +70,8 @@ export const PUT: RequestHandler = async (event) => {
 		.insert(settings)
 		.values({ key: 'tmdb_api_key', value: apiKey })
 		.onConflictDoUpdate({ target: settings.key, set: { value: apiKey } });
+
+	tmdb.invalidateSettings();
 
 	return json({ success: true });
 };
