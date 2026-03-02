@@ -23,6 +23,7 @@
 		HardDrive
 	} from 'lucide-svelte';
 	import TmdbImage from '$lib/components/tmdb/TmdbImage.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import { resolve } from '$app/paths';
 	import { resolvePath } from '$lib/utils/routing';
 	import type { UnifiedActivity } from '$lib/types/activity';
@@ -30,40 +31,123 @@
 
 	let { data } = $props();
 
-	// Local SSE-overridable state; derived values fall back to server props for SSR/initial render.
+	// Type definitions for dashboard data
+	interface RecentlyAddedMovie {
+		id: string;
+		tmdbId: number;
+		title: string;
+		year: number | null;
+		posterPath: string | null;
+		hasFile: boolean | null;
+		monitored: boolean | null;
+		added: string | null;
+		availability?: string;
+		isReleased?: boolean;
+	}
+
+	interface RecentlyAddedSeries {
+		id: string;
+		tmdbId: number;
+		title: string;
+		year: number | null;
+		posterPath: string | null;
+		episodeFileCount: number;
+		episodeCount: number;
+		airedMissingCount: number;
+		added: string | null;
+	}
+
+	interface MissingEpisode {
+		id: string;
+		seriesId: string;
+		seasonNumber: number;
+		episodeNumber: number;
+		title: string | null;
+		airDate: string | null;
+		series?: {
+			id: string;
+			title: string;
+			posterPath: string | null;
+		} | null;
+	}
+
+	// Resolve promises with initial empty state for smooth transitions
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let recentlyAddedResolved = $state<{ movies: any[]; series: any[] }>({ movies: [], series: [] });
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let missingEpisodesResolved = $state<any[]>([]);
+	let recentActivityResolved = $state<UnifiedActivity[]>([]);
+	let isRecentlyAddedLoading = $state(true);
+	let isMissingEpisodesLoading = $state(true);
+	let isActivityLoading = $state(true);
+
+	// Local SSE-overridable state; derived values fall back to resolved server data or SSR/initial render.
 	let statsState = $state<typeof data.stats | null>(null);
 	let recentActivityState = $state<UnifiedActivity[] | null>(null);
-	let recentlyAddedState = $state<typeof data.recentlyAdded | null>(null);
-	let missingEpisodesState = $state<typeof data.missingEpisodes | null>(null);
+	let recentlyAddedState = $state<typeof recentlyAddedResolved | null>(null);
+	let missingEpisodesState = $state<typeof missingEpisodesResolved | null>(null);
 
 	const stats = $derived(statsState ?? data.stats);
-	const recentActivity = $derived(recentActivityState ?? data.recentActivity);
-	const recentlyAdded = $derived(recentlyAddedState ?? data.recentlyAdded);
-	const missingEpisodes = $derived(missingEpisodesState ?? data.missingEpisodes);
+	const recentActivity = $derived(recentActivityState ?? recentActivityResolved);
+	const recentlyAdded = $derived(recentlyAddedState ?? recentlyAddedResolved);
+	const missingEpisodes = $derived(missingEpisodesState ?? missingEpisodesResolved);
+
+	// Resolve promises when they resolve
+	$effect(() => {
+		// Handle recently added promise
+		if (data.recentlyAdded instanceof Promise) {
+			data.recentlyAdded
+				.then((result) => {
+					recentlyAddedResolved = result;
+					isRecentlyAddedLoading = false;
+				})
+				.catch(() => {
+					isRecentlyAddedLoading = false;
+				});
+		} else {
+			recentlyAddedResolved = data.recentlyAdded;
+			isRecentlyAddedLoading = false;
+		}
+
+		// Handle missing episodes promise
+		if (data.missingEpisodes instanceof Promise) {
+			data.missingEpisodes
+				.then((result) => {
+					missingEpisodesResolved = result;
+					isMissingEpisodesLoading = false;
+				})
+				.catch(() => {
+					isMissingEpisodesLoading = false;
+				});
+		} else {
+			missingEpisodesResolved = data.missingEpisodes;
+			isMissingEpisodesLoading = false;
+		}
+
+		// Handle activity promise
+		if (data.recentActivity instanceof Promise) {
+			data.recentActivity
+				.then((result) => {
+					recentActivityResolved = result;
+					isActivityLoading = false;
+				})
+				.catch(() => {
+					isActivityLoading = false;
+				});
+		} else {
+			recentActivityResolved = data.recentActivity;
+			isActivityLoading = false;
+		}
+	});
 
 	// Sync from server data when it changes (e.g., on navigation)
 	$effect(() => {
 		statsState = data.stats;
-		recentActivityState = data.recentActivity;
-		recentlyAddedState = data.recentlyAdded;
-		missingEpisodesState = data.missingEpisodes;
 	});
 
 	// SSE Connection - automatically managed
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const sse = createSSE<Record<string, any>>(resolvePath('/api/dashboard/stream'), {
-		'dashboard:initial': (payload) => {
-			const data = payload as {
-				stats: typeof stats;
-				recentlyAdded: typeof recentlyAdded;
-				missingEpisodes: typeof missingEpisodes;
-				recentActivity: UnifiedActivity[];
-			};
-			statsState = data.stats;
-			recentlyAddedState = data.recentlyAdded;
-			missingEpisodesState = data.missingEpisodes;
-			recentActivityState = data.recentActivity;
-		},
 		'dashboard:stats': (newStats) => {
 			statsState = newStats as typeof stats;
 		},
@@ -75,7 +159,7 @@
 		},
 		'activity:new': (newActivity) => {
 			const activity = newActivity as UnifiedActivity;
-			const currentRecentActivity = recentActivityState ?? data.recentActivity;
+			const currentRecentActivity = recentActivityState ?? [];
 			recentActivityState = [
 				activity,
 				...currentRecentActivity.filter((a) => a.id !== activity.id)
@@ -83,14 +167,14 @@
 		},
 		'activity:updated': (updated) => {
 			const update = updated as Partial<UnifiedActivity>;
-			const currentRecentActivity = recentActivityState ?? data.recentActivity;
+			const currentRecentActivity = recentActivityState ?? [];
 			recentActivityState = currentRecentActivity.map((a) =>
 				a.id === update.id ? { ...a, ...update } : a
 			);
 		},
 		'activity:progress': (progressData) => {
 			const progress = progressData as { id: string; progress: number; status?: string };
-			const currentRecentActivity = recentActivityState ?? data.recentActivity;
+			const currentRecentActivity = recentActivityState ?? [];
 			recentActivityState = currentRecentActivity.map((a) =>
 				a.id === progress.id
 					? {
@@ -289,7 +373,11 @@
 						<Calendar class="h-6 w-6 text-warning" />
 					</div>
 					<div>
-						<div class="text-2xl font-bold">{missingEpisodes.length}</div>
+						{#if isMissingEpisodesLoading}
+							<Skeleton variant="text" class="h-8 w-12" />
+						{:else}
+							<div class="text-2xl font-bold">{missingEpisodes.length}</div>
+						{/if}
 						<div class="text-sm text-base-content/70">
 							<span class="sm:hidden">Missing Eps</span>
 							<span class="hidden sm:inline">Missing Episodes</span>
@@ -447,7 +535,28 @@
 		<!-- Recently Added Section (2/3 width) -->
 		<div class="space-y-6 lg:col-span-2">
 			<!-- Recently Added Movies -->
-			{#if recentlyAdded.movies.length > 0}
+			{#if isRecentlyAddedLoading}
+				<div class="card bg-base-200">
+					<div class="card-body">
+						<div class="flex items-center justify-between">
+							<h2 class="card-title">
+								<Clapperboard class="h-5 w-5" />
+								Recently Added Movies
+							</h2>
+							<Skeleton variant="text" class="h-8 w-20" />
+						</div>
+						<div
+							class="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6"
+						>
+							{#each Array(6) as _}
+								<div class="aspect-2/3 overflow-hidden rounded-lg">
+									<Skeleton class="h-full w-full" />
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{:else if recentlyAdded.movies.length > 0}
 				<div class="card bg-base-200">
 					<div class="card-body">
 						<div class="flex items-center justify-between">
@@ -460,14 +569,15 @@
 						<div
 							class="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6"
 						>
-							{#each recentlyAdded.movies as movie (movie.id)}
+							{#each recentlyAdded.movies as movie, index (movie.id)}
+								{@const typedMovie = movie as RecentlyAddedMovie}
 								<a
-									href={resolve(`/library/movie/${movie.id}`)}
+									href={resolve(`/library/movie/${typedMovie.id}`)}
 									class="group relative aspect-2/3 overflow-hidden rounded-lg"
 								>
 									<TmdbImage
-										path={movie.posterPath}
-										alt={movie.title}
+										path={typedMovie.posterPath}
+										alt={typedMovie.title}
 										size="w185"
 										class="h-full w-full object-cover transition-transform group-hover:scale-105"
 									/>
@@ -475,18 +585,18 @@
 										class="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 									>
 										<div class="absolute right-0 bottom-0 left-0 p-2">
-											<p class="truncate text-xs font-medium text-white">{movie.title}</p>
-											<p class="text-xs text-white/70">{movie.year}</p>
+											<p class="truncate text-xs font-medium text-white">{typedMovie.title}</p>
+											<p class="text-xs text-white/70">{typedMovie.year}</p>
 										</div>
 									</div>
-									{#if !movie.hasFile && movie.monitored}
+									{#if !typedMovie.hasFile && typedMovie.monitored}
 										<div class="absolute top-1 right-1">
 											<span
-												class="badge badge-xs {movie.isReleased
+												class="badge badge-xs {typedMovie.isReleased
 													? 'badge-warning'
 													: 'badge-secondary'}"
 											>
-												{movie.isReleased ? 'Missing' : 'Unreleased'}
+												{typedMovie.isReleased ? 'Missing' : 'Unreleased'}
 											</span>
 										</div>
 									{/if}
@@ -498,7 +608,28 @@
 			{/if}
 
 			<!-- Recently Added TV Shows -->
-			{#if recentlyAdded.series.length > 0}
+			{#if isRecentlyAddedLoading}
+				<div class="card bg-base-200">
+					<div class="card-body">
+						<div class="flex items-center justify-between">
+							<h2 class="card-title">
+								<Tv class="h-5 w-5" />
+								Recently Added TV Shows
+							</h2>
+							<Skeleton variant="text" class="h-8 w-20" />
+						</div>
+						<div
+							class="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6"
+						>
+							{#each Array(6) as _}
+								<div class="aspect-2/3 overflow-hidden rounded-lg">
+									<Skeleton class="h-full w-full" />
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{:else if recentlyAdded.series.length > 0}
 				<div class="card bg-base-200">
 					<div class="card-body">
 						<div class="flex items-center justify-between">
@@ -547,7 +678,28 @@
 			{/if}
 
 			<!-- Missing Episodes Section -->
-			{#if missingEpisodes.length > 0}
+			{#if isMissingEpisodesLoading}
+				<div class="card bg-base-200">
+					<div class="card-body">
+						<h2 class="card-title">
+							<Calendar class="h-5 w-5" />
+							Missing Episodes
+						</h2>
+						<div class="divide-y divide-base-300">
+							{#each Array(5) as _}
+								<div class="flex items-center gap-3 py-2">
+									<Skeleton variant="rect" class="h-12 w-8 shrink-0" />
+									<div class="min-w-0 flex-1">
+										<Skeleton variant="text" class="mb-1 w-32" />
+										<Skeleton variant="text" class="w-24" />
+									</div>
+									<Skeleton variant="text" class="w-16" />
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{:else if missingEpisodes.length > 0}
 				<div class="card bg-base-200">
 					<div class="card-body">
 						<h2 class="card-title">
@@ -589,7 +741,7 @@
 			{/if}
 
 			<!-- Empty State -->
-			{#if recentlyAdded.movies.length === 0 && recentlyAdded.series.length === 0}
+			{#if !isRecentlyAddedLoading && recentlyAdded.movies.length === 0 && recentlyAdded.series.length === 0}
 				<div class="card bg-base-200">
 					<div class="card-body items-center text-center">
 						<div class="rounded-full bg-base-300 p-4">
@@ -621,7 +773,30 @@
 						<ArrowRight class="h-3 w-3" />
 					</a>
 				</div>
-				{#if recentActivity.length > 0}
+				{#if isActivityLoading}
+					<div class="-mx-4 overflow-x-auto">
+						<table class="table table-xs">
+							<thead>
+								<tr>
+									<th>Status</th>
+									<th>Media</th>
+									<th>Progress</th>
+									<th>Time</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each Array(6) as _}
+									<tr>
+										<td><Skeleton variant="text" class="w-16" /></td>
+										<td><Skeleton variant="text" class="w-24" /></td>
+										<td><Skeleton variant="text" class="w-12" /></td>
+										<td><Skeleton variant="text" class="w-10" /></td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{:else if recentActivity.length > 0}
 					<div class="-mx-4 overflow-x-auto">
 						<table class="table table-xs">
 							<thead>

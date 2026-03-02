@@ -2,28 +2,16 @@ import { createSSEStream } from '$lib/server/sse';
 import { downloadMonitor } from '$lib/server/downloadClients/monitoring';
 import { librarySchedulerService } from '$lib/server/library/library-scheduler';
 import { diskScanService } from '$lib/server/library/disk-scan';
-import { db } from '$lib/server/db';
 import { logger } from '$lib/logging';
-import {
-	movies,
-	series,
-	episodes,
-	episodeFiles,
-	movieFiles,
-	downloadQueue,
-	downloadHistory,
-	unmatchedFiles,
-	rootFolders
-} from '$lib/server/db/schema';
-import { count, eq, desc, and, inArray, sql, gte, ne } from 'drizzle-orm';
-import { activityService, mediaResolver } from '$lib/server/activity';
+import { mediaResolver, activityService } from '$lib/server/activity';
 import { extractReleaseGroup } from '$lib/server/indexers/parser/patterns/releaseGroup';
+import {
+	getDashboardStats,
+	getRecentlyAdded,
+	getMissingEpisodes
+} from '$lib/server/dashboard/queries.js';
 import type { UnifiedActivity, ActivityStatus } from '$lib/types/activity';
 import type { RequestHandler } from '@sveltejs/kit';
-import {
-	computeMissingMovieAvailabilityCounts,
-	enrichMoviesWithAvailability
-} from '$lib/server/dashboard/movie-availability';
 
 interface QueueItem {
 	id: string;
@@ -85,391 +73,6 @@ function mapQueueStatusToActivityStatus(status: string): ActivityStatus {
 }
 
 /**
- * Get dashboard stats
- */
-async function getDashboardStats() {
-	const [movieStats] = await db
-		.select({
-			total: count(),
-			withFile: count(sql`CASE WHEN ${movies.hasFile} = 1 THEN 1 END`),
-			monitored: count(sql`CASE WHEN ${movies.monitored} = 1 THEN 1 END`)
-		})
-		.from(movies);
-
-	const [seriesStats] = await db
-		.select({
-			total: count(),
-			monitored: count(sql`CASE WHEN ${series.monitored} = 1 THEN 1 END`)
-		})
-		.from(series);
-
-	const [episodeStats] = await db
-		.select({
-			total: count(),
-			withFile: count(sql`CASE WHEN ${episodes.hasFile} = 1 THEN 1 END`),
-			monitored: count(sql`CASE WHEN ${episodes.monitored} = 1 THEN 1 END`)
-		})
-		.from(episodes);
-
-	const now = new Date();
-	const today = now.toISOString().split('T')[0];
-
-	// Primary counters are monitored-only (actionable). We also keep a secondary
-	// unmonitored missing counter for visibility ("ignored" in UI).
-	const [
-		airedMissingEpisodes,
-		unairedEpisodes,
-		unmonitoredAiredMissingEpisodes,
-		missingMoviesForAvailability
-	] = await Promise.all([
-		db
-			.select({ count: count() })
-			.from(episodes)
-			.innerJoin(series, eq(episodes.seriesId, series.id))
-			.where(
-				and(
-					eq(episodes.hasFile, false),
-					eq(episodes.monitored, true),
-					eq(series.monitored, true),
-					ne(episodes.seasonNumber, 0),
-					sql`${episodes.airDate} <= ${today}`
-				)
-			),
-		db
-			.select({ count: count() })
-			.from(episodes)
-			.innerJoin(series, eq(episodes.seriesId, series.id))
-			.where(
-				and(
-					eq(episodes.hasFile, false),
-					eq(episodes.monitored, true),
-					eq(series.monitored, true),
-					ne(episodes.seasonNumber, 0),
-					sql`${episodes.airDate} > ${today}`
-				)
-			),
-		db
-			.select({ count: count() })
-			.from(episodes)
-			.innerJoin(series, eq(episodes.seriesId, series.id))
-			.where(
-				and(
-					eq(episodes.hasFile, false),
-					ne(episodes.seasonNumber, 0),
-					sql`${episodes.airDate} <= ${today}`,
-					sql`(${episodes.monitored} = 0 OR ${series.monitored} = 0)`
-				)
-			),
-		db
-			.select({
-				tmdbId: movies.tmdbId,
-				year: movies.year,
-				added: movies.added,
-				monitored: movies.monitored
-			})
-			.from(movies)
-			.where(eq(movies.hasFile, false))
-	]);
-	const missingMovieCounts = await computeMissingMovieAvailabilityCounts(
-		missingMoviesForAvailability
-	);
-	const monitoredReleasedMissingMovies = missingMovieCounts.monitoredReleasedMissing;
-	const monitoredUnreleasedMovies = missingMovieCounts.monitoredUnreleased;
-	const unmonitoredMissingMovies = missingMovieCounts.unmonitoredMissing;
-
-	const oneDayAgoIso = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-	const [downloadingDownloads, queuedDownloads, downloadThroughput, completedDownloads24h] =
-		await Promise.all([
-			db
-				.select({ count: count() })
-				.from(downloadQueue)
-				.where(eq(downloadQueue.status, 'downloading')),
-			db.select({ count: count() }).from(downloadQueue).where(eq(downloadQueue.status, 'queued')),
-			db
-				.select({
-					totalSpeed: sql<number>`COALESCE(SUM(${downloadQueue.downloadSpeed}), 0)`,
-					avgProgress: sql<number>`COALESCE(AVG(CAST(${downloadQueue.progress} AS REAL)), 0)`,
-					movingCount: count(sql`CASE WHEN ${downloadQueue.downloadSpeed} > 0 THEN 1 END`)
-				})
-				.from(downloadQueue)
-				.where(eq(downloadQueue.status, 'downloading')),
-			db
-				.select({ count: count() })
-				.from(downloadHistory)
-				.where(
-					and(
-						eq(downloadHistory.status, 'imported'),
-						sql`COALESCE(${downloadHistory.importedAt}, ${downloadHistory.completedAt}, ${downloadHistory.createdAt}) >= ${oneDayAgoIso}`
-					)
-				)
-		]);
-	const activeDownloads = downloadingDownloads?.[0]?.count || 0;
-	const queuedDownloadCount = queuedDownloads?.[0]?.count || 0;
-	const downloadSpeedBytes = Number(downloadThroughput?.[0]?.totalSpeed || 0);
-	const downloadAvgProgress = Math.max(
-		0,
-		Math.min(100, Math.round(Number(downloadThroughput?.[0]?.avgProgress || 0) * 100))
-	);
-	const movingDownloads = downloadThroughput?.[0]?.movingCount || 0;
-	const completedDownloadsLast24h = completedDownloads24h?.[0]?.count || 0;
-
-	const [unmatchedCount] = await db.select({ count: count() }).from(unmatchedFiles);
-
-	// Get storage size totals
-	const [[movieSizeResult], [episodeSizeResult]] = await Promise.all([
-		db.select({ total: sql<number>`COALESCE(SUM(${movieFiles.size}), 0)` }).from(movieFiles),
-		db.select({ total: sql<number>`COALESCE(SUM(${episodeFiles.size}), 0)` }).from(episodeFiles)
-	]);
-	const movieStorageBytes = Number(movieSizeResult?.total || 0);
-	const tvStorageBytes = Number(episodeSizeResult?.total || 0);
-
-	const [missingMovieRoots, missingSeriesRoots] = await Promise.all([
-		db.select({ count: count() }).from(movies).where(sql`
-			${movies.rootFolderId} IS NULL
-			OR ${movies.rootFolderId} = ''
-			OR ${movies.rootFolderId} = 'null'
-			OR NOT EXISTS (
-				SELECT 1 FROM ${rootFolders} rf WHERE rf.id = ${movies.rootFolderId}
-			)
-			OR EXISTS (
-				SELECT 1 FROM ${rootFolders} rf
-				WHERE rf.id = ${movies.rootFolderId} AND rf.media_type != 'movie'
-			)
-		`),
-		db.select({ count: count() }).from(series).where(sql`
-			${series.rootFolderId} IS NULL
-			OR ${series.rootFolderId} = ''
-			OR ${series.rootFolderId} = 'null'
-			OR NOT EXISTS (
-				SELECT 1 FROM ${rootFolders} rf WHERE rf.id = ${series.rootFolderId}
-			)
-			OR EXISTS (
-				SELECT 1 FROM ${rootFolders} rf
-				WHERE rf.id = ${series.rootFolderId} AND rf.media_type != 'tv'
-			)
-		`)
-	]);
-
-	return {
-		movies: {
-			total: movieStats?.total || 0,
-			withFile: movieStats?.withFile || 0,
-			missing: monitoredReleasedMissingMovies,
-			unreleased: monitoredUnreleasedMovies,
-			unmonitoredMissing: unmonitoredMissingMovies,
-			monitored: movieStats?.monitored || 0
-		},
-		series: {
-			total: seriesStats?.total || 0,
-			monitored: seriesStats?.monitored || 0
-		},
-		episodes: {
-			total: episodeStats?.total || 0,
-			withFile: episodeStats?.withFile || 0,
-			missing: airedMissingEpisodes?.[0]?.count || 0,
-			unaired: unairedEpisodes?.[0]?.count || 0,
-			unmonitoredMissing: unmonitoredAiredMissingEpisodes?.[0]?.count || 0,
-			monitored: episodeStats?.monitored || 0
-		},
-		activeDownloads,
-		queuedDownloads: queuedDownloadCount,
-		downloadSpeedBytes,
-		downloadAvgProgress,
-		movingDownloads,
-		completedDownloadsLast24h,
-		unmatchedFiles: unmatchedCount?.count || 0,
-		missingRootFolders:
-			(missingMovieRoots?.[0]?.count || 0) + (missingSeriesRoots?.[0]?.count || 0),
-		storage: {
-			movieBytes: movieStorageBytes,
-			tvBytes: tvStorageBytes,
-			totalBytes: movieStorageBytes + tvStorageBytes
-		}
-	};
-}
-
-/**
- * Get recently added content
- */
-async function getRecentlyAdded() {
-	const recentlyAddedMovies = await db
-		.select({
-			id: movies.id,
-			tmdbId: movies.tmdbId,
-			title: movies.title,
-			year: movies.year,
-			posterPath: movies.posterPath,
-			hasFile: movies.hasFile,
-			monitored: movies.monitored,
-			added: movies.added
-		})
-		.from(movies)
-		.orderBy(desc(movies.added))
-		.limit(6);
-	const recentlyAddedMoviesWithAvailability =
-		await enrichMoviesWithAvailability(recentlyAddedMovies);
-
-	const recentlyAddedSeries = await db
-		.select({
-			id: series.id,
-			tmdbId: series.tmdbId,
-			title: series.title,
-			year: series.year,
-			posterPath: series.posterPath,
-			episodeFileCount: series.episodeFileCount,
-			episodeCount: series.episodeCount,
-			added: series.added
-		})
-		.from(series)
-		.orderBy(desc(series.added))
-		.limit(6);
-
-	const today = new Date().toISOString().split('T')[0];
-	const recentlyAddedSeriesIds = recentlyAddedSeries.map((s) => s.id);
-	const [recentRegularEpisodes, recentEpisodeFiles] =
-		recentlyAddedSeriesIds.length > 0
-			? await Promise.all([
-					db
-						.select({
-							id: episodes.id,
-							seriesId: episodes.seriesId
-						})
-						.from(episodes)
-						.where(
-							and(inArray(episodes.seriesId, recentlyAddedSeriesIds), ne(episodes.seasonNumber, 0))
-						),
-					db
-						.select({
-							seriesId: episodeFiles.seriesId,
-							episodeIds: episodeFiles.episodeIds
-						})
-						.from(episodeFiles)
-						.where(inArray(episodeFiles.seriesId, recentlyAddedSeriesIds))
-				])
-			: [[], []];
-	const recentEpisodeIdToSeries = new Map(recentRegularEpisodes.map((ep) => [ep.id, ep.seriesId]));
-	const recentEpisodeTotals = new Map<string, number>();
-	for (const episode of recentRegularEpisodes) {
-		recentEpisodeTotals.set(episode.seriesId, (recentEpisodeTotals.get(episode.seriesId) ?? 0) + 1);
-	}
-	const recentEpisodeFilesBySeries = new Map<string, Set<string>>();
-	for (const file of recentEpisodeFiles) {
-		const linkedEpisodeIds = (file.episodeIds as string[] | null) ?? [];
-		if (linkedEpisodeIds.length === 0) continue;
-		const seriesId = file.seriesId;
-		let tracked = recentEpisodeFilesBySeries.get(seriesId);
-		if (!tracked) {
-			tracked = new Set<string>();
-			recentEpisodeFilesBySeries.set(seriesId, tracked);
-		}
-		for (const episodeId of linkedEpisodeIds) {
-			if (recentEpisodeIdToSeries.get(episodeId) === seriesId) {
-				tracked.add(episodeId);
-			}
-		}
-	}
-	const recentlyAddedSeriesMissingCounts =
-		recentlyAddedSeriesIds.length > 0
-			? await db
-					.select({
-						seriesId: episodes.seriesId,
-						count: count()
-					})
-					.from(episodes)
-					.innerJoin(series, eq(episodes.seriesId, series.id))
-					.where(
-						and(
-							inArray(episodes.seriesId, recentlyAddedSeriesIds),
-							eq(episodes.hasFile, false),
-							// Poster "missing" badge is actionable only: monitored series + monitored episode.
-							eq(episodes.monitored, true),
-							eq(series.monitored, true),
-							ne(episodes.seasonNumber, 0),
-							sql`${episodes.airDate} <= ${today}`
-						)
-					)
-					.groupBy(episodes.seriesId)
-			: [];
-	const recentlyAddedSeriesMissingMap = new Map(
-		recentlyAddedSeriesMissingCounts.map((row) => [row.seriesId, row.count])
-	);
-	const recentlyAddedSeriesWithMissing = recentlyAddedSeries.map((show) => ({
-		...show,
-		episodeCount: recentEpisodeTotals.get(show.id) ?? 0,
-		episodeFileCount: recentEpisodeFilesBySeries.get(show.id)?.size ?? 0,
-		airedMissingCount: recentlyAddedSeriesMissingMap.get(show.id) ?? 0
-	}));
-
-	return {
-		movies: recentlyAddedMoviesWithAvailability,
-		series: recentlyAddedSeriesWithMissing
-	};
-}
-
-/**
- * Get missing episodes
- */
-async function getMissingEpisodes() {
-	const today = new Date().toISOString().split('T')[0];
-	const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-	const missingEpisodes = await db
-		.select({
-			id: episodes.id,
-			seriesId: episodes.seriesId,
-			seasonNumber: episodes.seasonNumber,
-			episodeNumber: episodes.episodeNumber,
-			title: episodes.title,
-			airDate: episodes.airDate
-		})
-		.from(episodes)
-		.innerJoin(series, eq(episodes.seriesId, series.id))
-		.where(
-			and(
-				eq(episodes.monitored, true),
-				eq(episodes.hasFile, false),
-				eq(series.monitored, true),
-				gte(episodes.airDate, thirtyDaysAgo),
-				sql`${episodes.airDate} <= ${today}`
-			)
-		)
-		.orderBy(desc(episodes.airDate))
-		.limit(10);
-
-	const seriesIds = [...new Set(missingEpisodes.map((e) => e.seriesId))];
-	const seriesInfo =
-		seriesIds.length > 0
-			? await db
-					.select({
-						id: series.id,
-						title: series.title,
-						posterPath: series.posterPath
-					})
-					.from(series)
-					.where(inArray(series.id, seriesIds))
-			: [];
-
-	const seriesMap = new Map(seriesInfo.map((s) => [s.id, s]));
-
-	return missingEpisodes.map((ep) => ({
-		...ep,
-		series: seriesMap.get(ep.seriesId) || null
-	}));
-}
-
-/**
- * Get recent activity
- */
-async function getRecentActivity(limit = 10): Promise<UnifiedActivity[]> {
-	const result = await activityService.getActivities(
-		{ status: 'all', mediaType: 'all', protocol: 'all' },
-		{ field: 'time', direction: 'desc' },
-		{ limit, offset: 0 }
-	);
-	return result.activities;
-}
-
-/**
  * Convert queue item to activity
  */
 async function queueItemToActivity(item: QueueItem): Promise<Partial<UnifiedActivity>> {
@@ -513,9 +116,12 @@ async function queueItemToActivity(item: QueueItem): Promise<Partial<UnifiedActi
 /**
  * Server-Sent Events endpoint for real-time dashboard updates
  *
+ * The client receives initial data from the page server load function,
+ * so this stream does NOT send an initial state dump. It only sends
+ * incremental updates triggered by real events (downloads, scans, etc).
+ *
  * Events emitted:
- * - dashboard:initial - Full dashboard state on connect
- * - dashboard:stats - Stats update
+ * - dashboard:stats - Stats update (triggered by library changes)
  * - dashboard:recentlyAdded - Recently added content update
  * - dashboard:missingEpisodes - Missing episodes update
  * - activity:new - New activity
@@ -524,29 +130,6 @@ async function queueItemToActivity(item: QueueItem): Promise<Partial<UnifiedActi
  */
 export const GET: RequestHandler = async () => {
 	return createSSEStream((send) => {
-		// Send initial state
-		const sendInitialState = async () => {
-			try {
-				const [stats, recentlyAdded, missingEpisodes, recentActivity] = await Promise.all([
-					getDashboardStats(),
-					getRecentlyAdded(),
-					getMissingEpisodes(),
-					getRecentActivity()
-				]);
-
-				send('dashboard:initial', {
-					stats,
-					recentlyAdded,
-					missingEpisodes,
-					recentActivity
-				});
-			} catch (error) {
-				logger.error('[DashboardStream] Failed to fetch initial state', {
-					error: error instanceof Error ? error.message : String(error)
-				});
-			}
-		};
-
 		// Send updated dashboard data (stats, recentlyAdded, missingEpisodes)
 		const sendDashboardUpdate = async () => {
 			try {
@@ -566,8 +149,25 @@ export const GET: RequestHandler = async () => {
 			}
 		};
 
-		// Send initial state immediately
-		sendInitialState();
+		// No initial state sent - client already has data from page server load
+
+		// Send initial activity data when client connects
+		(async () => {
+			try {
+				const { activities } = await activityService.getActivities(
+					{ status: 'all', mediaType: 'all', protocol: 'all' },
+					{ field: 'time', direction: 'desc' },
+					{ limit: 10, offset: 0 }
+				);
+				for (const activity of activities) {
+					send('activity:new', activity);
+				}
+			} catch (error) {
+				logger.error('[DashboardStream] Failed to fetch initial activity', {
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		})();
 
 		// Event handlers for download monitor
 		const onQueueAdded = async (item: unknown) => {

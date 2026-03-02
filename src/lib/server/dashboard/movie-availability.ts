@@ -105,7 +105,15 @@ export async function enrichMoviesWithAvailability<T extends MovieAvailabilityRo
 	movies: T[]
 ): Promise<Array<T & { availability: MovieAvailabilityLevel; isReleased: boolean }>> {
 	const now = new Date();
-	const releaseInfoByTmdbId = await getReleaseInfoMap(movies.map((movie) => movie.tmdbId));
+	const currentYear = now.getFullYear();
+
+	// Only current-year or unknown-year movies need TMDB data to resolve availability.
+	// Past-year movies are deterministically "released" and future-year are "announced"
+	// without any external API call.
+	const ambiguousTmdbIds = movies
+		.filter((movie) => movie.year === currentYear || movie.year === null)
+		.map((movie) => movie.tmdbId);
+	const releaseInfoByTmdbId = await getReleaseInfoMap(ambiguousTmdbIds);
 
 	return movies.map((movie) => {
 		const releaseInfo = releaseInfoByTmdbId.get(movie.tmdbId);
