@@ -80,11 +80,23 @@ export class ActivityService {
 		sort: ActivitySortOptions = { field: 'time', direction: 'desc' },
 		pagination: PaginationOptions = { limit: 50, offset: 0 }
 	): Promise<ActivityQueryResult> {
+		// Determine if we can use smaller fetch limits. When there are no non-trivial
+		// filters and we only need a small number of items sorted by time desc, we can
+		// reduce the amount of history/monitoring rows fetched from the DB.
+		const hasFilters = this.hasNonTrivialFilters(filters);
+		const isSimpleLatest =
+			!hasFilters && sort.field === 'time' && sort.direction === 'desc' && pagination.offset === 0;
+
+		// When doing a simple "latest N" without filters, fetch a modest overshoot
+		// to account for dedup/skipping, but much less than the full 200+100 defaults.
+		const historyFetchLimit = isSimpleLatest ? Math.min(pagination.limit * 3, 200) : 200;
+		const monitoringFetchLimit = isSimpleLatest ? Math.min(pagination.limit * 2, 100) : 100;
+
 		// Fetch data from all three sources
 		const [activeDownloads, historyItems, monitoringItems, failedQueueItems] = await Promise.all([
 			this.fetchActiveDownloads(),
-			this.fetchHistoryItems(),
-			this.fetchMonitoringItems(filters.includeNoResults),
+			this.fetchHistoryItems(historyFetchLimit),
+			this.fetchMonitoringItems(filters.includeNoResults, monitoringFetchLimit),
 			this.fetchFailedQueueItems()
 		]);
 
@@ -409,17 +421,18 @@ export class ActivityService {
 		return db.select().from(downloadQueue).where(eq(downloadQueue.status, 'failed')).all();
 	}
 
-	private async fetchHistoryItems(): Promise<DownloadHistoryRecord[]> {
+	private async fetchHistoryItems(fetchLimit = 200): Promise<DownloadHistoryRecord[]> {
 		return db
 			.select()
 			.from(downloadHistory)
 			.orderBy(desc(downloadHistory.createdAt))
-			.limit(200)
+			.limit(fetchLimit)
 			.all();
 	}
 
 	private async fetchMonitoringItems(
-		includeNoResults?: boolean
+		includeNoResults?: boolean,
+		fetchLimit = 100
 	): Promise<MonitoringHistoryRecord[]> {
 		// Build status filter based on includeNoResults flag
 		// By default (undefined/false), exclude 'no_results' to reduce noise
@@ -430,7 +443,7 @@ export class ActivityService {
 			.from(monitoringHistory)
 			.where(inArray(monitoringHistory.status, statuses))
 			.orderBy(desc(monitoringHistory.executedAt))
-			.limit(100)
+			.limit(fetchLimit)
 			.all();
 
 		// Filter out subtitle search noise
@@ -913,6 +926,25 @@ export class ActivityService {
 		const aPriority = a.status === 'downloading' ? 0 : 1;
 		const bPriority = b.status === 'downloading' ? 0 : 1;
 		return aPriority - bPriority;
+	}
+
+	/**
+	 * Check whether the filters would actually narrow results.
+	 * "Trivial" means status=all, mediaType=all, protocol=all, and no other constraints.
+	 */
+	private hasNonTrivialFilters(filters: ActivityFilters): boolean {
+		if (filters.status && filters.status !== 'all') return true;
+		if (filters.mediaType && filters.mediaType !== 'all') return true;
+		if (filters.protocol && filters.protocol !== 'all') return true;
+		if (filters.search) return true;
+		if (filters.indexer) return true;
+		if (filters.releaseGroup) return true;
+		if (filters.resolution) return true;
+		if (filters.downloadClientId) return true;
+		if (filters.isUpgrade !== undefined) return true;
+		if (filters.startDate) return true;
+		if (filters.endDate) return true;
+		return false;
 	}
 
 	private applyFilters(activities: UnifiedActivity[], filters: ActivityFilters): UnifiedActivity[] {

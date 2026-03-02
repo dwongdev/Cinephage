@@ -17,7 +17,64 @@ import { tmdbCache, getCacheKey } from './tmdb-cache';
 // In-flight request deduplication - prevents concurrent requests for the same endpoint
 const inFlightRequests = new Map<string, Promise<unknown>>();
 
+// Cached TMDB settings to avoid DB reads on every API call.
+// These settings change very rarely (admin-only operations).
+const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let _cachedApiKey: string | null = null;
+let _cachedFilters: GlobalTmdbFilters | null = null;
+let _settingsCacheTimestamp = 0;
+let _settingsCachePromise: Promise<void> | null = null;
+
+async function loadTmdbSettings(): Promise<{ apiKey: string; filters: GlobalTmdbFilters | null }> {
+	const now = Date.now();
+	if (_cachedApiKey !== null && now - _settingsCacheTimestamp < SETTINGS_CACHE_TTL_MS) {
+		return { apiKey: _cachedApiKey, filters: _cachedFilters };
+	}
+
+	// Deduplicate concurrent settings loads
+	if (!_settingsCachePromise) {
+		_settingsCachePromise = (async () => {
+			try {
+				const [apiKeySetting, filtersSetting] = await Promise.all([
+					db.query.settings.findFirst({ where: eq(settings.key, 'tmdb_api_key') }),
+					db.query.settings.findFirst({ where: eq(settings.key, 'global_filters') })
+				]);
+
+				_cachedApiKey = apiKeySetting?.value ?? null;
+				_cachedFilters = null;
+				if (filtersSetting) {
+					try {
+						_cachedFilters = JSON.parse(filtersSetting.value);
+					} catch (e) {
+						logger.error('Failed to parse global filters', e);
+					}
+				}
+				_settingsCacheTimestamp = Date.now();
+			} finally {
+				_settingsCachePromise = null;
+			}
+		})();
+	}
+	await _settingsCachePromise;
+
+	if (!_cachedApiKey) {
+		throw new Error('TMDB API Key not configured');
+	}
+
+	return { apiKey: _cachedApiKey, filters: _cachedFilters };
+}
+
 export const tmdb = {
+	/**
+	 * Invalidate the cached TMDB settings. Call this after updating
+	 * tmdb_api_key or global_filters in the settings table.
+	 */
+	invalidateSettings() {
+		_cachedApiKey = null;
+		_cachedFilters = null;
+		_settingsCacheTimestamp = 0;
+	},
+
 	async fetch(endpoint: string, options: RequestInit = {}, skipFilters = false) {
 		// Ensure endpoint starts with /
 		const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -43,28 +100,12 @@ export const tmdb = {
 		// Create the actual request as a promise
 		const requestPromise = (async () => {
 			try {
-				const [apiKeySetting, filtersSetting] = await Promise.all([
-					db.query.settings.findFirst({ where: eq(settings.key, 'tmdb_api_key') }),
-					db.query.settings.findFirst({ where: eq(settings.key, 'global_filters') })
-				]);
-
-				if (!apiKeySetting) {
-					throw new Error('TMDB API Key not configured');
-				}
-
-				let filters: GlobalTmdbFilters | null = null;
-				if (filtersSetting) {
-					try {
-						filters = JSON.parse(filtersSetting.value);
-					} catch (e) {
-						logger.error('Failed to parse global filters', e);
-					}
-				}
+				const { apiKey, filters } = await loadTmdbSettings();
 
 				const url = new URL(TMDB.BASE_URL + path);
 
 				// Add API key
-				url.searchParams.set('api_key', apiKeySetting.value);
+				url.searchParams.set('api_key', apiKey);
 
 				// Apply Global Filters (Pre-request)
 				if (filters) {
@@ -304,10 +345,12 @@ export const tmdb = {
 	 * Check if TMDB API key is configured
 	 */
 	async isConfigured(): Promise<boolean> {
-		const apiKeySetting = await db.query.settings.findFirst({
-			where: eq(settings.key, 'tmdb_api_key')
-		});
-		return !!apiKeySetting?.value;
+		try {
+			const { apiKey } = await loadTmdbSettings();
+			return !!apiKey;
+		} catch {
+			return false;
+		}
 	},
 
 	// =========================================================================
