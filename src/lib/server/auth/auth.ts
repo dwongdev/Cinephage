@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
-import { username, apiKey, admin } from 'better-auth/plugins';
+import { username, admin } from 'better-auth/plugins';
+import { apiKey } from '@better-auth/api-key';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getRequestEvent } from '$app/server';
 import { APIError } from 'better-auth/api';

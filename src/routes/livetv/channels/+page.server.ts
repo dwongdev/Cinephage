@@ -19,7 +19,10 @@ export const load: ServerLoad = async ({ request, locals }) => {
 		});
 
 		// Find media streaming key
-		const streamingApiKey = apiKeysResult.find((key) => key.metadata?.type === 'streaming') || null;
+		const streamingApiKey =
+			apiKeysResult.apiKeys.find(
+				(key: { metadata?: { type?: string } | null }) => key.metadata?.type === 'streaming'
+			) || null;
 
 		// Fetch encrypted key from database and decrypt it
 		const encryptedStreamingKey = streamingApiKey

@@ -19,12 +19,17 @@ export const POST: RequestHandler = async (event) => {
 
 	try {
 		// Check if user already has API keys
-		const existingKeys = await auth.api.listApiKeys({
+		const existingKeysResult = await auth.api.listApiKeys({
 			headers: request.headers
 		});
+		const existingKeys = existingKeysResult.apiKeys;
 
-		const hasMainKey = existingKeys.some((key) => key.metadata?.type === 'main');
-		const hasStreamingKey = existingKeys.some((key) => key.metadata?.type === 'streaming');
+		const hasMainKey = existingKeys.some(
+			(key: { metadata?: { type?: string } | null }) => key.metadata?.type === 'main'
+		);
+		const hasStreamingKey = existingKeys.some(
+			(key: { metadata?: { type?: string } | null }) => key.metadata?.type === 'streaming'
+		);
 
 		const results = {
 			mainKey: null as { id: string; key: string } | null,
@@ -110,13 +115,13 @@ export const GET: RequestHandler = async (event) => {
 	const { request } = event;
 
 	try {
-		const apiKeys = await auth.api.listApiKeys({
+		const apiKeysResult = await auth.api.listApiKeys({
 			headers: request.headers
 		});
 
 		return json({
 			success: true,
-			data: apiKeys
+			data: apiKeysResult.apiKeys
 		});
 	} catch (error) {
 		console.error('Error listing API keys:', error);

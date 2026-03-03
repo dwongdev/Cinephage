@@ -30,7 +30,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		}
 
 		// Verify the key belongs to the current user
-		if (existingKey.userId !== locals.user.id) {
+		if (existingKey.referenceId !== locals.user.id) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 

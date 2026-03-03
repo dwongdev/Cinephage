@@ -20,8 +20,14 @@ export const load: PageServerLoad = async ({ request, locals }) => {
 		});
 
 		// Find main and media streaming keys
-		const mainApiKey = apiKeysResult.find((key) => key.metadata?.type === 'main') || null;
-		const streamingApiKey = apiKeysResult.find((key) => key.metadata?.type === 'streaming') || null;
+		const mainApiKey =
+			apiKeysResult.apiKeys.find(
+				(key: { metadata?: { type?: string } | null }) => key.metadata?.type === 'main'
+			) || null;
+		const streamingApiKey =
+			apiKeysResult.apiKeys.find(
+				(key: { metadata?: { type?: string } | null }) => key.metadata?.type === 'streaming'
+			) || null;
 
 		// Fetch encrypted keys from database and decrypt them
 		const encryptedMainKey = mainApiKey

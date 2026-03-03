@@ -38,6 +38,7 @@ CLAUDE.md
 
 # OpenCode local settings
 .opencode/
+AGENTS.md
 
 # Backup files
 *.bak

@@ -110,9 +110,10 @@ export const authApiKeys = sqliteTable(
 		start: text('start'),
 		prefix: text('prefix'),
 		key: text('key').notNull(),
-		userId: text('userId')
+		referenceId: text('referenceId')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
+		configId: text('configId').default('default'),
 		refillInterval: integer('refillInterval'),
 		refillAmount: integer('refillAmount'),
 		lastRefillAt: text('lastRefillAt'),
@@ -129,7 +130,10 @@ export const authApiKeys = sqliteTable(
 		permissions: text('permissions'),
 		metadata: text('metadata')
 	},
-	(table) => [index('idx_apikey_user').on(table.userId), index('idx_apikey_key').on(table.key)]
+	(table) => [
+		index('idx_apikey_reference').on(table.referenceId),
+		index('idx_apikey_key').on(table.key)
+	]
 );
 
 export const authRateLimits = sqliteTable('rateLimit', {

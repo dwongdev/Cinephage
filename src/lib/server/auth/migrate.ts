@@ -1,4 +1,4 @@
-import { getMigrations } from 'better-auth/db';
+import { getMigrations } from 'better-auth/db/migration';
 import Database from 'better-sqlite3';
 import { logger } from '$lib/logging';
 import { getAuthSecret } from './secret.js';
