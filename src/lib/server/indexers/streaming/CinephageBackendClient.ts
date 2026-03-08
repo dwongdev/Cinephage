@@ -1,5 +1,5 @@
 import { logger } from '$lib/logging';
-import type { StreamSource, StreamSubtitle, StreamType } from '$lib/server/streaming/types/stream';
+import type { StreamSource, StreamSubtitle, StreamType } from '$lib/server/streaming/types';
 import { getStreamingIndexerSettings } from '$lib/server/streaming/settings';
 
 const streamLog = { logCategory: 'streams' as const };
@@ -10,7 +10,6 @@ interface CinephageBackendConfig {
 	baseUrl: string;
 	commit?: string;
 	version?: string;
-	clientKey?: string;
 	missing: string[];
 	configured: boolean;
 }
@@ -51,6 +50,8 @@ export interface CinephageBackendHealth {
 	healthy: boolean;
 	baseUrl: string;
 	missing: string[];
+	version?: string;
+	commit?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,28 +60,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeBaseUrl(value: string | undefined): string {
 	return (value ?? DEFAULT_API_BASE_URL).replace(/\/$/, '');
-}
-
-async function generateSignature(
-	commit: string,
-	version: string,
-	timestamp: number,
-	clientKey: string
-): Promise<string> {
-	const encoder = new TextEncoder();
-	const data = encoder.encode(`${commit}:${version}:${timestamp}`);
-	const keyData = encoder.encode(clientKey);
-
-	const cryptoKey = await crypto.subtle.importKey(
-		'raw',
-		keyData,
-		{ name: 'HMAC', hash: 'SHA-256' },
-		false,
-		['sign']
-	);
-
-	const signature = await crypto.subtle.sign('HMAC', cryptoKey, data);
-	return Buffer.from(new Uint8Array(signature)).toString('base64');
 }
 
 function getFirstString(...values: unknown[]): string | undefined {
@@ -231,32 +210,25 @@ async function loadConfig(): Promise<CinephageBackendConfig> {
 		settings?.cinephageCommit,
 		process.env.CINEPHAGE_API_COMMIT,
 		process.env.CINEPHAGE_UPSTREAM_COMMIT,
+		process.env.VITE_CINEPHAGE_COMMIT,
 		process.env.CINEPHAGE_COMMIT
 	);
 	const version = getFirstString(
 		settings?.cinephageVersion,
 		process.env.CINEPHAGE_API_VERSION,
 		process.env.CINEPHAGE_UPSTREAM_VERSION,
+		process.env.VITE_CINEPHAGE_VERSION,
 		process.env.CINEPHAGE_VERSION
 	);
-	const clientKey = getFirstString(
-		settings?.cinephageClientKey,
-		process.env.CINEPHAGE_API_CLIENT_KEY,
-		process.env.CINEPHAGE_UPSTREAM_CLIENT_KEY,
-		process.env.CINEPHAGE_CLIENT_KEY
-	);
 
-	const missing = [
-		commit ? null : 'cinephageCommit',
-		version ? null : 'cinephageVersion',
-		clientKey ? null : 'cinephageClientKey'
-	].filter((entry): entry is string => entry !== null);
+	const missing = [commit ? null : 'cinephageCommit', version ? null : 'cinephageVersion'].filter(
+		(entry): entry is string => entry !== null
+	);
 
 	return {
 		baseUrl,
 		commit,
 		version,
-		clientKey,
 		missing,
 		configured: missing.length === 0
 	};
@@ -271,7 +243,9 @@ export class CinephageBackendClient {
 			configured: config.configured,
 			healthy,
 			baseUrl: config.baseUrl,
-			missing: config.missing
+			missing: config.missing,
+			version: config.version,
+			commit: config.commit
 		};
 	}
 
@@ -297,7 +271,7 @@ export class CinephageBackendClient {
 
 	async getStreams(params: CinephageStreamLookupParams): Promise<CinephageStreamLookupResult> {
 		const config = await loadConfig();
-		if (!config.configured || !config.commit || !config.version || !config.clientKey) {
+		if (!config.configured || !config.commit || !config.version) {
 			return {
 				success: false,
 				sources: [],
@@ -306,12 +280,6 @@ export class CinephageBackendClient {
 		}
 
 		const timestamp = Math.floor(Date.now() / 1000);
-		const signature = await generateSignature(
-			config.commit,
-			config.version,
-			timestamp,
-			config.clientKey
-		);
 
 		const url = new URL(`${config.baseUrl}/api/v1/stream/${params.tmdbId}`);
 		url.searchParams.set('type', params.type);
@@ -331,8 +299,7 @@ export class CinephageBackendClient {
 					Accept: 'application/json',
 					'X-Cinephage-Version': config.version,
 					'X-Cinephage-Commit': config.commit,
-					'X-Cinephage-Timestamp': String(timestamp),
-					'X-Cinephage-Signature': signature
+					'X-Cinephage-Timestamp': String(timestamp)
 				}
 			});
 

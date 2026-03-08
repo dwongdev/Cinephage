@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.resolve-version.outputs.version }}
+      api_version: ${{ steps.resolve-api-version.outputs.api_version }}
       is_prerelease: ${{ steps.release-mode.outputs.is_prerelease }}
       source_tag: ${{ steps.validate-source-tag.outputs.source_tag }}
       git_sha: ${{ steps.capture-git-sha.outputs.git_sha }}
@@ -149,6 +150,22 @@ jobs:
             echo "❌ Version must be semantic and v-prefixed (e.g., v1.0.0 or v1.0.0-rc.1)"
             exit 1
           fi
+
+      - name: Resolve Cinephage API version
+        id: resolve-api-version
+        env:
+          VERSION: ${{ steps.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          API_VERSION="${VERSION#v}"
+          if [ -z "$API_VERSION" ]; then
+            echo "❌ Failed to derive Cinephage API version from ${VERSION}"
+            exit 1
+          fi
+
+          echo "api_version=${API_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved Cinephage API version: ${API_VERSION}"
 
       - name: Determine prerelease mode
         id: release-mode
@@ -275,6 +292,8 @@ jobs:
         env:
           SOURCE_TAG: ${{ needs.validate.outputs.source_tag }}
           VERSION: ${{ needs.validate.outputs.version }}
+          CINEPHAGE_API_VERSION: ${{ needs.validate.outputs.api_version }}
+          CINEPHAGE_API_COMMIT: ${{ needs.validate.outputs.git_sha }}
           IS_PRERELEASE: ${{ needs.validate.outputs.is_prerelease }}
           SOURCE_AMD64_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ needs.validate.outputs.source_tag }}-amd64
           SOURCE_ARM64_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ needs.validate.outputs.source_tag }}-arm64
@@ -291,6 +310,8 @@ jobs:
             --tag "$RELEASE_AMD64_IMAGE" \
             --env "APP_VERSION=$VERSION" \
             --env "PUBLIC_APP_VERSION=$VERSION" \
+            --env "CINEPHAGE_API_VERSION=$CINEPHAGE_API_VERSION" \
+            --env "CINEPHAGE_API_COMMIT=$CINEPHAGE_API_COMMIT" \
             --label "org.opencontainers.image.version=$VERSION"
 
           crane mutate "$SOURCE_ARM64_IMAGE" \
@@ -298,6 +319,8 @@ jobs:
             --tag "$RELEASE_ARM64_IMAGE" \
             --env "APP_VERSION=$VERSION" \
             --env "PUBLIC_APP_VERSION=$VERSION" \
+            --env "CINEPHAGE_API_VERSION=$CINEPHAGE_API_VERSION" \
+            --env "CINEPHAGE_API_COMMIT=$CINEPHAGE_API_COMMIT" \
             --label "org.opencontainers.image.version=$VERSION"
 
           # Confirm the runtime app version envs were written to promoted tags.
@@ -305,12 +328,20 @@ jobs:
           ARM64_APP_VERSION_ENV=$(crane config --platform linux/arm64 "$RELEASE_ARM64_IMAGE" | jq -r '.config.Env[]? | select(startswith("APP_VERSION="))' | tail -n 1)
           AMD64_VERSION_ENV=$(crane config --platform linux/amd64 "$RELEASE_AMD64_IMAGE" | jq -r '.config.Env[]? | select(startswith("PUBLIC_APP_VERSION="))' | tail -n 1)
           ARM64_VERSION_ENV=$(crane config --platform linux/arm64 "$RELEASE_ARM64_IMAGE" | jq -r '.config.Env[]? | select(startswith("PUBLIC_APP_VERSION="))' | tail -n 1)
+          AMD64_CINEPHAGE_VERSION_ENV=$(crane config --platform linux/amd64 "$RELEASE_AMD64_IMAGE" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_VERSION="))' | tail -n 1)
+          ARM64_CINEPHAGE_VERSION_ENV=$(crane config --platform linux/arm64 "$RELEASE_ARM64_IMAGE" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_VERSION="))' | tail -n 1)
+          AMD64_CINEPHAGE_COMMIT_ENV=$(crane config --platform linux/amd64 "$RELEASE_AMD64_IMAGE" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_COMMIT="))' | tail -n 1)
+          ARM64_CINEPHAGE_COMMIT_ENV=$(crane config --platform linux/arm64 "$RELEASE_ARM64_IMAGE" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_COMMIT="))' | tail -n 1)
           echo "amd64 ${AMD64_APP_VERSION_ENV}"
           echo "arm64 ${ARM64_APP_VERSION_ENV}"
           echo "amd64 ${AMD64_VERSION_ENV}"
           echo "arm64 ${ARM64_VERSION_ENV}"
+          echo "amd64 ${AMD64_CINEPHAGE_VERSION_ENV}"
+          echo "arm64 ${ARM64_CINEPHAGE_VERSION_ENV}"
+          echo "amd64 ${AMD64_CINEPHAGE_COMMIT_ENV}"
+          echo "arm64 ${ARM64_CINEPHAGE_COMMIT_ENV}"
 
-          if [ "$AMD64_APP_VERSION_ENV" != "APP_VERSION=$VERSION" ] || [ "$ARM64_APP_VERSION_ENV" != "APP_VERSION=$VERSION" ] || [ "$AMD64_VERSION_ENV" != "PUBLIC_APP_VERSION=$VERSION" ] || [ "$ARM64_VERSION_ENV" != "PUBLIC_APP_VERSION=$VERSION" ]; then
+          if [ "$AMD64_APP_VERSION_ENV" != "APP_VERSION=$VERSION" ] || [ "$ARM64_APP_VERSION_ENV" != "APP_VERSION=$VERSION" ] || [ "$AMD64_VERSION_ENV" != "PUBLIC_APP_VERSION=$VERSION" ] || [ "$ARM64_VERSION_ENV" != "PUBLIC_APP_VERSION=$VERSION" ] || [ "$AMD64_CINEPHAGE_VERSION_ENV" != "CINEPHAGE_API_VERSION=$CINEPHAGE_API_VERSION" ] || [ "$ARM64_CINEPHAGE_VERSION_ENV" != "CINEPHAGE_API_VERSION=$CINEPHAGE_API_VERSION" ] || [ "$AMD64_CINEPHAGE_COMMIT_ENV" != "CINEPHAGE_API_COMMIT=$CINEPHAGE_API_COMMIT" ] || [ "$ARM64_CINEPHAGE_COMMIT_ENV" != "CINEPHAGE_API_COMMIT=$CINEPHAGE_API_COMMIT" ]; then
             echo "❌ Failed to set runtime version metadata on promoted images"
             exit 1
           fi
@@ -339,6 +370,35 @@ jobs:
             echo "✅ Promoted ${SOURCE_TAG} to ${VERSION} and latest"
           else
             echo "✅ Promoted ${SOURCE_TAG} to ${VERSION} (latest skipped for prerelease)"
+          fi
+
+      - name: Sync stable release with Cinephage API
+        env:
+          API_URL: https://api.cinephage.net
+          AUTOMATION_KEY: ${{ secrets.CINEPHAGE_AUTOMATION_KEY }}
+          CINEPHAGE_API_VERSION: ${{ needs.validate.outputs.api_version }}
+          CINEPHAGE_API_COMMIT: ${{ needs.validate.outputs.git_sha }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS -X POST "${API_URL}/update/release" \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${AUTOMATION_KEY}" \
+            -d "{\"commit\":\"${CINEPHAGE_API_COMMIT}\",\"version\":\"${CINEPHAGE_API_VERSION}\"}")
+
+          echo "$RESPONSE" | jq .
+
+          if ! echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+            echo '❌ Failed to sync stable release with Cinephage API'
+            exit 1
+          fi
+
+          HEALTH=$(curl -sS "${API_URL}/health")
+          echo "$HEALTH" | jq .
+
+          if ! echo "$HEALTH" | jq -e --arg version "$CINEPHAGE_API_VERSION" '.version == $version' >/dev/null 2>&1; then
+            echo "❌ Cinephage API health version did not match ${CINEPHAGE_API_VERSION}"
+            exit 1
           fi
 
       - name: Get manifest digest

@@ -13,8 +13,8 @@
 import { logger } from '$lib/logging';
 import { getCinephageBackendClient } from '$lib/server/indexers/streaming/CinephageBackendClient';
 import { streamCache } from './cache';
-import { filterStreamsByLanguage } from './providers/language-utils';
-import type { StreamSource, StreamSubtitle, StreamType } from './types/stream';
+import { filterStreamsByLanguage } from './language-utils';
+import type { StreamSource, StreamSubtitle, StreamType } from './types';
 import { fetchAndRewritePlaylist } from './utils';
 
 const streamLog = { logCategory: 'streams' as const };

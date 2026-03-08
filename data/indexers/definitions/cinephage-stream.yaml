@@ -43,20 +43,14 @@ settings:
     label: Cinephage API Commit
     default: ''
     placeholder: 'abc123def'
-    helpText: 'Build commit used when signing requests to the Cinephage API.'
+    helpText: 'Build commit sent with authenticated requests to the Cinephage API.'
 
   - name: cinephageVersion
     type: text
     label: Cinephage API Version
     default: ''
     placeholder: '2.3.3'
-    helpText: 'Build version used when signing requests to the Cinephage API.'
-
-  - name: cinephageClientKey
-    type: password
-    label: Cinephage API Client Key
-    default: ''
-    helpText: 'Client key returned by the Cinephage publish flow. Keep this secret.'
+    helpText: 'Build version sent with authenticated requests to the Cinephage API.'
 
 # Protocol-specific configuration for streaming
 protocolConfig:

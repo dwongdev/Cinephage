@@ -9,7 +9,7 @@ import {
 	DEFAULT_USER_AGENT,
 	AVAILABILITY_CHECK_TIMEOUT_MS
 } from '../constants';
-import type { StreamSubtitle } from '../types/stream';
+import type { StreamSubtitle } from '../types';
 import { injectSubtitles, isMasterPlaylist } from './subtitle-injection';
 import { rewriteHlsPlaylistUrls } from './hls-rewrite.js';
 import { fetchWithCloudflareBypass } from './cloudflare-streaming';

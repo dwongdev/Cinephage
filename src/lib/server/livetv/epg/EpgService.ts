@@ -16,8 +16,6 @@ import {
 	type EpgProgramRecord
 } from '$lib/server/db/schema';
 import { createChildLogger } from '$lib/logging';
-
-const logger = createChildLogger({ module: 'EpgService' });
 import { getProvider } from '../providers';
 import type {
 	EpgProgram,
@@ -26,6 +24,8 @@ import type {
 	ChannelNowNext,
 	LiveTvAccount
 } from '$lib/types/livetv';
+
+const logger = createChildLogger({ module: 'EpgService' });
 
 const BATCH_SIZE = 1000;
 const DEFAULT_RETENTION_HOURS = 48;

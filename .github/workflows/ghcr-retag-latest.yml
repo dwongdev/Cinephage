@@ -126,11 +126,15 @@ jobs:
           VERSION_LABEL="$(echo "$SOURCE_CONFIG" | jq -r '.config.Labels["org.opencontainers.image.version"] // ""')"
           APP_INTERNAL_VERSION_ENV="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("APP_VERSION="))' | tail -n 1 | sed 's/^APP_VERSION=//')"
           APP_VERSION_ENV="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("PUBLIC_APP_VERSION="))' | tail -n 1 | sed 's/^PUBLIC_APP_VERSION=//')"
+          CINEPHAGE_API_VERSION_ENV="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_VERSION="))' | tail -n 1 | sed 's/^CINEPHAGE_API_VERSION=//')"
+          CINEPHAGE_API_COMMIT_ENV="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_COMMIT="))' | tail -n 1 | sed 's/^CINEPHAGE_API_COMMIT=//')"
 
           echo "Source tag: ${SOURCE_TAG}"
           echo "Version label: ${VERSION_LABEL:-<empty>}"
           echo "App version env: ${APP_INTERNAL_VERSION_ENV:-<empty>}"
           echo "Public app version env: ${APP_VERSION_ENV:-<empty>}"
+          echo "Cinephage API version env: ${CINEPHAGE_API_VERSION_ENV:-<empty>}"
+          echo "Cinephage API commit env: ${CINEPHAGE_API_COMMIT_ENV:-<empty>}"
 
           if [ "$VERSION_LABEL" != "$SOURCE_TAG" ]; then
             echo "Refusing retag: org.opencontainers.image.version must match ${SOURCE_TAG}."
@@ -144,6 +148,36 @@ jobs:
 
           if [ "$APP_VERSION_ENV" != "$SOURCE_TAG" ]; then
             echo "Refusing retag: PUBLIC_APP_VERSION metadata must match ${SOURCE_TAG}."
+            exit 1
+          fi
+
+          if [ -z "$CINEPHAGE_API_VERSION_ENV" ] || [ -z "$CINEPHAGE_API_COMMIT_ENV" ]; then
+            echo 'Refusing retag: Cinephage API metadata is missing from the stable image.'
+            exit 1
+          fi
+
+      - name: Sync Cinephage API current release for rollback
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          API_URL: https://api.cinephage.net
+          AUTOMATION_KEY: ${{ secrets.CINEPHAGE_AUTOMATION_KEY }}
+          SOURCE_IMAGE: ${{ steps.refs.outputs.source_image }}
+        run: |
+          set -euo pipefail
+
+          SOURCE_CONFIG="$(crane config --platform linux/amd64 "$SOURCE_IMAGE")"
+          CINEPHAGE_API_VERSION="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_VERSION="))' | tail -n 1 | sed 's/^CINEPHAGE_API_VERSION=//')"
+          CINEPHAGE_API_COMMIT="$(echo "$SOURCE_CONFIG" | jq -r '.config.Env[]? | select(startswith("CINEPHAGE_API_COMMIT="))' | tail -n 1 | sed 's/^CINEPHAGE_API_COMMIT=//')"
+
+          RESPONSE=$(curl -sS -X POST "${API_URL}/update/release" \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${AUTOMATION_KEY}" \
+            -d "{\"commit\":\"${CINEPHAGE_API_COMMIT}\",\"version\":\"${CINEPHAGE_API_VERSION}\"}")
+
+          echo "$RESPONSE" | jq .
+
+          if ! echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+            echo '❌ Failed to sync Cinephage API during stable rollback'
             exit 1
           fi
 

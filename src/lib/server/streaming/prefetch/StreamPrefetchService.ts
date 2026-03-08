@@ -6,7 +6,7 @@
  *
  * Features:
  * - Prefetches streams for recently added library items
- * - Respects rate limits and provider health
+ * - Respects upstream rate limits and cache state
  * - Can be scheduled via monitoring scheduler
  * - Skips items with existing cache entries or negative cache
  */
@@ -23,7 +23,7 @@ const streamLog = { logCategory: 'streams' as const };
 /** Maximum items to prefetch in a single run */
 const MAX_PREFETCH_ITEMS = 20;
 
-/** Delay between prefetch requests (ms) to avoid overwhelming providers */
+/** Delay between prefetch requests (ms) to avoid overwhelming the resolver */
 const PREFETCH_DELAY_MS = 2000;
 
 /** Timeout for each prefetch request (ms) */

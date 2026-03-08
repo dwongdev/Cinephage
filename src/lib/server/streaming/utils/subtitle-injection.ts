@@ -5,7 +5,7 @@
  * This allows players like Jellyfin to discover and display subtitle options.
  */
 
-import type { StreamSubtitle } from '../types/stream';
+import type { StreamSubtitle } from '../types';
 
 /**
  * Inject subtitle tracks into an HLS master playlist

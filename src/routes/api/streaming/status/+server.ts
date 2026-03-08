@@ -9,7 +9,7 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { clearCaches } from '$lib/server/streaming/providers';
+import { streamCache } from '$lib/server/streaming/cache';
 import { getStreamCache } from '$lib/server/streaming/cache/StreamCache';
 import { getCinephageBackendClient } from '$lib/server/indexers/streaming/CinephageBackendClient';
 import { logger } from '$lib/logging';
@@ -56,6 +56,8 @@ export interface StreamingStatusResponse {
 		healthy: boolean;
 		baseUrl: string;
 		missing: string[];
+		version?: string;
+		commit?: string;
 	};
 }
 
@@ -108,7 +110,9 @@ export const GET: RequestHandler = async () => {
 				configured: backendHealth.configured,
 				healthy: backendHealth.healthy,
 				baseUrl: backendHealth.baseUrl,
-				missing: backendHealth.missing
+				missing: backendHealth.missing,
+				version: backendHealth.version,
+				commit: backendHealth.commit
 			}
 		};
 
@@ -132,7 +136,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		const { action } = body;
 
 		if (action === 'reset-all') {
-			clearCaches();
+			streamCache.clear();
+			getStreamCache().clear();
 			logger.info('All streaming caches reset', streamLog);
 			return json({
 				success: true,

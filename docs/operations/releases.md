@@ -43,6 +43,7 @@ Use `vX.Y.Z` if you want deterministic, pinned deployments.
 - `ghcr.io/moldytaint/cinephage:dev`
 
 Use `dev` only if you want preview builds from the `dev` branch.
+Preview builds do not update or register against production `https://api.cinephage.net`.
 
 ---
 
@@ -67,6 +68,11 @@ That promotion creates:
 - GitHub Release `vX.Y.Z`
 - image tag `vX.Y.Z`
 - image tag `latest`
+- production CinephageAPI release sync using the exact stable version and commit
+
+Stable releases also update the single current release tracked by production `CinephageAPI`.
+The running stable image carries this metadata in `CINEPHAGE_API_VERSION` and `CINEPHAGE_API_COMMIT`,
+which the app uses for upstream authentication.
 
 ---
 
@@ -75,6 +81,7 @@ That promotion creates:
 - `latest` always points to a stable release
 - rollback is done by repointing `latest` to an earlier stable `vX.Y.Z`
 - Cinephage does not support forcing `latest` to a preview build
+- stable rollback also re-syncs production `CinephageAPI` to the rolled-back version and commit
 
 If you need a non-stable build, use `dev` explicitly.
 
@@ -89,3 +96,9 @@ In practice:
 - Docker stable releases report `vX.Y.Z`
 - Docker preview builds report `dev`, `main-YYYYMMDD-RUN`, or `dev-YYYYMMDD-RUN` as appropriate
 - local/manual development falls back to `dev-local`
+
+## CinephageAPI Integration
+
+- only stable releases update production `CinephageAPI`
+- preview builds may still read the currently configured production version and commit, but they are not registered independently
+- production `CinephageAPI` accepts exactly one current `version` and `commit` pair at a time
