@@ -79,7 +79,9 @@ describe('OpenSubtitlesProvider - authentication (Bug #180)', () => {
 		const fetchCalls: { url: string; headers: Record<string, string> }[] = [];
 
 		vi.spyOn(provider as any, 'fetchWithTimeout').mockImplementation(
-			async (url: string, options: any) => {
+			async (...args: unknown[]) => {
+				const url = args[0] as string;
+				const options = args[1] as any;
 				const headers = options?.headers ?? {};
 				fetchCalls.push({ url, headers });
 
@@ -120,7 +122,9 @@ describe('OpenSubtitlesProvider - authentication (Bug #180)', () => {
 		const fetchCalls: { url: string; headers: Record<string, string> }[] = [];
 
 		vi.spyOn(provider as any, 'fetchWithTimeout').mockImplementation(
-			async (url: string, options: any) => {
+			async (...args: unknown[]) => {
+				const url = args[0] as string;
+				const options = args[1] as any;
 				fetchCalls.push({ url, headers: options?.headers ?? {} });
 				return { ok: true, json: async () => SEARCH_RESPONSE };
 			}
@@ -142,7 +146,9 @@ describe('OpenSubtitlesProvider - authentication (Bug #180)', () => {
 		const fetchCalls: { url: string; headers: Record<string, string> }[] = [];
 
 		vi.spyOn(provider as any, 'fetchWithTimeout').mockImplementation(
-			async (url: string, options: any) => {
+			async (...args: unknown[]) => {
+				const url = args[0] as string;
+				const options = args[1] as any;
 				fetchCalls.push({ url, headers: options?.headers ?? {} });
 
 				if (url.includes('/login')) {
@@ -201,7 +207,8 @@ describe('OpenSubtitlesProvider - authentication (Bug #180)', () => {
 
 		let loginCount = 0;
 
-		vi.spyOn(provider as any, 'fetchWithTimeout').mockImplementation(async (url: string) => {
+		vi.spyOn(provider as any, 'fetchWithTimeout').mockImplementation(async (...args: unknown[]) => {
+			const url = args[0] as string;
 			if (url.includes('/login')) {
 				loginCount++;
 				return {
