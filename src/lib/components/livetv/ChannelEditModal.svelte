@@ -17,6 +17,7 @@
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
 	import { copyToClipboard as copyTextToClipboard } from '$lib/utils/clipboard';
 	import { toasts } from '$lib/stores/toast.svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type {
 		ChannelBackupLink,
 		ChannelCategory,
@@ -344,7 +345,7 @@
 		logoPickerError = null;
 
 		try {
-			const params = new URLSearchParams({ limit: '18', offset: String(offset) });
+			const params = new SvelteURLSearchParams({ limit: '18', offset: String(offset) });
 			if (search.trim()) params.set('search', search.trim());
 			if (country) params.set('country', country);
 
