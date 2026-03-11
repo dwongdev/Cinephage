@@ -4,6 +4,7 @@
  * Validates that search() and download() correctly authenticate before
  * making API requests when username+password credentials are provided.
  * (Bug #180: token was never set for search/download, only for test())
+ *
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
