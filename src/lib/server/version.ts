@@ -1,6 +1,6 @@
-export const PLACEHOLDER_PACKAGE_VERSION = '0.0.1';
+import { PLACEHOLDER_PACKAGE_VERSION } from '$lib/version.js';
 
-function readVersion(value: string | undefined): string | null {
+function readVersion(value: string | undefined | null): string | null {
 	const normalized = value?.trim();
 	if (!normalized) return null;
 	if (normalized === PLACEHOLDER_PACKAGE_VERSION) return null;
