@@ -70,7 +70,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server.js ./server.js
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/data ./bundled-data
-COPY --chmod=755 docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/cinephage-entrypoint
 COPY --chmod=755 docker-script-runner.sh /usr/local/bin/cinephage-script
 RUN ln -sf /usr/local/bin/cinephage-script /usr/local/bin/cine-run
 
@@ -88,5 +88,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider "http://127.0.0.1:$PORT/api/health" || exit 1
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/cinephage-entrypoint"]
 CMD ["node", "server.js"]
