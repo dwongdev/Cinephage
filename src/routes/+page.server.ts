@@ -9,11 +9,6 @@ import {
 
 export const load: PageServerLoad = async ({ setHeaders }) => {
 	try {
-		// Disable buffering to enable progressive streaming
-		setHeaders({
-			'X-Accel-Buffering': 'no'
-		});
-
 		// Fetch critical stats immediately (blocks SSR)
 		const stats = await getDashboardStats();
 
