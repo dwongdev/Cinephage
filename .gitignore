@@ -88,6 +88,12 @@ cine-local.yaml
 # Docs
 docs/notes/
 
+# Docusaurus (docs-site)
+docs-site/node_modules/
+docs-site/build/
+docs-site/.docusaurus/
+docs-site/.cache-loader/
+
 #Local test folders
 data/indexers/definitions/custom/
 data/external-lists/presets/custom/

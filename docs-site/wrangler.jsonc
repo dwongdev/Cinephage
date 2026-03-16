@@ -1,0 +1,8 @@
+{
+	"name": "cinephage-docs",
+	// Set to deployment date
+	"compatibility_date": "2026-03-16",
+	"assets": {
+		"directory": "./build"
+	}
+}
