@@ -1368,11 +1368,11 @@ export class MonitoringSearchService {
 
 				if (!episode.series) continue;
 
-				// Get existing file
-				const existingFiles = await db.query.episodeFiles.findMany({
-					where: eq(episodeFiles.seriesId, episode.seriesId),
-					limit: 1
+				// Get existing file for this specific episode
+				const allSeriesFiles = await db.query.episodeFiles.findMany({
+					where: eq(episodeFiles.seriesId, episode.seriesId)
 				});
+				const existingFiles = allSeriesFiles.filter((f) => f.episodeIds?.includes(episode.id));
 
 				if (existingFiles.length === 0) continue;
 
