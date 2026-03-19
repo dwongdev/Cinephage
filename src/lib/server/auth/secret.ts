@@ -75,7 +75,9 @@ export function getAuthSecret(): string {
 	const secret = process.env.BETTER_AUTH_SECRET;
 
 	if (!secret) {
-		if (process.env.VITE_SSR_BUILD) {
+		// During SSR build and vitest runs there is no runtime auth flow.
+		// Use a deterministic placeholder to keep imports from crashing in CI/tests.
+		if (process.env.VITE_SSR_BUILD || process.env.VITEST || process.env.NODE_ENV === 'test') {
 			return 'build-time-placeholder-do-not-use-in-production';
 		}
 		throw new Error(
