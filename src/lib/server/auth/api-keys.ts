@@ -1,4 +1,4 @@
-import { and, eq, like, desc } from 'drizzle-orm';
+import { and, eq, like, desc, notInArray } from 'drizzle-orm';
 import { db } from '$lib/server/db/index.js';
 import { authApiKeys, userApiKeySecrets } from '$lib/server/db/schema.js';
 import { decryptApiKey, encryptApiKey } from '$lib/server/crypto/apiKeyCrypto.js';
@@ -107,10 +107,6 @@ export async function upsertRecoverableApiKeySecret(
 				createdAt
 			}
 		});
-}
-
-export async function deleteRecoverableApiKeySecret(keyId: string): Promise<void> {
-	await db.delete(userApiKeySecrets).where(eq(userApiKeySecrets.id, keyId));
 }
 
 export async function getRecoverableApiKeyValue(keyId: string): Promise<string | null> {
@@ -256,7 +252,14 @@ export async function regenerateRecoverableApiKey(options: {
 		body: { keyId: options.keyId },
 		headers: options.headers
 	});
-	await deleteRecoverableApiKeySecret(options.keyId);
+	await db
+		.delete(userApiKeySecrets)
+		.where(
+			and(
+				eq(userApiKeySecrets.userId, options.userId),
+				notInArray(userApiKeySecrets.id, db.select({ id: authApiKeys.id }).from(authApiKeys))
+			)
+		);
 
 	const newKey = await createRecoverableApiKey({
 		userId: options.userId,

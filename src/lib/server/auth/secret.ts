@@ -1,12 +1,8 @@
-import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 
-import { logger } from '$lib/logging';
-
 const DATA_DIR = process.env.DATA_DIR || 'data';
-const SECRET_FILE = join(DATA_DIR, '.auth-secret');
 const DEFAULT_BASE_URL = 'http://localhost:5173';
 
 function normalizeUrl(url: string): string {
@@ -66,36 +62,28 @@ function getConfiguredExternalUrl(): string | null {
 }
 
 /**
- * Get or generate the Better Auth secret
+ * Get the Better Auth secret from the environment.
  *
- * Priority:
- * 1. BETTER_AUTH_SECRET environment variable (for power users)
- * 2. Existing secret file (survives restarts)
- * 3. Generate new secret and save to file (first run)
+ * The secret MUST be provided via the BETTER_AUTH_SECRET environment variable.
+ * In dev, Vite loads .env automatically. In production, server.js loads it via dotenv.
+ * Docker users can pass it via docker-compose environment or -e flag.
  *
- * This approach works for both Docker and bare-metal deployments.
- * The secret is stored alongside the database in the data directory.
+ * WARNING: Changing this value will invalidate all active sessions and make
+ * encrypted API keys in the database permanently unrecoverable.
  */
 export function getAuthSecret(): string {
-	// 1. Environment variable takes precedence
-	if (process.env.BETTER_AUTH_SECRET) {
-		return process.env.BETTER_AUTH_SECRET;
+	const secret = process.env.BETTER_AUTH_SECRET;
+
+	if (!secret) {
+		if (process.env.VITE_SSR_BUILD) {
+			return 'build-time-placeholder-do-not-use-in-production';
+		}
+		throw new Error(
+			'BETTER_AUTH_SECRET is not set. ' +
+				'Add it to your .env file or pass it as an environment variable. ' +
+				"Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
+		);
 	}
-
-	// 2. Use existing secret file
-	if (existsSync(SECRET_FILE)) {
-		return readFileSync(SECRET_FILE, 'utf8').trim();
-	}
-
-	// 3. Generate new secret and save it
-	const secret = randomBytes(32).toString('base64');
-	mkdirSync(DATA_DIR, { recursive: true });
-	writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
-
-	logger.info(
-		{ component: 'AuthSecret', logDomain: 'auth', secretFile: SECRET_FILE },
-		'[Auth] Generated new auth secret'
-	);
 	return secret;
 }
 
