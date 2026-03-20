@@ -119,6 +119,27 @@ const DEFAULT_OPTIONS: Required<
 	useCache: true
 };
 
+const NON_VIDEO_ARTIFACT_TITLE_PATTERNS: RegExp[] = [
+	/\boriginal\s+soundtrack\b/i,
+	/\bsoundtrack\b/i,
+	/\b(?:film|movie|motion\s+picture|series)\s+score\b/i,
+	/\[(?:\s*(?:score|soundtrack|ost)\s*(?:,\s*(?:score|soundtrack|ost)\s*)*)\]/i,
+	/\((?:\s*(?:score|soundtrack|ost)\s*(?:,\s*(?:score|soundtrack|ost)\s*)*)\)/i,
+	/\bost\b/i,
+	/\bdiscography\b/i,
+	/\balbum\b/i,
+	/\bvinyl\b/i,
+	/\blossless\b/i,
+	/\bflac\b/i,
+	/\bmp3\b/i,
+	/\baac\b/i,
+	/\bm4a\b/i,
+	/\b(?:audio\s*)?cd\b/i
+];
+
+const VIDEO_SIGNAL_PATTERN =
+	/\b(?:\d{3,4}p|4k|8k|web[-.\s]?dl|web[-.\s]?rip|webrip|bluray|bdrip|bdremux|remux|hdtv|dvdrip|x264|x265|h\.?264|h\.?265|hevc|av1|s\d{1,2}e\d{1,3}|\d{1,2}x\d{2,3})\b/i;
+
 interface TvEpisodeCounts {
 	seriesEpisodeCount?: number;
 	seasonEpisodeCounts: Map<number, number>;
@@ -250,6 +271,7 @@ export class SearchOrchestrator {
 			const searchType = criteria.searchType as 'movie' | 'tv' | 'music' | 'book';
 			filtered = this.filterByCategoryMatch(filtered, searchType);
 		}
+		filtered = this.filterOutNonVideoArtifacts(filtered, criteriaWithSource);
 
 		// Rank
 		const ranked = this.ranker.rank(filtered);
@@ -378,6 +400,7 @@ export class SearchOrchestrator {
 			const searchType = enrichedCriteria.searchType as 'movie' | 'tv' | 'music' | 'book';
 			filtered = this.filterByCategoryMatch(filtered, searchType);
 		}
+		filtered = this.filterOutNonVideoArtifacts(filtered, enrichedCriteria);
 
 		// Hard filter by ID match with title+year fallback
 		// Completely removes releases with wrong IDs or mismatched title/year
@@ -1614,6 +1637,74 @@ export class SearchOrchestrator {
 
 			return hasMatchingCategory;
 		});
+	}
+
+	/**
+	 * Filter non-video artifacts (soundtracks/scores/audio collections) for movie/TV searches.
+	 * This is a safety net for indexers that mislabel categories or provide incomplete metadata.
+	 */
+	private filterOutNonVideoArtifacts(
+		releases: ReleaseResult[],
+		criteria: SearchCriteria
+	): ReleaseResult[] {
+		if (!isMovieSearch(criteria) && !isTvSearch(criteria)) {
+			return releases;
+		}
+
+		const beforeCount = releases.length;
+		const filtered = releases.filter((release) => {
+			const title = release.title ?? '';
+			if (!this.matchesNonVideoArtifactTitle(title)) {
+				return true;
+			}
+
+			const releaseWithCache = release as ReleaseResult & {
+				_parsedRelease?: ReturnType<typeof parseRelease>;
+			};
+			if (!releaseWithCache._parsedRelease) {
+				releaseWithCache._parsedRelease = parseRelease(title);
+			}
+			const parsed = releaseWithCache._parsedRelease;
+
+			// Keep only when there are strong video signals.
+			// We intentionally avoid trusting weak parser hints here because
+			// soundtrack-style titles can contain ambiguous tokens.
+			const hasVideoSignals =
+				VIDEO_SIGNAL_PATTERN.test(title) ||
+				parsed.episode !== undefined ||
+				(parsed.resolution !== null && parsed.resolution !== 'unknown');
+
+			if (!hasVideoSignals) {
+				logger.debug(
+					{
+						title: release.title,
+						searchType: criteria.searchType,
+						indexer: release.indexerName
+					},
+					'[SearchOrchestrator] Rejecting non-video artifact release'
+				);
+			}
+
+			return hasVideoSignals;
+		});
+
+		if (filtered.length < beforeCount) {
+			logger.info(
+				{
+					before: beforeCount,
+					after: filtered.length,
+					removed: beforeCount - filtered.length,
+					searchType: criteria.searchType
+				},
+				'[SearchOrchestrator] Non-video artifact filter removed releases'
+			);
+		}
+
+		return filtered;
+	}
+
+	private matchesNonVideoArtifactTitle(title: string): boolean {
+		return NON_VIDEO_ARTIFACT_TITLE_PATTERNS.some((pattern) => pattern.test(title));
 	}
 
 	/**

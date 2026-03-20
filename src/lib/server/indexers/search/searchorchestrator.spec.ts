@@ -660,6 +660,64 @@ describe('SearchOrchestrator.filterByIdOrTitleMatch', () => {
 	});
 });
 
+describe('SearchOrchestrator.filterOutNonVideoArtifacts', () => {
+	const orchestrator = new SearchOrchestrator();
+
+	it('rejects soundtrack/audio collection releases for movie searches', () => {
+		const releases = [
+			{
+				title: '(Score, Soundtrack) [CD] The Matrix Soundtrack Collection'
+			},
+			{
+				title: 'The.Matrix.1999.1080p.BluRay.x264'
+			}
+		] as any[];
+
+		const criteria = {
+			searchType: 'movie',
+			query: 'The Matrix'
+		} as any;
+
+		const filtered = (orchestrator as any).filterOutNonVideoArtifacts(releases, criteria);
+		expect(filtered).toHaveLength(1);
+		expect(filtered[0].title).toBe('The.Matrix.1999.1080p.BluRay.x264');
+	});
+
+	it('keeps video releases even when title contains ambiguous words', () => {
+		const releases = [
+			{
+				title: 'The.Score.2001.1080p.BluRay.x264'
+			}
+		] as any[];
+
+		const criteria = {
+			searchType: 'movie',
+			query: 'The Score'
+		} as any;
+
+		const filtered = (orchestrator as any).filterOutNonVideoArtifacts(releases, criteria);
+		expect(filtered).toHaveLength(1);
+		expect(filtered[0].title).toBe('The.Score.2001.1080p.BluRay.x264');
+	});
+
+	it('does not apply non-video artifact filter to music searches', () => {
+		const releases = [
+			{
+				title: 'The Matrix Soundtrack OST FLAC'
+			}
+		] as any[];
+
+		const criteria = {
+			searchType: 'music',
+			query: 'The Matrix Soundtrack'
+		} as any;
+
+		const filtered = (orchestrator as any).filterOutNonVideoArtifacts(releases, criteria);
+		expect(filtered).toHaveLength(1);
+		expect(filtered[0].title).toBe('The Matrix Soundtrack OST FLAC');
+	});
+});
+
 describe('SearchOrchestrator.filterByTitleRelevance', () => {
 	const orchestrator = new SearchOrchestrator();
 
