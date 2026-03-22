@@ -610,6 +610,9 @@ describe('SearchOnAddService.searchForMissingEpisodes monitoring behavior', () =
 		expect(mocks.searchWithMultiSeasonPriority).toHaveBeenCalledWith(
 			expect.objectContaining({
 				searchSource: 'interactive',
+				completeSeriesThreshold: 100,
+				multiSeasonThreshold: 100,
+				singleSeasonThreshold: 100,
 				episodes: [
 					expect.objectContaining({
 						id: 'ep-1',
@@ -620,6 +623,39 @@ describe('SearchOnAddService.searchForMissingEpisodes monitoring behavior', () =
 						monitored: true
 					})
 				]
+			})
+		);
+	});
+
+	it('keeps default pack thresholds for non-bypassed missing searches', async () => {
+		mocks.seriesFindFirst.mockResolvedValue({
+			id: 'series-1',
+			title: 'Afro Samurai',
+			tmdbId: 19544,
+			tvdbId: 79755,
+			imdbId: 'tt0465316',
+			scoringProfileId: 'streamer'
+		});
+		mocks.episodesFindMany.mockResolvedValue([
+			{
+				id: 'ep-1',
+				seriesId: 'series-1',
+				seasonNumber: 1,
+				episodeNumber: 1,
+				hasFile: false,
+				monitored: true,
+				airDate: '2007-01-03'
+			}
+		]);
+
+		await searchOnAdd.searchForMissingEpisodes('series-1');
+
+		expect(mocks.searchWithMultiSeasonPriority).toHaveBeenCalledWith(
+			expect.objectContaining({
+				searchSource: 'interactive',
+				completeSeriesThreshold: undefined,
+				multiSeasonThreshold: undefined,
+				singleSeasonThreshold: undefined
 			})
 		);
 	});

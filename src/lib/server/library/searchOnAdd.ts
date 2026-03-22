@@ -1398,6 +1398,9 @@ class SearchOnAddService {
 			const { getMultiSeasonSearchStrategy } =
 				await import('$lib/server/downloads/MultiSeasonSearchStrategy.js');
 			const multiSeasonStrategy = getMultiSeasonSearchStrategy();
+			// Manual missing auto-grab should avoid re-downloading existing episodes.
+			// Require 100% missing coverage before attempting any pack type.
+			const packThreshold = bypassMonitoring ? 100 : undefined;
 
 			const searchResult = await multiSeasonStrategy.searchWithMultiSeasonPriority({
 				seriesData: {
@@ -1411,7 +1414,10 @@ class SearchOnAddService {
 				episodes: episodesToSearch,
 				scoringProfileId: seriesData.scoringProfileId ?? undefined,
 				searchSource: 'interactive',
-				onProgress
+				onProgress,
+				completeSeriesThreshold: packThreshold,
+				multiSeasonThreshold: packThreshold,
+				singleSeasonThreshold: packThreshold
 			});
 
 			// Convert results to AutoSearchItemResult format
