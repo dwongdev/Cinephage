@@ -140,6 +140,9 @@ const NON_VIDEO_ARTIFACT_TITLE_PATTERNS: RegExp[] = [
 const VIDEO_SIGNAL_PATTERN =
 	/\b(?:\d{3,4}p|4k|8k|web[-.\s]?dl|web[-.\s]?rip|webrip|bluray|bdrip|bdremux|remux|hdtv|dvdrip|x264|x265|h\.?264|h\.?265|hevc|av1|s\d{1,2}e\d{1,3}|\d{1,2}x\d{2,3})\b/i;
 
+const RUTRACKER_AUTOMATIC_MAX_TITLES = 2;
+const RUTRACKER_AUTOMATIC_SEASON_CACHE_TTL_MS = 3 * 60_000;
+
 interface TvEpisodeCounts {
 	seriesEpisodeCount?: number;
 	seasonEpisodeCounts: Map<number, number>;
@@ -169,6 +172,15 @@ export class SearchOrchestrator {
 	private seasonEpisodeCountCache: Map<string, number> = new Map();
 	/** Cache for TV show episode counts (tmdbId -> aggregate + per-season counts) */
 	private tvEpisodeCountsCache: Map<number, TvEpisodeCounts> = new Map();
+	/** Short-lived cache for RuTracker automatic TV season searches (reduces per-episode query fan-out). */
+	private rutrackerAutomaticSeasonSearchCache: Map<
+		string,
+		{ cachedAtMs: number; releases: ReleaseResult[] }
+	> = new Map();
+	/** In-flight dedupe for identical RuTracker automatic season searches. */
+	private rutrackerAutomaticSeasonSearchInFlight: Map<string, Promise<ReleaseResult[]>> = new Map();
+	/** Single-lane queue for RuTracker automatic season searches to avoid bursty host traffic. */
+	private rutrackerAutomaticSearchLane: Promise<void> = Promise.resolve();
 	private rateLimitRegistry: RateLimitRegistry;
 	private hostRateLimiter: HostRateLimiter;
 	private deduplicator: ReleaseDeduplicator;
@@ -1069,6 +1081,10 @@ export class SearchOrchestrator {
 			return [];
 		}
 
+		if (this.shouldUseRuTrackerAutomaticSeasonSearch(indexer, criteria)) {
+			return this.executeRuTrackerAutomaticSeasonSearch(indexer, criteria, titlesToSearch);
+		}
+
 		// Get episode formats to try based on indexer capabilities.
 		// Do not force season-only tokens for season 0 (specials / unknown season),
 		// because many trackers return no results for S00-only keyword suffixes.
@@ -1287,6 +1303,115 @@ export class SearchOrchestrator {
 		return allReleases;
 	}
 
+	private shouldUseRuTrackerAutomaticSeasonSearch(
+		indexer: IIndexer,
+		criteria: SearchCriteria
+	): boolean {
+		return (
+			isTvSearch(criteria) &&
+			criteria.season !== undefined &&
+			criteria.episode !== undefined &&
+			this.isRuTrackerHost(indexer.baseUrl) &&
+			this.isRuTrackerIndexerName(indexer.name)
+		);
+	}
+
+	private async executeRuTrackerAutomaticSeasonSearch(
+		indexer: IIndexer,
+		criteria: SearchCriteria,
+		titlesToSearch: string[]
+	): Promise<ReleaseResult[]> {
+		const cacheKey = this.buildRuTrackerAutomaticSeasonCacheKey(indexer, criteria, titlesToSearch);
+		const now = Date.now();
+		const cached = this.rutrackerAutomaticSeasonSearchCache.get(cacheKey);
+
+		if (cached && now - cached.cachedAtMs <= RUTRACKER_AUTOMATIC_SEASON_CACHE_TTL_MS) {
+			return cached.releases;
+		}
+
+		const existingInFlight = this.rutrackerAutomaticSeasonSearchInFlight.get(cacheKey);
+		if (existingInFlight) {
+			return existingInFlight;
+		}
+
+		const inFlightPromise = this.enqueueRuTrackerAutomaticSeasonSearch(async () => {
+			const allReleases: ReleaseResult[] = [];
+			const seenGuids = new Set<string>();
+			const limitedTitles = titlesToSearch.slice(0, RUTRACKER_AUTOMATIC_MAX_TITLES);
+
+			for (const title of limitedTitles) {
+				const seasonOnlyCriteria = createTextOnlyCriteria({
+					...criteria,
+					query: title,
+					episode: undefined,
+					preferredEpisodeFormat: 'standard'
+				});
+
+				try {
+					const releases = await indexer.search(seasonOnlyCriteria);
+					for (const release of releases) {
+						if (!seenGuids.has(release.guid)) {
+							seenGuids.add(release.guid);
+							allReleases.push(release);
+						}
+					}
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					logger.debug(
+						{
+							indexer: indexer.name,
+							title,
+							error: message
+						},
+						'RuTracker season pointer search variant failed'
+					);
+				}
+			}
+
+			this.rutrackerAutomaticSeasonSearchCache.set(cacheKey, {
+				cachedAtMs: Date.now(),
+				releases: allReleases
+			});
+
+			return allReleases;
+		});
+
+		this.rutrackerAutomaticSeasonSearchInFlight.set(cacheKey, inFlightPromise);
+		try {
+			return await inFlightPromise;
+		} finally {
+			this.rutrackerAutomaticSeasonSearchInFlight.delete(cacheKey);
+		}
+	}
+
+	private enqueueRuTrackerAutomaticSeasonSearch<T>(work: () => Promise<T>): Promise<T> {
+		const queuedWork = this.rutrackerAutomaticSearchLane.then(work, work);
+		this.rutrackerAutomaticSearchLane = queuedWork.then(
+			() => undefined,
+			() => undefined
+		);
+		return queuedWork;
+	}
+
+	private buildRuTrackerAutomaticSeasonCacheKey(
+		indexer: IIndexer,
+		criteria: SearchCriteria,
+		titlesToSearch: string[]
+	): string {
+		const tmdbId = 'tmdbId' in criteria ? criteria.tmdbId : undefined;
+		const tvdbId = 'tvdbId' in criteria ? criteria.tvdbId : undefined;
+		const imdbId = 'imdbId' in criteria ? criteria.imdbId : undefined;
+		const season = 'season' in criteria ? criteria.season : undefined;
+		const primaryId =
+			tmdbId?.toString() ?? tvdbId?.toString() ?? imdbId ?? criteria.query ?? 'unknown';
+		const normalizedTitles = titlesToSearch
+			.slice(0, RUTRACKER_AUTOMATIC_MAX_TITLES)
+			.map((title) => this.normalizeForComparison(title))
+			.filter(Boolean)
+			.join('|');
+		return `${indexer.id}::${primaryId}::s${season ?? 'x'}::${normalizedTitles}`;
+	}
+
 	/** Check if the indexer supports the specific IDs in the search criteria */
 	private indexerSupportsSearchIds(indexer: IIndexer, criteria: SearchCriteria): boolean {
 		const caps = indexer.capabilities;
@@ -1367,13 +1492,15 @@ export class SearchOrchestrator {
 	 * - Season-only search: Returns single-season packs that exactly match the target season
 	 *   (multi-season packs and complete series are excluded; RuTracker packs must be verifiably complete)
 	 * - Season+episode search:
-	 *   - interactive: Returns exact episodes, falls back to episode pointers from matching season packs
-	 *   - automatic: Returns exact episodes and season-pack candidates
-	 *     (RuTracker season-pack candidates are converted to episode pointers)
+	 *   - RuTracker: returns episode pointers from matching season packs (never raw season packs)
+	 *   - Other indexers:
+	 *     - interactive: returns exact episodes, falls back to season-pack pointers
+	 *     - automatic: returns exact episodes and season-pack candidates
 	 * - Episode-only search:
-	 *   - interactive: Returns exact episodes, falls back to episode pointers from season packs
-	 *   - automatic: Returns exact episodes and season-pack candidates
-	 *     (RuTracker season-pack candidates are converted to episode pointers)
+	 *   - RuTracker: returns episode pointers from matching season packs (never raw season packs)
+	 *   - Other indexers:
+	 *     - interactive: returns exact episodes, falls back to season-pack pointers
+	 *     - automatic: returns exact episodes and season-pack candidates
 	 *
 	 * Optimization: Caches parsed results on releases to avoid re-parsing in enricher.
 	 */
@@ -1508,23 +1635,37 @@ export class SearchOrchestrator {
 					isSingleSeasonMatch(episodeInfo) &&
 					seasonPackContainsEpisode(episodeInfo, targetEpisode)
 			);
+			const rutrackerSeasonPackPointers = seasonPackMatches
+				.filter(({ release }) => this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release, episodeInfo }) =>
+					this.createEpisodePointerRelease(release, targetEpisode, targetSeason, episodeInfo)
+				);
+			const nonRuTrackerExactReleases = exactEpisodeMatches
+				.filter(({ release }) => !this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release }) => release);
+			const nonRuTrackerSeasonPackReleases = seasonPackMatches
+				.filter(({ release }) => !this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release }) => release);
 
 			if (isInteractiveSearch) {
-				if (exactEpisodeMatches.length > 0) {
-					return exactEpisodeMatches.map(({ release }) => release);
+				if (rutrackerSeasonPackPointers.length > 0) {
+					return [...nonRuTrackerExactReleases, ...rutrackerSeasonPackPointers];
 				}
+
+				if (nonRuTrackerExactReleases.length > 0) {
+					return nonRuTrackerExactReleases;
+				}
+
 				return seasonPackMatches.map(({ release, episodeInfo }) =>
 					this.createEpisodePointerRelease(release, targetEpisode, targetSeason, episodeInfo)
 				);
 			}
 
-			const exactReleases = exactEpisodeMatches.map(({ release }) => release);
-			const seasonPackReleases = seasonPackMatches.map(({ release, episodeInfo }) =>
-				this.shouldCreateRutrackerEpisodePointer(release)
-					? this.createEpisodePointerRelease(release, targetEpisode, targetSeason, episodeInfo)
-					: release
-			);
-			return [...exactReleases, ...seasonPackReleases];
+			return [
+				...nonRuTrackerExactReleases,
+				...rutrackerSeasonPackPointers,
+				...nonRuTrackerSeasonPackReleases
+			];
 		}
 
 		// Episode-only search (rare):
@@ -1538,23 +1679,37 @@ export class SearchOrchestrator {
 			const seasonPackMatches = parsedReleases.filter(({ episodeInfo }) =>
 				seasonPackContainsEpisode(episodeInfo, targetEpisode)
 			);
+			const rutrackerSeasonPackPointers = seasonPackMatches
+				.filter(({ release }) => this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release, episodeInfo }) =>
+					this.createEpisodePointerRelease(release, targetEpisode, undefined, episodeInfo)
+				);
+			const nonRuTrackerExactReleases = exactEpisodeMatches
+				.filter(({ release }) => !this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release }) => release);
+			const nonRuTrackerSeasonPackReleases = seasonPackMatches
+				.filter(({ release }) => !this.shouldCreateRutrackerEpisodePointer(release))
+				.map(({ release }) => release);
 
 			if (isInteractiveSearch) {
-				if (exactEpisodeMatches.length > 0) {
-					return exactEpisodeMatches.map(({ release }) => release);
+				if (rutrackerSeasonPackPointers.length > 0) {
+					return [...nonRuTrackerExactReleases, ...rutrackerSeasonPackPointers];
 				}
+
+				if (nonRuTrackerExactReleases.length > 0) {
+					return nonRuTrackerExactReleases;
+				}
+
 				return seasonPackMatches.map(({ release, episodeInfo }) =>
 					this.createEpisodePointerRelease(release, targetEpisode, undefined, episodeInfo)
 				);
 			}
 
-			const exactReleases = exactEpisodeMatches.map(({ release }) => release);
-			const seasonPackReleases = seasonPackMatches.map(({ release, episodeInfo }) =>
-				this.shouldCreateRutrackerEpisodePointer(release)
-					? this.createEpisodePointerRelease(release, targetEpisode, undefined, episodeInfo)
-					: release
-			);
-			return [...exactReleases, ...seasonPackReleases];
+			return [
+				...nonRuTrackerExactReleases,
+				...rutrackerSeasonPackPointers,
+				...nonRuTrackerSeasonPackReleases
+			];
 		}
 
 		return releases;
@@ -1673,6 +1828,17 @@ export class SearchOrchestrator {
 
 	private isRuTrackerIndexerName(indexerName: string | undefined): boolean {
 		return typeof indexerName === 'string' && indexerName.toLowerCase().includes('rutracker');
+	}
+
+	private isRuTrackerHost(baseUrl: string | undefined): boolean {
+		if (!baseUrl) {
+			return false;
+		}
+		try {
+			return new URL(baseUrl).hostname.toLowerCase().includes('rutracker.');
+		} catch {
+			return baseUrl.toLowerCase().includes('rutracker.');
+		}
 	}
 
 	/**
