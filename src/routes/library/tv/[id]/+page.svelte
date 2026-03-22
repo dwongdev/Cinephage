@@ -947,6 +947,14 @@
 					found: results?.filter((r) => r.found).length ?? 0,
 					grabbed: results?.filter((r) => r.grabbed).length ?? 0
 				};
+
+				// Streaming grabs can complete before queue/file SSE updates arrive; refresh once so
+				// the episode/file counters reflect the completed auto-grab immediately.
+				if ((missingSearchResult.grabbed ?? 0) > 0) {
+					setTimeout(() => {
+						void refreshSeriesFromApi();
+					}, 500);
+				}
 			}
 
 			// Clear result after 10 seconds

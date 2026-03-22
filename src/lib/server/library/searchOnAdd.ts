@@ -25,7 +25,13 @@ import { logger } from '$lib/logging/index.js';
 import { db } from '$lib/server/db/index.js';
 import { movieFiles, series, episodes, episodeFiles } from '$lib/server/db/schema.js';
 import { eq, and, inArray, ne } from 'drizzle-orm';
-import type { SearchCriteria } from '$lib/server/indexers/types';
+import {
+	CINEPHAGE_STREAM_DEFINITION_ID,
+	indexerHasCategoriesForSearchType,
+	type IndexerCapabilities,
+	type IndexerConfig,
+	type SearchCriteria
+} from '$lib/server/indexers/types';
 import { evaluateIndexerSearchAvailability } from '$lib/server/indexers/search/availability';
 import {
 	getMovieSearchTitles,
@@ -101,8 +107,9 @@ interface SearchForMissingEpisodesOptions {
 	 * - 'pack-first': complete/multi-season/single-season packs, then episodes
 	 * - 'episode-only': targeted episode searches, but if an entire aired season is missing
 	 *   we attempt a single-season pack grab first
+	 * - 'auto': use episode-only only when RuTracker is the sole eligible TV indexer
 	 */
-	searchStrategy?: 'pack-first' | 'episode-only';
+	searchStrategy?: 'pack-first' | 'episode-only' | 'auto';
 }
 
 /** Result for a single item in multi-search operations */
@@ -1107,16 +1114,14 @@ class SearchOnAddService {
 			}
 
 			const indexerManager = await getIndexerManager();
-			const indexerAvailability = evaluateIndexerSearchAvailability(
-				await indexerManager.getIndexers(),
-				{
-					searchType: 'tv',
-					searchSource: 'interactive',
-					scoringProfileId: seriesData.scoringProfileId ?? undefined,
-					getDefinitionCapabilities: (definitionId) =>
-						indexerManager.getDefinitionCapabilities(definitionId)
-				}
-			);
+			const indexerConfigs = await indexerManager.getIndexers();
+			const indexerAvailability = evaluateIndexerSearchAvailability(indexerConfigs, {
+				searchType: 'tv',
+				searchSource: 'interactive',
+				scoringProfileId: seriesData.scoringProfileId ?? undefined,
+				getDefinitionCapabilities: (definitionId) =>
+					indexerManager.getDefinitionCapabilities(definitionId)
+			});
 
 			if (!indexerAvailability.ok) {
 				const errorMessage = indexerAvailability.message || 'No indexers are available';
@@ -1134,6 +1139,16 @@ class SearchOnAddService {
 					error: errorMessage
 				};
 			}
+
+			const effectiveSearchStrategy =
+				searchStrategy === 'auto'
+					? this.resolveAutoMissingSearchStrategy(indexerConfigs, {
+							searchSource: 'interactive',
+							scoringProfileId: seriesData.scoringProfileId,
+							getDefinitionCapabilities: (definitionId) =>
+								indexerManager.getDefinitionCapabilities(definitionId)
+						})
+					: searchStrategy;
 
 			// Find all missing episodes. Automatic/background searches only include monitored
 			// episodes, while manual user-triggered searches can bypass monitoring.
@@ -1163,7 +1178,8 @@ class SearchOnAddService {
 				{
 					seriesId,
 					total: missingEpisodes.length,
-					aired: airedMissingEpisodes.length
+					aired: airedMissingEpisodes.length,
+					searchStrategy: effectiveSearchStrategy
 				},
 				'[SearchOnAdd] Found missing episodes'
 			);
@@ -1185,7 +1201,7 @@ class SearchOnAddService {
 				monitored: ep.monitored
 			}));
 
-			if (searchStrategy === 'episode-only') {
+			if (effectiveSearchStrategy === 'episode-only') {
 				const sortedEpisodes = [...episodesToSearch].sort(
 					(a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber
 				);
@@ -1268,8 +1284,7 @@ class SearchOnAddService {
 							seasonNumber,
 							bypassMonitoring
 						});
-						const seasonPackWasGrabbed =
-							seasonSearchResult.success && !!seasonSearchResult.releaseName;
+						const seasonPackWasGrabbed = seasonSearchResult.success;
 
 						if (seasonPackWasGrabbed) {
 							seasonPacksGrabbed++;
@@ -1326,7 +1341,7 @@ class SearchOnAddService {
 							bypassMonitoring
 						});
 
-						const wasGrabbed = searchResult.success && !!searchResult.releaseName;
+						const wasGrabbed = searchResult.success;
 						const wasFound = wasGrabbed;
 
 						if (wasFound) {
@@ -1671,6 +1686,63 @@ class SearchOnAddService {
 				summary: { searched: 0, found: 0, grabbed: 0 },
 				error: message
 			};
+		}
+	}
+
+	private resolveAutoMissingSearchStrategy(
+		indexerConfigs: IndexerConfig[],
+		options: {
+			searchSource: 'interactive' | 'automatic';
+			scoringProfileId?: string | null;
+			getDefinitionCapabilities: (definitionId: string) => IndexerCapabilities | undefined;
+		}
+	): 'pack-first' | 'episode-only' {
+		const isStreamerProfile = options.scoringProfileId === 'streamer';
+		const profileScoped = isStreamerProfile
+			? indexerConfigs.filter((config) => config.definitionId === CINEPHAGE_STREAM_DEFINITION_ID)
+			: indexerConfigs;
+
+		const eligibleTvIndexers = profileScoped.filter((config) => {
+			if (!config.enabled) {
+				return false;
+			}
+			if (options.searchSource === 'interactive' && config.enableInteractiveSearch === false) {
+				return false;
+			}
+			if (options.searchSource === 'automatic' && config.enableAutomaticSearch === false) {
+				return false;
+			}
+
+			const capabilities = options.getDefinitionCapabilities(config.definitionId);
+			return Boolean(
+				capabilities?.tvSearch?.available &&
+				indexerHasCategoriesForSearchType(capabilities.categories, 'tv')
+			);
+		});
+
+		const hasRuTracker = eligibleTvIndexers.some(
+			(config) => this.isRuTrackerIndexerName(config.name) || this.isRuTrackerHost(config.baseUrl)
+		);
+		const hasNonRuTracker = eligibleTvIndexers.some(
+			(config) =>
+				!(this.isRuTrackerIndexerName(config.name) || this.isRuTrackerHost(config.baseUrl))
+		);
+
+		return hasRuTracker && !hasNonRuTracker ? 'episode-only' : 'pack-first';
+	}
+
+	private isRuTrackerIndexerName(indexerName: string | undefined): boolean {
+		return typeof indexerName === 'string' && indexerName.toLowerCase().includes('rutracker');
+	}
+
+	private isRuTrackerHost(baseUrl: string | undefined): boolean {
+		if (!baseUrl) {
+			return false;
+		}
+		try {
+			return new URL(baseUrl).hostname.toLowerCase().includes('rutracker.');
+		} catch {
+			return baseUrl.toLowerCase().includes('rutracker.');
 		}
 	}
 }
