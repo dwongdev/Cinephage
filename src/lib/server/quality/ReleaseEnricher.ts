@@ -178,7 +178,11 @@ export class ReleaseEnricher {
 		const releaseWithCache = release as ReleaseResult & {
 			_parsedRelease?: ReturnType<typeof parseRelease>;
 		};
-		const parsed = releaseWithCache._parsedRelease ?? parseRelease(release.title);
+		const parsed =
+			releaseWithCache._parsedRelease ??
+			parseRelease(release.title, {
+				sourceLanguage: release.sourceLanguage
+			});
 
 		// Calculate quality score using enhanced scoring if profile available
 		// Pass release.size (bytes) for file size filtering

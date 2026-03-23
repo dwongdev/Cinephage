@@ -1516,7 +1516,9 @@ export class SearchOrchestrator {
 					_parsedRelease?: ReturnType<typeof parseRelease>;
 				};
 				if (!releaseWithCache._parsedRelease) {
-					releaseWithCache._parsedRelease = parseRelease(release.title);
+					releaseWithCache._parsedRelease = parseRelease(release.title, {
+						sourceLanguage: release.sourceLanguage
+					});
 				}
 				const parsed = releaseWithCache._parsedRelease;
 
@@ -1560,7 +1562,9 @@ export class SearchOrchestrator {
 					_parsedRelease?: ReturnType<typeof parseRelease>;
 				};
 				if (!releaseWithCache._parsedRelease) {
-					releaseWithCache._parsedRelease = parseRelease(release.title);
+					releaseWithCache._parsedRelease = parseRelease(release.title, {
+						sourceLanguage: release.sourceLanguage
+					});
 				}
 				return {
 					release,
@@ -2224,7 +2228,9 @@ export class SearchOrchestrator {
 			let parsed: ReturnType<typeof parseRelease> | undefined;
 			const getParsed = () => {
 				if (!parsed) {
-					parsed = parseRelease(release.title);
+					parsed = parseRelease(release.title, {
+						sourceLanguage: release.sourceLanguage
+					});
 				}
 				return parsed;
 			};

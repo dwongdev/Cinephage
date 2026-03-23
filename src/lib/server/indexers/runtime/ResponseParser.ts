@@ -528,6 +528,12 @@ export class ResponseParser {
 		// Make URLs absolute
 		const baseUrl = context.baseUrl;
 
+		// Extract language code from definition (e.g., "ru-RU" -> "ru")
+		const definitionLanguage = this.definition.language;
+		const sourceLanguage = definitionLanguage
+			? definitionLanguage.toLowerCase().split('-')[0]
+			: undefined;
+
 		const result: ReleaseResult = {
 			guid: String(guid),
 			title: title,
@@ -537,7 +543,8 @@ export class ResponseParser {
 			indexerId: context.indexerId,
 			indexerName: context.indexerName,
 			protocol: context.protocol,
-			categories
+			categories,
+			sourceLanguage
 		};
 
 		// Optional fields
