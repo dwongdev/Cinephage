@@ -8,6 +8,9 @@ node_modules
 /.svelte-kit
 /build
 
+# Abandoned paraglide directory (Vite plugin now outputs to src/lib/paraglide/)
+/src/paraglide/
+
 # OS
 .DS_Store
 Thumbs.db

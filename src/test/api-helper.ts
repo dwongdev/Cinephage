@@ -34,6 +34,7 @@ function createTestUser(role: 'admin' | 'user'): App.Locals['user'] {
 		username: `${role}_tester`,
 		displayUsername: `${role}_tester`,
 		role,
+		language: 'en',
 		banned: 0,
 		banReason: null,
 		banExpires: null,
