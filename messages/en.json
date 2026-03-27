@@ -2943,7 +2943,7 @@
 	"library_bulkQualityProfile_applyButton": "Apply",
 	"library_bulkQualityProfile_defaultOption": "Default ({name})",
 	"library_bulkQualityProfile_description": "Change the quality profile for selected items",
-	"library_bulkQualityProfile_profileHint": "Choose a quality profile to apply",
+	"library_bulkQualityProfile_profileHint": "This will change the quality profile for {count} items",
 	"library_bulkQualityProfile_qualityProfileLabel": "Quality Profile",
 	"library_bulkQualityProfile_selectedCount": "{count} items selected",
 	"library_bulkQualityProfile_title": "Change Quality Profile",

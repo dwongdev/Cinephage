@@ -138,9 +138,8 @@
 			if (result.success) {
 				toasts.success(
 					m.library_matchFile_matchedToEpisode({
-						name: selectedShow.name || '',
-						season: String(season).padStart(2, '0'),
-						episode: String(episode).padStart(2, '0')
+						title: selectedShow.name || '',
+						episode: `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
 					})
 				);
 				onSuccess(file.id);
@@ -257,10 +256,7 @@
 				{:else}
 					<Check class="h-4 w-4" />
 				{/if}
-				{m.library_matchFile_matchTo({
-					season: String(season).padStart(2, '0'),
-					episode: String(episode).padStart(2, '0')
-				})}
+				{m.library_matchFile_matchTo({ title: selectedShow?.name || 'Unknown' })}
 			</button>
 		</div>
 	{:else}

@@ -96,7 +96,7 @@
 				{#if currentProfile}
 					{currentProfile.description}
 				{:else}
-					{m.library_bulkQualityProfile_profileHint()}
+					{m.library_bulkQualityProfile_profileHint({ count: selectedCount })}
 				{/if}
 			</span>
 		</div>

@@ -374,10 +374,7 @@
 							<div class="mt-1.5">
 								<div class="flex items-center gap-2 text-xs text-base-content/60">
 									<span>
-										{m.library_libraryMediaTable_episodesCount({
-											fileCount: item.episodeFileCount ?? 0,
-											totalCount: item.episodeCount ?? 0
-										})}
+										{m.library_libraryMediaTable_episodesCount({ count: item.episodeCount ?? 0 })}
 									</span>
 									{#if item.percentComplete === 100}
 										<span class="badge badge-sm badge-success">

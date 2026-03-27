@@ -114,7 +114,7 @@
 			if (result.success) {
 				const mediaTitle = selectedMedia.title || selectedMedia.name || m.common_unknown();
 				toasts.success(
-					m.library_matchFolder_matchedFiles({ count: result.data.matched, title: mediaTitle }),
+					m.library_matchFolder_matchedFiles({ count: result.data.matched }),
 					result.data.failed > 0
 						? { description: m.library_matchFolder_filesFailed({ count: result.data.failed }) }
 						: undefined
@@ -208,7 +208,9 @@
 
 			<!-- Match Preview -->
 			<div>
-				<p class="mb-2 text-sm font-medium">{m.library_matchFolder_filesWillBeMatched()}:</p>
+				<p class="mb-2 text-sm font-medium">
+					{m.library_matchFolder_filesWillBeMatched({ count: matchPreview.length })}:
+				</p>
 				<div class="max-h-48 space-y-1 overflow-y-auto rounded-lg bg-base-200 p-2">
 					{#each matchPreview.slice(0, 10) as item, index (`${item.file}-${index}`)}
 						<div class="flex items-center justify-between rounded bg-base-300/50 px-2 py-1 text-sm">
