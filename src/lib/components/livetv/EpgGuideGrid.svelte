@@ -346,7 +346,7 @@
 		</div>
 		{#if channelSearch}
 			<div class="text-xs text-base-content/60">
-				{m.livetv_epgGuide_showingCount({ filtered: filteredLineup.length, total: lineup.length })}
+				{m.livetv_epgGuide_showingCount({ count: filteredLineup.length, total: lineup.length })}
 			</div>
 		{/if}
 		{#if loadingPrograms && programsByChannel.size > 0}

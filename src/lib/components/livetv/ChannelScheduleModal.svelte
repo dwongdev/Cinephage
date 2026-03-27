@@ -123,7 +123,8 @@
 		{#if channel.epgSourceChannelId && channel.epgSourceChannel}
 			<div class="mb-4 flex items-center gap-2 rounded-lg bg-info/10 px-3 py-2 text-sm text-info">
 				<Calendar class="h-4 w-4" />
-				<span>{m.livetv_channelScheduleModal_epgFrom({ name: channel.epgSourceChannel.name })}</span
+				<span
+					>{m.livetv_channelScheduleModal_epgFrom({ source: channel.epgSourceChannel.name })}</span
 				>
 			</div>
 		{/if}

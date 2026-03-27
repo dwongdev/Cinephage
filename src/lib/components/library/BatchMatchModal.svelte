@@ -210,9 +210,7 @@
 				const mediaTitle = selectedMedia.title || selectedMedia.name;
 				toasts.success(
 					m.library_batchMatch_matchedFiles({
-						matched: result.data.matched,
-						total: selectedFileIds.length,
-						title: mediaTitle
+						count: result.data.matched
 					}),
 					result.data.failed > 0
 						? { description: m.library_batchMatch_filesFailed({ count: result.data.failed }) }

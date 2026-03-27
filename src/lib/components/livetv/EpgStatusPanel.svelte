@@ -142,7 +142,7 @@
 						<div>
 							<div class="text-2xl font-bold">{status.totalPrograms.toLocaleString(undefined)}</div>
 							<div class="text-sm text-base-content/60">
-								{m.livetv_epgStatusPanel_totalPrograms()}
+								{m.livetv_epgStatusPanel_totalPrograms({ count: status.totalPrograms })}
 							</div>
 						</div>
 					</div>
