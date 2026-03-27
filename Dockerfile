@@ -22,6 +22,8 @@ COPY static ./static
 COPY data ./data
 COPY scripts/fix-tv-subtitle-paths.js scripts/reset-admin-password.js ./scripts/
 COPY server.js svelte.config.js tsconfig.json vite.config.ts ./
+COPY project.inlang ./project.inlang
+COPY messages ./messages
 
 ARG APP_VERSION=dev
 

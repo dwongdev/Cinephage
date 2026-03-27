@@ -37,7 +37,6 @@
 			if (!response.ok) {
 				// Non-fatal - language is still set in cookie
 				// Silently ignore persistence failures
-				console.warn('Failed to persist language preference to user account');
 			}
 
 			// Step 2: Set the locale cookie WITHOUT triggering reload
