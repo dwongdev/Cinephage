@@ -112,7 +112,6 @@
 			const result = await response.json();
 
 			if (result.success) {
-				const mediaTitle = selectedMedia.title || selectedMedia.name || m.common_unknown();
 				toasts.success(
 					m.library_matchFolder_matchedFiles({ count: result.data.matched }),
 					result.data.failed > 0
