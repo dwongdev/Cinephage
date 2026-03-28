@@ -436,21 +436,21 @@ export class ActivityService {
 
 		const { deletedDownloadHistory, deletedMonitoringHistory, deletedTaskHistory } =
 			await db.transaction((tx) => {
-			const deletedDownloadHistory =
-				eligibleHistoryIdList.length > 0
-					? tx
-							.delete(downloadHistory)
-							.where(inArray(downloadHistory.id, eligibleHistoryIdList))
-							.run().changes
-					: 0;
+				const deletedDownloadHistory =
+					eligibleHistoryIdList.length > 0
+						? tx
+								.delete(downloadHistory)
+								.where(inArray(downloadHistory.id, eligibleHistoryIdList))
+								.run().changes
+						: 0;
 
-			const deletedMonitoringHistory =
-				monitoringIdList.length > 0
-					? tx
-							.delete(monitoringHistory)
-							.where(inArray(monitoringHistory.id, monitoringIdList))
-							.run().changes
-					: 0;
+				const deletedMonitoringHistory =
+					monitoringIdList.length > 0
+						? tx
+								.delete(monitoringHistory)
+								.where(inArray(monitoringHistory.id, monitoringIdList))
+								.run().changes
+						: 0;
 
 				const deletedTaskHistory =
 					eligibleTaskIdList.length > 0
@@ -488,14 +488,14 @@ export class ActivityService {
 
 		const { deletedDownloadHistory, deletedMonitoringHistory, deletedTaskHistory } =
 			await db.transaction((tx) => {
-			const deletedDownloadHistory = tx
-				.delete(downloadHistory)
-				.where(lt(downloadHistory.createdAt, cutoffIso))
-				.run().changes;
-			const deletedMonitoringHistory = tx
-				.delete(monitoringHistory)
-				.where(lt(monitoringHistory.executedAt, cutoffIso))
-				.run().changes;
+				const deletedDownloadHistory = tx
+					.delete(downloadHistory)
+					.where(lt(downloadHistory.createdAt, cutoffIso))
+					.run().changes;
+				const deletedMonitoringHistory = tx
+					.delete(monitoringHistory)
+					.where(lt(monitoringHistory.executedAt, cutoffIso))
+					.run().changes;
 
 				const deletedTaskHistory = tx
 					.delete(taskHistory)
@@ -523,8 +523,8 @@ export class ActivityService {
 	async purgeAllHistory(): Promise<PurgeHistoryResult> {
 		const { deletedDownloadHistory, deletedMonitoringHistory, deletedTaskHistory } =
 			await db.transaction((tx) => {
-			const deletedDownloadHistory = tx.delete(downloadHistory).run().changes;
-			const deletedMonitoringHistory = tx.delete(monitoringHistory).run().changes;
+				const deletedDownloadHistory = tx.delete(downloadHistory).run().changes;
+				const deletedMonitoringHistory = tx.delete(monitoringHistory).run().changes;
 
 				const deletedTaskHistory = tx
 					.delete(taskHistory)
