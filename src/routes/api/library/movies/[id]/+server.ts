@@ -220,9 +220,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 				isAnimeMedia = isLikelyAnimeMedia({
 					genres: movieDetails.genres,
 					originalLanguage: movieDetails.original_language,
-					originCountries: movieDetails.production_countries?.map(
-						(country) => country.iso_3166_1
-					),
+					originCountries: movieDetails.production_countries?.map((country) => country.iso_3166_1),
 					productionCountries: movieDetails.production_countries,
 					title: movieDetails.title,
 					originalTitle: movieDetails.original_title
