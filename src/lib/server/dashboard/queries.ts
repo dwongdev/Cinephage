@@ -37,6 +37,8 @@ export async function getDashboardStats() {
 		missingMoviesForAvailability,
 		downloadingDownloads,
 		queuedDownloads,
+		stalledDownloads,
+		pausedDownloads,
 		downloadThroughput,
 		completedDownloads24h,
 		[unmatchedCount],
@@ -121,6 +123,8 @@ export async function getDashboardStats() {
 			.from(downloadQueue)
 			.where(eq(downloadQueue.status, 'downloading')),
 		db.select({ count: count() }).from(downloadQueue).where(eq(downloadQueue.status, 'queued')),
+		db.select({ count: count() }).from(downloadQueue).where(eq(downloadQueue.status, 'stalled')),
+		db.select({ count: count() }).from(downloadQueue).where(eq(downloadQueue.status, 'paused')),
 		db
 			.select({
 				totalSpeed: sql<number>`COALESCE(SUM(${downloadQueue.downloadSpeed}), 0)`,
@@ -198,8 +202,10 @@ export async function getDashboardStats() {
 			unmonitoredMissing: unmonitoredAiredMissingEpisodes?.[0]?.count || 0,
 			monitored: episodeStats?.monitored || 0
 		},
-		activeDownloads: downloadingDownloads?.[0]?.count || 0,
+		activeDownloads: (downloadingDownloads?.[0]?.count || 0) + (stalledDownloads?.[0]?.count || 0),
 		queuedDownloads: queuedDownloads?.[0]?.count || 0,
+		stalledDownloads: stalledDownloads?.[0]?.count || 0,
+		pausedDownloads: pausedDownloads?.[0]?.count || 0,
 		downloadSpeedBytes: Number(downloadThroughput?.[0]?.totalSpeed || 0),
 		downloadAvgProgress: Math.max(
 			0,

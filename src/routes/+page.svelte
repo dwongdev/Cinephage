@@ -352,13 +352,25 @@
 						<div class="text-sm text-base-content/70">{m.dashboard_stats_downloads()}</div>
 					</div>
 				</div>
-				<div class="mt-2 text-xs">
+				<div class="mt-2 flex flex-wrap gap-2 text-xs">
 					{#if stats.activeDownloads > 0}
-						<div class="flex flex-wrap gap-2">
-							<span class="badge badge-sm badge-accent"
-								>{m.dashboard_stats_activeCount({ count: stats.activeDownloads })}</span
+						{@const downloadingCount =
+							stats.activeDownloads - stats.stalledDownloads - stats.pausedDownloads}
+						{#if downloadingCount > 0}
+							<span class="badge badge-sm badge-success"
+								>{m.dashboard_stats_downloadingCount({ count: downloadingCount })}</span
 							>
-						</div>
+						{/if}
+						{#if stats.stalledDownloads > 0}
+							<span class="badge badge-sm badge-warning"
+								>{m.dashboard_stats_stalledCount({ count: stats.stalledDownloads })}</span
+							>
+						{/if}
+						{#if stats.pausedDownloads > 0}
+							<span class="badge badge-sm badge-secondary"
+								>{m.dashboard_stats_pausedCount({ count: stats.pausedDownloads })}</span
+							>
+						{/if}
 					{:else}
 						<span class="text-base-content/50">{m.dashboard_stats_noActiveDownloads()}</span>
 					{/if}
