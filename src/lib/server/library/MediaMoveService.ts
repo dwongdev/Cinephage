@@ -7,6 +7,7 @@ import { getTaskHistoryService } from '$lib/server/tasks/TaskHistoryService.js';
 import { activityStreamEvents } from '$lib/server/activity/ActivityStreamEvents.js';
 import { libraryMediaEvents } from './LibraryMediaEvents.js';
 import { moveDirectoryWithinRoots } from '$lib/server/filesystem/move-helpers.js';
+import { getLibraryEntityService } from './LibraryEntityService.js';
 
 const logger = createChildLogger({ module: 'MediaMoveService' });
 
@@ -104,17 +105,27 @@ class MediaMoveService {
 				input.relativePath,
 				destinationRoot.path
 			);
+			const destinationLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+				input.destinationRootFolderId,
+				input.mediaType === 'movie' ? 'movie' : 'tv'
+			);
 
 			if (input.mediaType === 'movie') {
 				await db
 					.update(movies)
-					.set({ rootFolderId: input.destinationRootFolderId })
+					.set({
+						rootFolderId: input.destinationRootFolderId,
+						libraryId: destinationLibrary.id
+					})
 					.where(eq(movies.id, input.mediaId));
 				libraryMediaEvents.emitMovieUpdated(input.mediaId);
 			} else {
 				await db
 					.update(series)
-					.set({ rootFolderId: input.destinationRootFolderId })
+					.set({
+						rootFolderId: input.destinationRootFolderId,
+						libraryId: destinationLibrary.id
+					})
 					.where(eq(series.id, input.mediaId));
 				libraryMediaEvents.emitSeriesUpdated(input.mediaId);
 			}

@@ -519,6 +519,7 @@ export const libraryCreateSchema = z.object({
 	name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
 	mediaType: libraryMediaTypeSchema,
 	mediaSubType: libraryMediaSubTypeSchema.default('standard'),
+	rootFolderIds: z.array(z.string().uuid()).optional().default([]),
 	defaultRootFolderId: z.string().uuid().optional().nullable(),
 	isDefault: z.boolean().default(false),
 	defaultMonitored: z.boolean().default(true),

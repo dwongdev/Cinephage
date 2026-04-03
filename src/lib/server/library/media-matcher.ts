@@ -26,6 +26,7 @@ import { searchSubtitlesForNewMedia } from '$lib/server/subtitles/services/Subti
 import { monitoringScheduler } from '$lib/server/monitoring/MonitoringScheduler.js';
 import { logger } from '$lib/logging/index.js';
 import { parseRelease, extractExternalIds } from '$lib/server/indexers/parser/ReleaseParser.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 
 /**
  * Default match confidence threshold (0.0 - 1.0)
@@ -692,6 +693,10 @@ export class MediaMatcherService {
 			// Get default language profile for new media
 			const subtitleSettings = getSubtitleSettingsService();
 			const defaultProfileId = await subtitleSettings.get('defaultLanguageProfileId');
+			const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+				rootFolder.id,
+				'movie'
+			);
 
 			try {
 				const [newMovie] = await db
@@ -710,6 +715,7 @@ export class MediaMatcherService {
 						runtime: tmdbMovie.runtime,
 						genres: tmdbMovie.genres?.map((g) => g.name),
 						path: movieFolder || fileName,
+						libraryId: owningLibrary.id,
 						rootFolderId: rootFolder.id,
 						hasFile: true,
 						monitored: rootFolder.defaultMonitored ?? true,
@@ -838,6 +844,10 @@ export class MediaMatcherService {
 			// Get default language profile for new media
 			const subtitleSettings = getSubtitleSettingsService();
 			const defaultProfileId = await subtitleSettings.get('defaultLanguageProfileId');
+			const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+				rootFolder.id,
+				'tv'
+			);
 			let createdSeries = false;
 
 			try {
@@ -859,6 +869,7 @@ export class MediaMatcherService {
 						network: tmdbSeries.networks?.[0]?.name,
 						genres: tmdbSeries.genres?.map((g) => g.name),
 						path: seriesFolder,
+						libraryId: owningLibrary.id,
 						rootFolderId: rootFolder.id,
 						monitored: rootFolder.defaultMonitored ?? true,
 						languageProfileId: defaultProfileId,

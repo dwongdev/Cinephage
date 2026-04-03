@@ -46,6 +46,12 @@
 		defaultSearchOnAdd: boolean;
 		defaultWantsSubtitles: boolean;
 	};
+	type LibraryDeleteOption = {
+		targetLibraryId: string | null;
+		targetLibraryName: string;
+		selectionMode: 'system' | 'choose-custom' | 'none';
+		customCandidates: LibraryEntity[];
+	};
 	type ScanProgress = {
 		phase: string;
 		rootFolderId?: string;
@@ -85,6 +91,9 @@
 	let librarySaveError = $state<string | null>(null);
 	let confirmLibraryDeleteOpen = $state(false);
 	let deleteLibraryTarget = $state<LibraryEntity | null>(null);
+	let deleteLibraryTargetOption = $state<LibraryDeleteOption | null>(null);
+	let deleteLibraryDestinationId = $state<string>('');
+	let deleteLibraryLoading = $state(false);
 	let libraryForm = $state<LibraryFormData>({
 		name: '',
 		mediaType: 'movie',
@@ -146,6 +155,48 @@
 	const selectedLibraryRootFolderIds = $derived(new Set(libraryForm.rootFolderIds));
 	const selectedLibraryRootFolderCount = $derived(libraryForm.rootFolderIds.length);
 	const editingLibraryIsSystem = $derived(editingLibrary?.isSystem === true);
+
+	function getSystemLibraryFallbackName(library: LibraryEntity): string {
+		if (library.mediaType === 'movie') {
+			return library.mediaSubType === 'anime' ? 'Anime Movies' : 'Movies';
+		}
+		return library.mediaSubType === 'anime' ? 'Anime Series' : 'TV Shows';
+	}
+
+	function getLibraryDeleteOption(library: LibraryEntity): LibraryDeleteOption {
+		if ((library.rootFolders?.length ?? 0) === 0) {
+			return {
+				targetLibraryId: null,
+				targetLibraryName: '',
+				selectionMode: 'none',
+				customCandidates: []
+			};
+		}
+
+		const compatibleCustomLibraries = data.libraries.filter(
+			(candidate) =>
+				!candidate.isSystem &&
+				candidate.id !== library.id &&
+				candidate.mediaType === library.mediaType &&
+				candidate.mediaSubType === library.mediaSubType
+		);
+
+		if (compatibleCustomLibraries.length > 0) {
+			return {
+				targetLibraryId: null,
+				targetLibraryName: getSystemLibraryFallbackName(library),
+				selectionMode: 'choose-custom',
+				customCandidates: compatibleCustomLibraries
+			};
+		}
+
+		return {
+			targetLibraryId: null,
+			targetLibraryName: getSystemLibraryFallbackName(library),
+			selectionMode: 'system',
+			customCandidates: []
+		};
+	}
 
 	$effect(() => {
 		layoutState.setMobileSseStatus(deriveMobileSseStatus(sse));
@@ -483,16 +534,36 @@
 
 	function confirmLibraryDelete(library: LibraryEntity) {
 		deleteLibraryTarget = library;
+		deleteLibraryTargetOption = getLibraryDeleteOption(library);
+		deleteLibraryDestinationId = '';
 		confirmLibraryDeleteOpen = true;
+	}
+
+	function closeLibraryDeleteModal() {
+		confirmLibraryDeleteOpen = false;
+		deleteLibraryTarget = null;
+		deleteLibraryTargetOption = null;
+		deleteLibraryDestinationId = '';
+		deleteLibraryLoading = false;
 	}
 
 	async function handleConfirmLibraryDelete() {
 		if (!deleteLibraryTarget) return;
+		deleteLibraryLoading = true;
 
 		try {
 			const response = await fetch(`/api/libraries/${deleteLibraryTarget.id}`, {
 				method: 'DELETE',
-				headers: { Accept: 'application/json' }
+				headers: {
+					'Content-Type': 'application/json',
+					Accept: 'application/json'
+				},
+				body: JSON.stringify({
+					targetLibraryId:
+						deleteLibraryTargetOption?.selectionMode === 'choose-custom'
+							? deleteLibraryDestinationId || null
+							: (deleteLibraryTargetOption?.targetLibraryId ?? null)
+				})
 			});
 			const payload = await readResponsePayload<Record<string, unknown>>(response);
 
@@ -501,12 +572,31 @@
 			}
 
 			await invalidateAll();
-			confirmLibraryDeleteOpen = false;
-			deleteLibraryTarget = null;
+			closeLibraryDeleteModal();
 			toasts.success('Library deleted');
 		} catch (error) {
 			toasts.error(error instanceof Error ? error.message : 'Failed to delete library');
+		} finally {
+			deleteLibraryLoading = false;
 		}
+	}
+
+	const activeTabActionLabel = $derived.by(() => {
+		if (activeTab === 'libraries') return 'Create library';
+		if (activeTab === 'rootFolders') return m.settings_general_addFolder();
+		return 'Run library scan';
+	});
+
+	function handleActiveTabAction() {
+		if (activeTab === 'libraries') {
+			openAddLibraryModal('movie');
+			return;
+		}
+		if (activeTab === 'rootFolders') {
+			openAddFolderModal();
+			return;
+		}
+		void triggerLibraryScan();
 	}
 </script>
 
@@ -515,37 +605,39 @@
 </svelte:head>
 
 <SettingsPage title="Library & Storage" subtitle="Manage libraries, root folders, and storage.">
-	<div role="tablist" class="tabs-boxed tabs">
-		<button
-			type="button"
-			role="tab"
-			class="tab gap-2"
-			class:tab-active={activeTab === 'libraries'}
-			onclick={() => void setTab('libraries')}
-		>
-			<Library class="h-4 w-4" />
-			Libraries
-		</button>
-		<button
-			type="button"
-			role="tab"
-			class="tab gap-2"
-			class:tab-active={activeTab === 'rootFolders'}
-			onclick={() => void setTab('rootFolders')}
-		>
-			<FolderOpen class="h-4 w-4" />
-			Root Folders
-		</button>
-		<button
-			type="button"
-			role="tab"
-			class="tab gap-2"
-			class:tab-active={activeTab === 'maintenance'}
-			onclick={() => void setTab('maintenance')}
-		>
-			<Settings class="h-4 w-4" />
-			Storage Maintenance
-		</button>
+	<div class="overflow-x-auto">
+		<div role="tablist" class="tabs-boxed tabs inline-flex min-w-max flex-nowrap">
+			<button
+				type="button"
+				role="tab"
+				class="tab gap-2 whitespace-nowrap"
+				class:tab-active={activeTab === 'libraries'}
+				onclick={() => void setTab('libraries')}
+			>
+				<Library class="h-4 w-4" />
+				Libraries
+			</button>
+			<button
+				type="button"
+				role="tab"
+				class="tab gap-2 whitespace-nowrap"
+				class:tab-active={activeTab === 'rootFolders'}
+				onclick={() => void setTab('rootFolders')}
+			>
+				<FolderOpen class="h-4 w-4" />
+				Root Folders
+			</button>
+			<button
+				type="button"
+				role="tab"
+				class="tab gap-2 whitespace-nowrap"
+				class:tab-active={activeTab === 'maintenance'}
+				onclick={() => void setTab('maintenance')}
+			>
+				<Settings class="h-4 w-4" />
+				Storage Maintenance
+			</button>
+		</div>
 	</div>
 
 	{#if activeTab === 'libraries'}
@@ -555,25 +647,10 @@
 			variant="flat"
 		>
 			{#snippet actions()}
-				<div class="flex flex-wrap gap-2">
-					<button
-						class="btn gap-2 btn-ghost btn-sm"
-						onclick={() => triggerLibraryScan()}
-						disabled={scanning}
-					>
-						{#if scanning}
-							<RefreshCw class="h-4 w-4 animate-spin" />
-							Scanning
-						{:else}
-							<RefreshCw class="h-4 w-4" />
-							Scan libraries
-						{/if}
-					</button>
-					<button class="btn gap-2 btn-sm btn-primary" onclick={() => openAddLibraryModal('movie')}>
-						<Plus class="h-4 w-4" />
-						Create library
-					</button>
-				</div>
+				<button class="btn ml-auto gap-2 btn-sm btn-primary" onclick={handleActiveTabAction}>
+					<Plus class="h-4 w-4" />
+					{activeTabActionLabel}
+				</button>
 			{/snippet}
 
 			<LibraryList
@@ -591,25 +668,10 @@
 			variant="flat"
 		>
 			{#snippet actions()}
-				<div class="flex flex-wrap gap-2">
-					<button
-						class="btn gap-2 btn-ghost btn-sm"
-						onclick={() => triggerLibraryScan()}
-						disabled={scanning}
-					>
-						{#if scanning}
-							<RefreshCw class="h-4 w-4 animate-spin" />
-							Scanning
-						{:else}
-							<RefreshCw class="h-4 w-4" />
-							Scan root folders
-						{/if}
-					</button>
-					<button class="btn gap-2 btn-sm btn-primary" onclick={openAddFolderModal}>
-						<Plus class="h-4 w-4" />
-						{m.settings_general_addFolder()}
-					</button>
-				</div>
+				<button class="btn ml-auto gap-2 btn-sm btn-primary" onclick={handleActiveTabAction}>
+					<Plus class="h-4 w-4" />
+					{activeTabActionLabel}
+				</button>
 			{/snippet}
 
 			<RootFolderList
@@ -650,8 +712,8 @@
 		>
 			{#snippet actions()}
 				<button
-					class="btn gap-2 self-start btn-sm btn-primary sm:w-auto"
-					onclick={() => triggerLibraryScan()}
+					class="btn ml-auto gap-2 btn-sm btn-primary"
+					onclick={handleActiveTabAction}
 					disabled={scanning || data.rootFolders.length === 0}
 				>
 					{#if scanning}
@@ -659,7 +721,7 @@
 						{m.settings_general_scanning()}
 					{:else}
 						<HardDrive class="h-4 w-4" />
-						Run maintenance scan
+						{activeTabActionLabel}
 					{/if}
 				</button>
 			{/snippet}
@@ -701,17 +763,74 @@
 	onCancel={() => (confirmFolderDeleteOpen = false)}
 />
 
-<ConfirmationModal
-	open={confirmLibraryDeleteOpen}
-	title={m.settings_general_confirmDelete()}
-	messagePrefix={m.settings_general_confirmDeleteMessagePrefix()}
-	messageEmphasis={deleteLibraryTarget?.name ?? ''}
-	messageSuffix={m.settings_general_confirmDeleteMessageSuffix()}
-	confirmLabel={m.action_delete()}
-	confirmVariant="error"
-	onConfirm={handleConfirmLibraryDelete}
-	onCancel={() => (confirmLibraryDeleteOpen = false)}
-/>
+{#if confirmLibraryDeleteOpen}
+	<ModalWrapper
+		open={confirmLibraryDeleteOpen}
+		onClose={closeLibraryDeleteModal}
+		maxWidth="md"
+		labelledBy="library-delete-modal-title"
+	>
+		<ModalHeader title={m.settings_general_confirmDelete()} onClose={closeLibraryDeleteModal} />
+		<div class="space-y-4">
+			<p>
+				{m.settings_general_confirmDeleteMessagePrefix()}
+				<strong>{deleteLibraryTarget?.name ?? ''}</strong>
+				{m.settings_general_confirmDeleteMessageSuffix()}
+			</p>
+
+			{#if deleteLibraryTargetOption?.selectionMode === 'system'}
+				<div class="rounded-lg border border-base-300 bg-base-200 p-3 text-sm text-base-content/80">
+					Attached root folders will be moved to <strong
+						>{deleteLibraryTargetOption.targetLibraryName}</strong
+					>.
+				</div>
+			{:else if deleteLibraryTargetOption?.selectionMode === 'choose-custom'}
+				<div class="space-y-3">
+					<div
+						class="rounded-lg border border-base-300 bg-base-200 p-3 text-sm text-base-content/80"
+					>
+						By default, attached root folders will be moved to <strong
+							>{deleteLibraryTargetOption.targetLibraryName}</strong
+						>.
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-base-content/80">
+							Optional: choose a different compatible custom library.
+						</p>
+						<select
+							class="select-bordered select w-full"
+							bind:value={deleteLibraryDestinationId}
+							disabled={deleteLibraryLoading}
+						>
+							<option value="">{deleteLibraryTargetOption.targetLibraryName}</option>
+							{#each deleteLibraryTargetOption.customCandidates as candidate (candidate.id)}
+								<option value={candidate.id}>{candidate.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+			{/if}
+		</div>
+		<div class="modal-action mt-6 flex-wrap gap-2 border-t border-base-300 pt-4">
+			<button
+				type="button"
+				class="btn btn-ghost"
+				onclick={closeLibraryDeleteModal}
+				disabled={deleteLibraryLoading}
+			>
+				{m.action_cancel()}
+			</button>
+			<button
+				type="button"
+				class="btn btn-error"
+				onclick={handleConfirmLibraryDelete}
+				disabled={deleteLibraryLoading}
+			>
+				{m.action_delete()}
+			</button>
+		</div>
+	</ModalWrapper>
+{/if}
 
 {#if libraryModalOpen}
 	<ModalWrapper
@@ -776,38 +895,86 @@
 				</div>
 
 				<div class="form-control md:col-span-2">
-					<div class="label py-1">
-						<span class="label-text">Default root folders</span>
-						<span class="label-text-alt">
-							{selectedLibraryRootFolderCount} selected
-						</span>
-					</div>
-					<div
-						class="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-base-300 bg-base-200 p-3"
-					>
-						{#if filteredLibraryRootFolders.length === 0}
-							<div class="text-sm text-base-content/60">No matching root folders available.</div>
-						{:else}
-							{#each filteredLibraryRootFolders as folder (folder.id)}
-								<label class="label cursor-pointer justify-start gap-3 rounded-lg px-0 py-2">
-									<input
-										type="checkbox"
-										class="checkbox checkbox-sm checkbox-primary"
-										checked={selectedLibraryRootFolderIds.has(folder.id)}
-										onchange={(event) => {
-											const checked = (event.currentTarget as HTMLInputElement).checked;
-											libraryForm.rootFolderIds = checked
-												? Array.from(new Set([...libraryForm.rootFolderIds, folder.id]))
-												: libraryForm.rootFolderIds.filter((id) => id !== folder.id);
-										}}
-									/>
-									<div class="min-w-0">
-										<div class="text-sm font-medium">{folder.name}</div>
-										<div class="text-xs text-base-content/60">{folder.path}</div>
-									</div>
-								</label>
-							{/each}
+					<div class="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
+						<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+							<div class="space-y-1">
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-medium text-base-content">Root Folders</span>
+									<span class="badge badge-ghost badge-sm">
+										{selectedLibraryRootFolderCount} selected
+									</span>
+								</div>
+								<p class="text-xs text-base-content/60">
+									Attach the root folders this library can use. Each root folder can belong to only
+									one library at a time.
+								</p>
+							</div>
+						</div>
+
+						{#if selectedLibraryRootFolderCount > 0}
+							{#if selectedLibraryRootFolderCount <= 4}
+								<div class="flex flex-wrap gap-2">
+									{#each filteredLibraryRootFolders.filter( (folder) => selectedLibraryRootFolderIds.has(folder.id) ) as folder (folder.id)}
+										<span class="badge gap-1 badge-outline px-3 py-3 badge-primary">
+											<FolderOpen class="h-3.5 w-3.5" />
+											{folder.name}
+										</span>
+									{/each}
+								</div>
+							{:else}
+								<div class="rounded-lg bg-base-200 px-3 py-2 text-sm text-base-content/70">
+									{selectedLibraryRootFolderCount} root folders selected
+								</div>
+							{/if}
 						{/if}
+
+						<div class="max-h-64 space-y-2 overflow-y-auto pr-1">
+							{#if filteredLibraryRootFolders.length === 0}
+								<div
+									class="flex items-start gap-3 rounded-xl border border-dashed border-base-300 bg-base-200/60 p-4"
+								>
+									<AlertCircle class="mt-0.5 h-4 w-4 shrink-0 text-base-content/50" />
+									<div class="space-y-1 text-sm text-base-content/70">
+										<div class="font-medium text-base-content">No matching root folders</div>
+										<div>
+											Create a {libraryForm.mediaSubType === 'anime' ? 'anime' : 'standard'}
+											{libraryForm.mediaType === 'movie' ? 'movie' : 'TV'} root folder to attach it here.
+										</div>
+									</div>
+								</div>
+							{:else}
+								{#each filteredLibraryRootFolders as folder (folder.id)}
+									<label
+										class={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+											selectedLibraryRootFolderIds.has(folder.id)
+												? 'border-primary/40 bg-primary/5'
+												: 'border-base-300 bg-base-100 hover:border-primary/30 hover:bg-base-200/40'
+										}`}
+									>
+										<input
+											type="checkbox"
+											class="checkbox mt-1 shrink-0 checkbox-sm checkbox-primary"
+											checked={selectedLibraryRootFolderIds.has(folder.id)}
+											onchange={(event) => {
+												const checked = (event.currentTarget as HTMLInputElement).checked;
+												libraryForm.rootFolderIds = checked
+													? Array.from(new Set([...libraryForm.rootFolderIds, folder.id]))
+													: libraryForm.rootFolderIds.filter((id) => id !== folder.id);
+											}}
+										/>
+										<div class="min-w-0 flex-1 space-y-0.5">
+											<div class="flex flex-wrap items-center justify-between gap-2">
+												<span class="font-medium text-base-content">{folder.name}</span>
+												{#if selectedLibraryRootFolderIds.has(folder.id)}
+													<span class="badge badge-sm badge-primary">Selected</span>
+												{/if}
+											</div>
+											<div class="truncate text-xs text-base-content/60">{folder.path}</div>
+										</div>
+									</label>
+								{/each}
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>

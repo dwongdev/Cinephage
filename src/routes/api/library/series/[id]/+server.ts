@@ -26,6 +26,7 @@ import {
 	getAnimeSubtypeEnforcement
 } from '$lib/server/library/LibraryAddService.js';
 import { mediaMoveService } from '$lib/server/library/MediaMoveService.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import { isLikelyAnimeMedia } from '$lib/shared/anime-classification.js';
 import { tmdb } from '$lib/server/tmdb.js';
 
@@ -300,7 +301,12 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 					};
 				} else {
 					// Recovery path: if files exist but current root folder is missing, re-link directly.
+					const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+						nextRootFolderId,
+						'tv'
+					);
 					updateData.rootFolderId = nextRootFolderId;
+					updateData.libraryId = owningLibrary.id;
 				}
 			}
 		}

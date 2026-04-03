@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db/index.js';
-import { libraries, libraryRootFolders, rootFolders } from '$lib/server/db/schema.js';
+import {
+	libraries,
+	libraryRootFolders,
+	movies,
+	rootFolders,
+	series
+} from '$lib/server/db/schema.js';
 import { NotFoundError, ValidationError } from '$lib/errors';
 
 export type LibraryMediaType = 'movie' | 'tv';
@@ -52,6 +58,7 @@ export type UpdateLibraryInput = Partial<CreateLibraryInput>;
 interface ListOptions {
 	mediaType?: LibraryMediaType;
 	includeSystem?: boolean;
+	includeHiddenEmptySystemAnime?: boolean;
 }
 
 const SYSTEM_LIBRARY_DEFS: Array<{
@@ -159,29 +166,6 @@ async function ensureRootFoldersMatchLibrary(
 	}
 }
 
-async function getDefaultRootForSystemLibrary(
-	mediaType: LibraryMediaType,
-	mediaSubType: LibraryMediaSubType
-): Promise<{ id: string; defaultMonitored: boolean } | null> {
-	const [row] = await db
-		.select({
-			id: rootFolders.id,
-			defaultMonitored: rootFolders.defaultMonitored
-		})
-		.from(rootFolders)
-		.where(and(eq(rootFolders.mediaType, mediaType), eq(rootFolders.mediaSubType, mediaSubType)))
-		.orderBy(desc(rootFolders.isDefault), asc(rootFolders.createdAt))
-		.limit(1);
-
-	if (!row) {
-		return null;
-	}
-	return {
-		id: row.id,
-		defaultMonitored: row.defaultMonitored ?? true
-	};
-}
-
 async function getRootFoldersForLibraries(libraryIds: string[]): Promise<
 	Array<{
 		libraryId: string;
@@ -218,6 +202,21 @@ async function getRootFoldersForLibraries(libraryIds: string[]): Promise<
 			desc(libraryRootFolders.isDefault),
 			asc(rootFolders.createdAt)
 		);
+}
+
+function getSystemLibraryDefinition(
+	mediaType: LibraryMediaType,
+	mediaSubType: LibraryMediaSubType
+): (typeof SYSTEM_LIBRARY_DEFS)[number] {
+	const definition = SYSTEM_LIBRARY_DEFS.find(
+		(def) => def.mediaType === mediaType && def.mediaSubType === mediaSubType
+	);
+
+	if (!definition) {
+		throw new Error(`Missing system library definition for ${mediaType}/${mediaSubType}`);
+	}
+
+	return definition;
 }
 
 export class LibraryEntityService {
@@ -367,8 +366,18 @@ export class LibraryEntityService {
 			}
 		}
 
-		return rows.map((row) => {
+		return rows.flatMap((row) => {
 			const attachedRootFolders = rootFoldersByLibraryId.get(row.id) ?? [];
+			const isHiddenEmptySystemAnimeLibrary =
+				!options.includeHiddenEmptySystemAnime &&
+				(row.isSystem ?? false) &&
+				normalizeMediaSubType(row.mediaSubType) === 'anime' &&
+				attachedRootFolders.length === 0;
+
+			if (isHiddenEmptySystemAnimeLibrary) {
+				return [];
+			}
+
 			const fallbackDefaultFolder = attachedRootFolders[0] ?? null;
 			const defaultRootFolderId = row.defaultRootFolderId ?? fallbackDefaultFolder?.id ?? null;
 			return {
@@ -396,11 +405,10 @@ export class LibraryEntityService {
 		});
 	}
 
-	async syncSystemLibrariesFromRootFolders(): Promise<void> {
+	private async ensureSystemLibraryRecords(): Promise<void> {
 		const now = new Date().toISOString();
 
 		for (const def of SYSTEM_LIBRARY_DEFS) {
-			const rootFolder = await getDefaultRootForSystemLibrary(def.mediaType, def.mediaSubType);
 			await db
 				.insert(libraries)
 				.values({
@@ -412,8 +420,8 @@ export class LibraryEntityService {
 					isSystem: true,
 					systemKey: def.systemKey,
 					isDefault: def.isDefault,
-					defaultRootFolderId: rootFolder?.id ?? null,
-					defaultMonitored: rootFolder?.defaultMonitored ?? true,
+					defaultRootFolderId: null,
+					defaultMonitored: true,
 					defaultSearchOnAdd: true,
 					defaultWantsSubtitles: true,
 					sortOrder: def.sortOrder,
@@ -428,25 +436,254 @@ export class LibraryEntityService {
 						mediaType: def.mediaType,
 						mediaSubType: def.mediaSubType,
 						isDefault: def.isDefault,
-						defaultRootFolderId: rootFolder?.id ?? null,
-						defaultMonitored: rootFolder?.defaultMonitored ?? true,
 						sortOrder: def.sortOrder,
 						updatedAt: now
 					}
 				});
+		}
+	}
 
-			if (rootFolder) {
+	private async normalizeLibraryRootFolderState(libraryId: string): Promise<void> {
+		const library = await db
+			.select({
+				id: libraries.id,
+				isSystem: libraries.isSystem
+			})
+			.from(libraries)
+			.where(eq(libraries.id, libraryId))
+			.limit(1)
+			.get();
+
+		if (!library) {
+			return;
+		}
+
+		const attachments = await db
+			.select({
+				rootFolderId: libraryRootFolders.rootFolderId,
+				isDefault: libraryRootFolders.isDefault,
+				createdAt: libraryRootFolders.createdAt,
+				defaultMonitored: rootFolders.defaultMonitored
+			})
+			.from(libraryRootFolders)
+			.innerJoin(rootFolders, eq(libraryRootFolders.rootFolderId, rootFolders.id))
+			.where(eq(libraryRootFolders.libraryId, libraryId))
+			.orderBy(desc(libraryRootFolders.isDefault), asc(libraryRootFolders.createdAt));
+
+		const defaultAttachment = attachments[0] ?? null;
+		const defaultRootFolderId = defaultAttachment?.rootFolderId ?? null;
+		const now = new Date().toISOString();
+
+		await db
+			.update(libraryRootFolders)
+			.set({ isDefault: false })
+			.where(eq(libraryRootFolders.libraryId, libraryId));
+
+		if (defaultRootFolderId) {
+			await db
+				.update(libraryRootFolders)
+				.set({ isDefault: true })
+				.where(
+					and(
+						eq(libraryRootFolders.libraryId, libraryId),
+						eq(libraryRootFolders.rootFolderId, defaultRootFolderId)
+					)
+				);
+		}
+
+		const updateData: Record<string, unknown> = {
+			defaultRootFolderId,
+			updatedAt: now
+		};
+
+		await db.update(libraries).set(updateData).where(eq(libraries.id, libraryId));
+	}
+
+	private async reconcileRootFolderAssignments(rootFolderIds?: string[]): Promise<void> {
+		await this.ensureSystemLibraryRecords();
+
+		const scopedRootFolderIds = rootFolderIds?.filter((id) => id.trim().length > 0);
+		const targetRootFolders = await db
+			.select({
+				id: rootFolders.id,
+				mediaType: rootFolders.mediaType,
+				mediaSubType: rootFolders.mediaSubType
+			})
+			.from(rootFolders)
+			.where(
+				scopedRootFolderIds && scopedRootFolderIds.length > 0
+					? inArray(rootFolders.id, scopedRootFolderIds)
+					: undefined
+			);
+
+		const assignments = await db
+			.select({
+				rootFolderId: libraryRootFolders.rootFolderId,
+				libraryId: libraryRootFolders.libraryId,
+				libraryMediaType: libraries.mediaType,
+				libraryMediaSubType: libraries.mediaSubType,
+				isSystem: libraries.isSystem
+			})
+			.from(libraryRootFolders)
+			.innerJoin(libraries, eq(libraryRootFolders.libraryId, libraries.id))
+			.where(
+				scopedRootFolderIds && scopedRootFolderIds.length > 0
+					? inArray(libraryRootFolders.rootFolderId, scopedRootFolderIds)
+					: undefined
+			)
+			.orderBy(asc(libraries.isSystem), asc(libraryRootFolders.createdAt));
+
+		const assignmentsByRootFolder = new Map<string, typeof assignments>();
+		for (const assignment of assignments) {
+			const list = assignmentsByRootFolder.get(assignment.rootFolderId) ?? [];
+			list.push(assignment);
+			assignmentsByRootFolder.set(assignment.rootFolderId, list);
+		}
+
+		const now = new Date().toISOString();
+		for (const folder of targetRootFolders) {
+			const normalizedSubType = normalizeMediaSubType(folder.mediaSubType);
+			const compatibleAssignments =
+				assignmentsByRootFolder
+					.get(folder.id)
+					?.filter(
+						(assignment) =>
+							assignment.libraryMediaType === folder.mediaType &&
+							normalizeMediaSubType(assignment.libraryMediaSubType) === normalizedSubType
+					) ?? [];
+			const preferredLibraryId =
+				compatibleAssignments.find((assignment) => !assignment.isSystem)?.libraryId ??
+				compatibleAssignments[0]?.libraryId ??
+				getSystemLibraryDefinition(folder.mediaType as LibraryMediaType, normalizedSubType).id;
+
+			await db.delete(libraryRootFolders).where(eq(libraryRootFolders.rootFolderId, folder.id));
+			await db
+				.insert(libraryRootFolders)
+				.values({
+					libraryId: preferredLibraryId,
+					rootFolderId: folder.id,
+					isDefault: false,
+					createdAt: now
+				})
+				.onConflictDoNothing();
+		}
+
+		const allLibraries = await db.select({ id: libraries.id }).from(libraries);
+		for (const library of allLibraries) {
+			await this.normalizeLibraryRootFolderState(library.id);
+		}
+
+		await this.syncMediaLibraryIdsForRootFolders(targetRootFolders.map((folder) => folder.id));
+	}
+
+	private async syncMediaLibraryIdsForRootFolders(rootFolderIds: string[]): Promise<void> {
+		if (rootFolderIds.length === 0) {
+			return;
+		}
+
+		const assignments = await db
+			.select({
+				rootFolderId: libraryRootFolders.rootFolderId,
+				libraryId: libraryRootFolders.libraryId,
+				mediaType: libraries.mediaType
+			})
+			.from(libraryRootFolders)
+			.innerJoin(libraries, eq(libraryRootFolders.libraryId, libraries.id))
+			.where(inArray(libraryRootFolders.rootFolderId, rootFolderIds));
+
+		for (const assignment of assignments) {
+			if (assignment.mediaType === 'movie') {
 				await db
-					.insert(libraryRootFolders)
-					.values({
-						libraryId: def.id,
-						rootFolderId: rootFolder.id,
-						isDefault: true,
-						createdAt: now
-					})
-					.onConflictDoNothing();
+					.update(movies)
+					.set({ libraryId: assignment.libraryId })
+					.where(eq(movies.rootFolderId, assignment.rootFolderId));
+			} else {
+				await db
+					.update(series)
+					.set({ libraryId: assignment.libraryId })
+					.where(eq(series.rootFolderId, assignment.rootFolderId));
 			}
 		}
+	}
+
+	async syncSystemLibrariesFromRootFolders(): Promise<void> {
+		await this.reconcileRootFolderAssignments();
+	}
+
+	async resolveOwningLibraryForRootFolder(
+		rootFolderId: string,
+		mediaType: LibraryMediaType
+	): Promise<LibraryEntity> {
+		await this.reconcileRootFolderAssignments([rootFolderId]);
+
+		const assignment = await db
+			.select({
+				libraryId: libraryRootFolders.libraryId
+			})
+			.from(libraryRootFolders)
+			.innerJoin(libraries, eq(libraryRootFolders.libraryId, libraries.id))
+			.where(
+				and(eq(libraryRootFolders.rootFolderId, rootFolderId), eq(libraries.mediaType, mediaType))
+			)
+			.limit(1)
+			.get();
+
+		if (!assignment?.libraryId) {
+			throw new ValidationError('No library is assigned to the selected root folder', {
+				rootFolderId,
+				mediaType
+			});
+		}
+
+		const library = await this.getLibrary(assignment.libraryId);
+		if (!library) {
+			throw new NotFoundError('Library', assignment.libraryId);
+		}
+
+		return library;
+	}
+
+	private async assignRootFoldersToLibrary(
+		libraryId: string,
+		rootFolderIds: string[] | undefined
+	): Promise<void> {
+		if (rootFolderIds === undefined) {
+			return;
+		}
+
+		await db.delete(libraryRootFolders).where(eq(libraryRootFolders.libraryId, libraryId));
+
+		if (rootFolderIds.length > 0) {
+			await db
+				.delete(libraryRootFolders)
+				.where(inArray(libraryRootFolders.rootFolderId, rootFolderIds));
+			await db
+				.insert(libraryRootFolders)
+				.values(
+					rootFolderIds.map((rootFolderId, index) => ({
+						libraryId,
+						rootFolderId,
+						isDefault: index === 0,
+						createdAt: new Date().toISOString()
+					}))
+				)
+				.onConflictDoNothing();
+		}
+
+		await this.reconcileRootFolderAssignments();
+	}
+
+	private async releaseRootFoldersToSystemLibraries(rootFolderIds: string[]): Promise<void> {
+		if (rootFolderIds.length === 0) {
+			await this.reconcileRootFolderAssignments();
+			return;
+		}
+
+		await db
+			.delete(libraryRootFolders)
+			.where(inArray(libraryRootFolders.rootFolderId, rootFolderIds));
+
+		await this.reconcileRootFolderAssignments();
 	}
 
 	async listLibraries(options: ListOptions = {}): Promise<LibraryEntity[]> {
@@ -455,6 +692,11 @@ export class LibraryEntityService {
 
 	async getLibrary(id: string): Promise<LibraryEntity | null> {
 		const rows = await this.loadLibraryEntities();
+		return rows.find((row) => row.id === id) ?? null;
+	}
+
+	private async getLibraryForMutation(id: string): Promise<LibraryEntity | null> {
+		const rows = await this.loadLibraryEntities({ includeHiddenEmptySystemAnime: true });
 		return rows.find((row) => row.id === id) ?? null;
 	}
 
@@ -527,7 +769,7 @@ export class LibraryEntityService {
 			isSystem: false,
 			systemKey: null,
 			isDefault: input.isDefault ?? false,
-			defaultRootFolderId: rootFolderIds[0] ?? null,
+			defaultRootFolderId: null,
 			defaultMonitored: input.defaultMonitored ?? true,
 			defaultSearchOnAdd: input.defaultSearchOnAdd ?? true,
 			defaultWantsSubtitles: input.defaultWantsSubtitles ?? true,
@@ -536,19 +778,7 @@ export class LibraryEntityService {
 			updatedAt: now
 		});
 
-		if (rootFolderIds.length > 0) {
-			await db
-				.insert(libraryRootFolders)
-				.values(
-					rootFolderIds.map((rootFolderId, index) => ({
-						libraryId: id,
-						rootFolderId,
-						isDefault: index === 0,
-						createdAt: now
-					}))
-				)
-				.onConflictDoNothing();
-		}
+		await this.assignRootFoldersToLibrary(id, rootFolderIds);
 
 		const created = await this.getLibrary(id);
 		if (!created) {
@@ -609,9 +839,6 @@ export class LibraryEntityService {
 		if (updates.mediaSubType !== undefined && !existing.isSystem) {
 			updateData.mediaSubType = normalizeMediaSubType(updates.mediaSubType);
 		}
-		if (rootFolderIds !== undefined) {
-			updateData.defaultRootFolderId = rootFolderIds[0] ?? null;
-		}
 		if (updates.isDefault !== undefined) {
 			updateData.isDefault = updates.isDefault;
 		}
@@ -630,23 +857,7 @@ export class LibraryEntityService {
 
 		await db.update(libraries).set(updateData).where(eq(libraries.id, id));
 
-		if (rootFolderIds !== undefined) {
-			await db.delete(libraryRootFolders).where(eq(libraryRootFolders.libraryId, id));
-			if (rootFolderIds.length > 0) {
-				const now = new Date().toISOString();
-				await db
-					.insert(libraryRootFolders)
-					.values(
-						rootFolderIds.map((rootFolderId, index) => ({
-							libraryId: id,
-							rootFolderId,
-							isDefault: index === 0,
-							createdAt: now
-						}))
-					)
-					.onConflictDoNothing();
-			}
-		}
+		await this.assignRootFoldersToLibrary(id, rootFolderIds);
 
 		const updated = await this.getLibrary(id);
 		if (!updated) {
@@ -655,13 +866,61 @@ export class LibraryEntityService {
 		return updated;
 	}
 
-	async deleteLibrary(id: string): Promise<void> {
-		const existing = await this.getLibrary(id);
+	private async resolveLibraryDeletionTarget(
+		library: LibraryEntity,
+		targetLibraryId?: string | null
+	): Promise<string | null> {
+		if (library.rootFolders.length === 0) {
+			return null;
+		}
+
+		const allLibraries = await this.loadLibraryEntities({
+			mediaType: library.mediaType,
+			includeHiddenEmptySystemAnime: true
+		});
+		const systemLibraryId = getSystemLibraryDefinition(library.mediaType, library.mediaSubType).id;
+
+		if (targetLibraryId) {
+			const targetLibrary = allLibraries.find((candidate) => candidate.id === targetLibraryId);
+			if (!targetLibrary) {
+				throw new NotFoundError('Library', targetLibraryId);
+			}
+			if (targetLibrary.id === library.id) {
+				throw new ValidationError('Cannot move root folders into the library being deleted');
+			}
+			if (
+				targetLibrary.mediaType !== library.mediaType ||
+				targetLibrary.mediaSubType !== library.mediaSubType
+			) {
+				throw new ValidationError('Selected target library is not compatible with this library');
+			}
+			return targetLibrary.id;
+		}
+
+		return systemLibraryId;
+	}
+
+	async deleteLibrary(id: string, targetLibraryId?: string | null): Promise<void> {
+		const existing = await this.getLibraryForMutation(id);
 		if (!existing) {
 			throw new NotFoundError('Library', id);
 		}
 		if (existing.isSystem) {
 			throw new ValidationError('System libraries cannot be deleted');
+		}
+
+		const attachedRootFolderIds = existing.rootFolders.map((folder) => folder.id);
+		const destinationLibraryId = await this.resolveLibraryDeletionTarget(existing, targetLibraryId);
+		if (destinationLibraryId) {
+			const destinationLibrary = await this.getLibraryForMutation(destinationLibraryId);
+			if (!destinationLibrary) {
+				throw new NotFoundError('Library', destinationLibraryId);
+			}
+			const nextRootFolderIds = [
+				...destinationLibrary.rootFolders.map((folder) => folder.id),
+				...attachedRootFolderIds
+			];
+			await this.assignRootFoldersToLibrary(destinationLibrary.id, nextRootFolderIds);
 		}
 
 		await db.delete(libraryRootFolders).where(eq(libraryRootFolders.libraryId, id));

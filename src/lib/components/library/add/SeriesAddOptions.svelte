@@ -34,6 +34,7 @@
 		seasonFolder: boolean;
 		monitoredSeasons: SvelteSet<number>;
 		showAdvanced: boolean;
+		onMonitoredInput?: () => void;
 	}
 
 	let {
@@ -44,7 +45,8 @@
 		seriesType = $bindable(),
 		seasonFolder = $bindable(),
 		monitoredSeasons,
-		showAdvanced = $bindable()
+		showAdvanced = $bindable(),
+		onMonitoredInput
 	}: Props = $props();
 
 	let showSeasonSelection = $state(false);
@@ -237,6 +239,7 @@
 		class="toggle mt-0.5 shrink-0 toggle-primary"
 		checked={monitorType !== 'none'}
 		onchange={(e) => {
+			onMonitoredInput?.();
 			if (!e.currentTarget.checked) {
 				monitorType = 'none';
 			} else {

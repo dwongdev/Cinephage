@@ -37,6 +37,7 @@ import {
 } from '$lib/server/library/LibraryAddService.js';
 import { NamingService, type MediaNamingInfo } from '$lib/server/library/naming/NamingService.js';
 import { namingSettingsService } from '$lib/server/library/naming/NamingSettingsService.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import type {
 	CreateSmartListInput,
 	UpdateSmartListInput,
@@ -854,6 +855,10 @@ export class SmartListService {
 
 				const { imdbId } = await fetchMovieExternalIds(item.tmdbId);
 				const languageProfileId = await getLanguageProfileId(wantsSubtitles, item.tmdbId);
+				const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+					list.rootFolderId,
+					'movie'
+				);
 
 				const [newMovie] = await db
 					.insert(movies)
@@ -869,6 +874,7 @@ export class SmartListService {
 						runtime: movieDetails.runtime,
 						genres: movieDetails.genres?.map((g) => g.name) ?? [],
 						path: folderName,
+						libraryId: owningLibrary.id,
 						rootFolderId: list.rootFolderId,
 						scoringProfileId,
 						monitored,
@@ -942,6 +948,10 @@ export class SmartListService {
 				} as MediaNamingInfo);
 
 				const languageProfileId = await getLanguageProfileId(wantsSubtitles, item.tmdbId);
+				const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+					list.rootFolderId,
+					'tv'
+				);
 
 				const [newSeries] = await db
 					.insert(series)
@@ -962,6 +972,7 @@ export class SmartListService {
 								: null,
 						genres: seriesDetails.genres?.map((g) => g.name) ?? [],
 						path: folderName,
+						libraryId: owningLibrary.id,
 						rootFolderId: list.rootFolderId,
 						scoringProfileId,
 						monitored,
@@ -1417,6 +1428,10 @@ export class SmartListService {
 
 				// Get the language profile if subtitles wanted
 				const languageProfileId = await getLanguageProfileId(wantsSubtitles, item.tmdbId);
+				const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+					list.rootFolderId!,
+					'movie'
+				);
 
 				// Insert movie into database
 				const [newMovie] = await db
@@ -1433,6 +1448,7 @@ export class SmartListService {
 						runtime: movieDetails.runtime,
 						genres: movieDetails.genres?.map((g) => g.name) ?? [],
 						path: folderName,
+						libraryId: owningLibrary.id,
 						rootFolderId: list.rootFolderId!,
 						scoringProfileId,
 						monitored,
@@ -1547,6 +1563,10 @@ export class SmartListService {
 
 				// Get the language profile if subtitles wanted
 				const languageProfileId = await getLanguageProfileId(wantsSubtitles, item.tmdbId);
+				const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+					list.rootFolderId!,
+					'tv'
+				);
 
 				// Insert series into database
 				const [newSeries] = await db
@@ -1568,6 +1588,7 @@ export class SmartListService {
 								: null,
 						genres: seriesDetails.genres?.map((g) => g.name) ?? [],
 						path: folderName,
+						libraryId: owningLibrary.id,
 						rootFolderId: list.rootFolderId!,
 						scoringProfileId,
 						monitored,

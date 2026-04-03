@@ -31,6 +31,8 @@
 		searchOnAdd: boolean;
 		wantsSubtitles: boolean;
 		requiredMediaSubType?: 'standard' | 'anime';
+		onSearchOnAddInput?: () => void;
+		onWantsSubtitlesInput?: () => void;
 	}
 
 	let {
@@ -41,7 +43,9 @@
 		selectedScoringProfile = $bindable(),
 		searchOnAdd = $bindable(),
 		wantsSubtitles = $bindable(),
-		requiredMediaSubType
+		requiredMediaSubType,
+		onSearchOnAddInput,
+		onWantsSubtitlesInput
 	}: Props = $props();
 
 	const filteredRootFolders = $derived(
@@ -137,7 +141,12 @@
 
 <!-- Search on Add Toggle -->
 <label class="flex cursor-pointer items-start gap-4 py-2">
-	<input type="checkbox" class="toggle mt-0.5 shrink-0 toggle-success" bind:checked={searchOnAdd} />
+	<input
+		type="checkbox"
+		class="toggle mt-0.5 shrink-0 toggle-success"
+		bind:checked={searchOnAdd}
+		onchange={() => onSearchOnAddInput?.()}
+	/>
 	<div class="min-w-0">
 		<span class="flex items-center gap-2 text-sm font-medium">
 			<Search class="h-4 w-4 shrink-0" />
@@ -157,6 +166,7 @@
 		type="checkbox"
 		class="toggle mt-0.5 shrink-0 toggle-primary"
 		bind:checked={wantsSubtitles}
+		onchange={() => onWantsSubtitlesInput?.()}
 	/>
 	<div class="min-w-0">
 		<span class="flex items-center gap-2 text-sm font-medium">

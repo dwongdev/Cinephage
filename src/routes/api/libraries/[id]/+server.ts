@@ -1,10 +1,15 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { requireAdmin, requireAuth } from '$lib/server/auth/authorization.js';
-import { parseBody } from '$lib/server/api/validate.js';
+import { parseBody, parseOptionalBody } from '$lib/server/api/validate.js';
 import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import { libraryUpdateSchema } from '$lib/validation/schemas.js';
 import { NotFoundError, isAppError } from '$lib/errors';
+import { z } from 'zod';
+
+const libraryDeleteSchema = z.object({
+	targetLibraryId: z.string().uuid().optional().nullable()
+});
 
 export const GET: RequestHandler = async (event) => {
 	const authError = requireAuth(event);
@@ -41,8 +46,9 @@ export const DELETE: RequestHandler = async (event) => {
 	if (authError) return authError;
 
 	try {
+		const payload = await parseOptionalBody(event.request, libraryDeleteSchema);
 		const service = getLibraryEntityService();
-		await service.deleteLibrary(event.params.id);
+		await service.deleteLibrary(event.params.id, payload.targetLibraryId ?? null);
 		return json({ success: true });
 	} catch (error) {
 		if (isAppError(error)) {

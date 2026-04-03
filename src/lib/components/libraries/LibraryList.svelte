@@ -1,5 +1,16 @@
 <script lang="ts">
-	import { Film, Tv, Settings, Trash2 } from 'lucide-svelte';
+	import {
+		Film,
+		Tv,
+		Settings,
+		Trash2,
+		Eye,
+		EyeOff,
+		Search,
+		SearchSlash,
+		Captions,
+		CaptionsOff
+	} from 'lucide-svelte';
 	import type { PageData } from '../../../routes/settings/general/$types';
 
 	type LibraryRootFolder = {
@@ -48,6 +59,12 @@
 		return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
 	}
 
+	function getStatusBadgeClass(enabled: boolean): string {
+		return enabled
+			? 'border-success/30 bg-success/10 text-success'
+			: 'border-error/30 bg-error/10 text-error';
+	}
+
 	const sections = $derived(
 		[
 			{
@@ -87,7 +104,7 @@
 					</div>
 				</div>
 
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{#each section.libraries as library (library.id)}
 						{@const usage = getStorageEntry(library.id)}
 						<div class="card bg-base-200 shadow-sm">
@@ -137,23 +154,53 @@
 									</div>
 								</div>
 
-								<div class="mt-3 grid gap-2 border-t border-base-300 pt-3 text-sm sm:grid-cols-3">
-									<div class="font-semibold">
-										Monitored:
-										<span class={library.defaultMonitored ? 'text-success' : 'text-error'}>
-											{library.defaultMonitored ? ' Yes' : ' No'}
+								<div class="mt-3 grid grid-cols-3 gap-2 border-t border-base-300 pt-3">
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={`Monitored by default: ${library.defaultMonitored ? 'Enabled' : 'Disabled'}`}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+												library.defaultMonitored
+											)}`}
+										>
+											{#if library.defaultMonitored}
+												<Eye class="h-3.5 w-3.5" />
+											{:else}
+												<EyeOff class="h-3.5 w-3.5" />
+											{/if}
 										</span>
 									</div>
-									<div class="font-semibold">
-										Search on add:
-										<span class={library.defaultSearchOnAdd ? 'text-success' : 'text-error'}>
-											{library.defaultSearchOnAdd ? ' Yes' : ' No'}
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={`Search on add: ${library.defaultSearchOnAdd ? 'Enabled' : 'Disabled'}`}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+												library.defaultSearchOnAdd
+											)}`}
+										>
+											{#if library.defaultSearchOnAdd}
+												<Search class="h-3.5 w-3.5" />
+											{:else}
+												<SearchSlash class="h-3.5 w-3.5" />
+											{/if}
 										</span>
 									</div>
-									<div class="font-semibold">
-										Subtitles:
-										<span class={library.defaultWantsSubtitles ? 'text-success' : 'text-error'}>
-											{library.defaultWantsSubtitles ? ' Yes' : ' No'}
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={`Subtitles by default: ${library.defaultWantsSubtitles ? 'Enabled' : 'Disabled'}`}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+												library.defaultWantsSubtitles
+											)}`}
+										>
+											{#if library.defaultWantsSubtitles}
+												<Captions class="h-3.5 w-3.5" />
+											{:else}
+												<CaptionsOff class="h-3.5 w-3.5" />
+											{/if}
 										</span>
 									</div>
 								</div>

@@ -78,14 +78,14 @@
 	}: Props = $props();
 </script>
 
-<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+<div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
 	<div class="card bg-base-200 shadow-sm">
 		<div class="card-body p-4">
 			<div class="flex items-center gap-2 text-sm text-base-content/60">
 				<Database class="h-4 w-4" />
 				Total storage
 			</div>
-			<div class="mt-2 text-2xl font-semibold">
+			<div class="mt-2 text-xl font-semibold sm:text-2xl">
 				{formatBytes(storage.totalUsedBytes)}
 			</div>
 		</div>
@@ -96,7 +96,7 @@
 				<Film class="h-4 w-4" />
 				Movies
 			</div>
-			<div class="mt-2 text-2xl font-semibold">
+			<div class="mt-2 text-xl font-semibold sm:text-2xl">
 				{formatBytes(storage.moviesUsedBytes)}
 			</div>
 			<div class="text-xs text-base-content/50">{storage.movieCount} movies</div>
@@ -108,7 +108,7 @@
 				<Tv class="h-4 w-4" />
 				TV
 			</div>
-			<div class="mt-2 text-2xl font-semibold">{formatBytes(storage.tvUsedBytes)}</div>
+			<div class="mt-2 text-xl font-semibold sm:text-2xl">{formatBytes(storage.tvUsedBytes)}</div>
 			<div class="text-xs text-base-content/50">{storage.seriesCount} series</div>
 		</div>
 	</div>
@@ -118,7 +118,7 @@
 				<FolderOpen class="h-4 w-4" />
 				Subtitles
 			</div>
-			<div class="mt-2 text-2xl font-semibold">
+			<div class="mt-2 text-xl font-semibold sm:text-2xl">
 				{formatBytes(storage.subtitlesUsedBytes)}
 			</div>
 			<div class="text-xs text-base-content/50">
@@ -196,7 +196,31 @@
 			<Library class="h-4 w-4" />
 			<h3 class="font-semibold">Library usage</h3>
 		</div>
-		<div class="overflow-x-auto rounded-lg border border-base-300">
+		<div class="space-y-3 md:hidden">
+			{#each storage.libraryBreakdown as item (item.id)}
+				<div class="rounded-lg border border-base-300 bg-base-100 p-3">
+					<div class="font-medium">{item.name}</div>
+					<div class="mt-1 text-xs text-base-content/50">
+						{item.path ?? 'No root folder assigned'}
+					</div>
+					<div class="mt-3 grid grid-cols-3 gap-2 text-sm">
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Class</div>
+							<div>{item.mediaType} / {item.mediaSubType}</div>
+						</div>
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Items</div>
+							<div>{item.itemCount}</div>
+						</div>
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Used</div>
+							<div>{formatBytes(item.usedBytes)}</div>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+		<div class="hidden overflow-x-auto rounded-lg border border-base-300 md:block">
 			<table class="table table-sm">
 				<thead>
 					<tr>
@@ -230,7 +254,29 @@
 			<FolderOpen class="h-4 w-4" />
 			<h3 class="font-semibold">Root folder usage</h3>
 		</div>
-		<div class="overflow-x-auto rounded-lg border border-base-300">
+		<div class="space-y-3 md:hidden">
+			{#each storage.rootFolderBreakdown as item (item.id)}
+				<div class="rounded-lg border border-base-300 bg-base-100 p-3">
+					<div class="font-medium">{item.name}</div>
+					<div class="mt-1 text-xs text-base-content/50">{item.path}</div>
+					<div class="mt-3 grid grid-cols-3 gap-2 text-sm">
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Class</div>
+							<div>{item.mediaType} / {item.mediaSubType}</div>
+						</div>
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Items</div>
+							<div>{item.itemCount}</div>
+						</div>
+						<div>
+							<div class="text-[11px] tracking-wide text-base-content/50 uppercase">Used</div>
+							<div>{formatBytes(item.usedBytes)}</div>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+		<div class="hidden overflow-x-auto rounded-lg border border-base-300 md:block">
 			<table class="table table-sm">
 				<thead>
 					<tr>
