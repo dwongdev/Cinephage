@@ -2,7 +2,7 @@
 	import * as m from '$lib/paraglide/messages.js';
 	import { Folder, ChevronDown, ChevronUp, Link } from 'lucide-svelte';
 	import type { UnmatchedFolder } from '$lib/types/unmatched.js';
-	import { formatBytes, getFileName } from '$lib/utils/format.js';
+	import { getFileName } from '$lib/utils/format.js';
 
 	interface Props {
 		folder: UnmatchedFolder;

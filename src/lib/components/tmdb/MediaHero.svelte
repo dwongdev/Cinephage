@@ -187,12 +187,8 @@
 				class="h-full w-full object-cover opacity-40 blur-sm"
 			/>
 		{/if}
-		<div
-			class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/80 to-transparent"
-		></div>
-		<div
-			class="absolute inset-0 bg-gradient-to-r from-base-200 via-base-200/60 to-transparent"
-		></div>
+		<div class="absolute inset-0 bg-linear-to-t from-base-200 via-base-200/80 to-transparent"></div>
+		<div class="absolute inset-0 bg-linear-to-r from-base-200 via-base-200/60 to-transparent"></div>
 	</div>
 
 	<!-- Content -->
