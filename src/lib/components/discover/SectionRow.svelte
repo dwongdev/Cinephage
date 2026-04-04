@@ -167,7 +167,7 @@
 			{/each}
 			{#if loading}
 				<div
-					class="flex min-h-[200px] w-32 flex-none items-center justify-center sm:w-36 md:w-40 lg:w-44"
+					class="flex min-h-50 w-32 flex-none items-center justify-center sm:w-36 md:w-40 lg:w-44"
 				>
 					<span class="loading loading-md loading-spinner text-primary"></span>
 				</div>

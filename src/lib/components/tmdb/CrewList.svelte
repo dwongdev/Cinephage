@@ -36,8 +36,8 @@
 	<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
 		{#if creators.length > 0}
 			<div class="flex items-center gap-2">
-				<span class="text-white/60">{m.tmdb_crewList_createdBy()}</span>
-				<span class="font-medium text-white">
+				<span class="text-base-content/60">{m.tmdb_crewList_createdBy()}</span>
+				<span class="font-medium text-base-content">
 					{creators.map((c) => c.name).join(', ')}
 				</span>
 			</div>
@@ -45,8 +45,8 @@
 
 		{#each Object.entries(groupedCrew) as [job, members] (job)}
 			<div class="flex items-center gap-2">
-				<span class="text-white/60">{job}</span>
-				<span class="font-medium text-white">
+				<span class="text-base-content/60">{job}</span>
+				<span class="font-medium text-base-content">
 					{members.map((m) => m.name).join(', ')}
 				</span>
 			</div>

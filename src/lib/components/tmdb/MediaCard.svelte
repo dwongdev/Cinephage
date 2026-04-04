@@ -54,7 +54,7 @@
 
 <a
 	href={resolvePath(link)}
-	class="group relative block aspect-[2/3] w-full overflow-hidden rounded-lg bg-base-300 shadow-sm transition-all hover:shadow-md hover:ring-2 hover:ring-primary/50"
+	class="group relative block aspect-2/3 w-full overflow-hidden rounded-lg bg-base-300 shadow-sm transition-all hover:shadow-md hover:ring-2 hover:ring-primary/50"
 >
 	<TmdbImage
 		path={poster}
@@ -99,7 +99,7 @@
 
 	<!-- Hover Overlay -->
 	<div
-		class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+		class="absolute inset-0 flex flex-col justify-end bg-linear-to-t from-black/90 via-black/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
 	>
 		<!-- Quick Add Button (top-right corner when not in library) -->
 		{#if !inLibrary && onAddToLibrary}

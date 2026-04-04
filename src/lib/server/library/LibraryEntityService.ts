@@ -246,24 +246,7 @@ export class LibraryEntityService {
 		const assigned = new Set(
 			existingAssignments.map((row) => `${row.libraryId}:${row.rootFolderId}`)
 		);
-		const rootFoldersByMedia = new Map<string, { id: string; isDefault: boolean }>();
-
-		const rootFolderRows = await db
-			.select({
-				id: rootFolders.id,
-				mediaType: rootFolders.mediaType,
-				mediaSubType: rootFolders.mediaSubType,
-				isDefault: rootFolders.isDefault
-			})
-			.from(rootFolders);
-
-		for (const folder of rootFolderRows) {
-			const key = `${folder.mediaType}:${normalizeMediaSubType(folder.mediaSubType)}`;
-			const current = rootFoldersByMedia.get(key);
-			if (!current || (folder.isDefault ?? false)) {
-				rootFoldersByMedia.set(key, { id: folder.id, isDefault: folder.isDefault ?? false });
-			}
-		}
+		const assignedRootFolderIds = new Set(existingAssignments.map((row) => row.rootFolderId));
 
 		const rowsToInsert: Array<{
 			libraryId: string;
@@ -274,14 +257,8 @@ export class LibraryEntityService {
 		const now = new Date().toISOString();
 
 		for (const library of libraryRows) {
-			const fallbackRootFolder =
-				library.defaultRootFolderId ??
-				rootFoldersByMedia.get(
-					`${library.mediaType}:${normalizeMediaSubType(library.mediaSubType)}`
-				)?.id ??
-				null;
-
-			if (!fallbackRootFolder) {
+			const fallbackRootFolder = library.defaultRootFolderId;
+			if (!fallbackRootFolder || assignedRootFolderIds.has(fallbackRootFolder)) {
 				continue;
 			}
 
@@ -297,6 +274,7 @@ export class LibraryEntityService {
 				createdAt: now
 			});
 			assigned.add(key);
+			assignedRootFolderIds.add(fallbackRootFolder);
 		}
 
 		if (rowsToInsert.length > 0) {

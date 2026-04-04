@@ -173,7 +173,7 @@
 			<X class="h-4 w-4" />
 		</button>
 	</div>
-	<p class="mt-1 text-sm break-words text-base-content/70" title={file.path}>
+	<p class="mt-1 text-sm wrap-break-word text-base-content/70" title={file.path}>
 		{getFileName(file.path)}
 	</p>
 
@@ -205,7 +205,7 @@
 		<!-- TV Show Selected - Season/Episode Input -->
 		<div class="mt-4 rounded-lg bg-base-200 p-4">
 			<div class="flex items-center gap-3">
-				<div class="h-16 w-12 flex-shrink-0 overflow-hidden rounded">
+				<div class="h-16 w-12 shrink-0 overflow-hidden rounded">
 					<TmdbImage
 						path={selectedShow.poster_path}
 						alt={selectedShow.name ?? 'Show poster'}
@@ -293,7 +293,7 @@
 						onclick={() => (searchType === 'movie' ? matchToMovie(result) : selectShow(result))}
 						disabled={isMatching}
 					>
-						<div class="h-16 w-12 flex-shrink-0 overflow-hidden rounded bg-base-300">
+						<div class="h-16 w-12 shrink-0 overflow-hidden rounded bg-base-300">
 							{#if result.poster_path}
 								<TmdbImage
 									path={result.poster_path}
@@ -312,7 +312,7 @@
 							{/if}
 						</div>
 						<div class="min-w-0 flex-1">
-							<p class="font-medium break-words sm:truncate">{result.title || result.name}</p>
+							<p class="font-medium wrap-break-word sm:truncate">{result.title || result.name}</p>
 							<p class="text-sm text-base-content/70">
 								{(result.release_date || result.first_air_date)?.substring(0, 4) || 'Unknown year'}
 							</p>
