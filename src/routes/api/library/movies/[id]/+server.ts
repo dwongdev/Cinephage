@@ -28,6 +28,7 @@ import {
 } from '$lib/server/library/LibraryAddService.js';
 import { isLikelyAnimeMedia } from '$lib/shared/anime-classification.js';
 import { mediaMoveService } from '$lib/server/library/MediaMoveService.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 
 /**
  * GET /api/library/movies/[id]
@@ -248,7 +249,12 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 				};
 			} else {
 				// Recovery path: if files exist but current root folder is missing, re-link directly.
+				const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+					nextRootFolderId,
+					'movie'
+				);
 				updateData.rootFolderId = nextRootFolderId;
+				updateData.libraryId = owningLibrary.id;
 			}
 		}
 	}

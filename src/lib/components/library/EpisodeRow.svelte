@@ -11,7 +11,8 @@
 		Zap,
 		ChevronDown,
 		Loader2,
-		Subtitles,
+		Captions,
+		CaptionsOff,
 		Trash2
 	} from 'lucide-svelte';
 	import QualityBadge from './QualityBadge.svelte';
@@ -429,11 +430,11 @@
 								? m.library_episodeRow_noSubtitlesTooltip()
 								: m.library_episodeRow_subtitleCountTooltip({ count: allSubtitles.length })}
 						>
-							<Subtitles
-								size={12}
-								class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
-							/>
 							{#if allSubtitles.length > 0}
+								<Captions
+									size={12}
+									class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
+								/>
 								<span class="inline-flex min-w-0">
 									<SubtitleDisplay
 										subtitles={allSubtitles}
@@ -445,6 +446,10 @@
 									/>
 								</span>
 							{:else if missingSubtitles}
+								<CaptionsOff
+									size={12}
+									class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
+								/>
 								<span class="text-xs text-warning"
 									>{m.library_episodeRow_subtitlesMissingLabel()}</span
 								>
@@ -493,12 +498,12 @@
 							? m.library_episodeRow_noSubtitlesTooltip()
 							: m.library_episodeRow_subtitleCountTooltip({ count: allSubtitles.length })}
 					>
-						<Subtitles
-							size={12}
-							class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
-						/>
 						{#if allSubtitles.length > 0}
-							<span class="inline-flex max-w-[9.5rem] min-w-0">
+							<Captions
+								size={12}
+								class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
+							/>
+							<span class="inline-flex max-w-38 min-w-0">
 								<SubtitleDisplay
 									subtitles={allSubtitles}
 									maxDisplay={2}
@@ -509,10 +514,15 @@
 								/>
 							</span>
 						{:else if missingSubtitles}
+							<Captions size={12} />
 							<span class="text-xs text-warning"
 								>{m.library_episodeRow_subtitlesMissingLabel()}</span
 							>
 						{:else}
+							<CaptionsOff
+								size={12}
+								class={missingSubtitles ? 'text-warning' : 'text-base-content/50'}
+							/>
 							<span class="text-xs text-base-content/40"
 								>{m.library_episodeRow_subtitlesNoneLabel()}</span
 							>

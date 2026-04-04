@@ -17,6 +17,7 @@ import {
 } from '$lib/server/library/LibraryAddService.js';
 import { isLikelyAnimeMedia } from '$lib/shared/anime-classification.js';
 import { fetchAndStoreMovieAlternateTitles } from '$lib/server/services/AlternateTitleService.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import { ValidationError } from '$lib/errors';
 import { logger } from '$lib/logging';
 import { requireAuth } from '$lib/server/auth/authorization.js';
@@ -201,6 +202,10 @@ export const POST: RequestHandler = async (event) => {
 			isAnimeMedia,
 			mediaTitle: movieDetails.title
 		});
+		const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+			rootFolderId,
+			'movie'
+		);
 
 		// Generate folder path
 		const year = movieDetails.release_date
@@ -232,6 +237,7 @@ export const POST: RequestHandler = async (event) => {
 				runtime: movieDetails.runtime,
 				genres: movieDetails.genres?.map((g) => g.name) ?? [],
 				path: folderName,
+				libraryId: owningLibrary.id,
 				rootFolderId,
 				scoringProfileId: effectiveProfileId,
 				monitored,

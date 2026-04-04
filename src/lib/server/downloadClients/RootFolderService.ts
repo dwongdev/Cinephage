@@ -19,6 +19,7 @@ import {
 	isAnimeRootFolderEnforcementEnabled,
 	setAnimeRootFolderEnforcement
 } from '$lib/server/library/anime-root-enforcement-settings.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getLibraryScheduler } from '$lib/server/library/library-scheduler.js';
@@ -191,6 +192,8 @@ export class RootFolderService {
 			);
 		});
 
+		await this.syncSystemLibraries();
+
 		const created = await this.getFolder(id);
 		if (!created) {
 			throw new Error('Failed to create root folder');
@@ -262,6 +265,8 @@ export class RootFolderService {
 			throw new Error('Failed to update root folder');
 		}
 
+		await this.syncSystemLibraries();
+
 		const autoDisabledAnimeEnforcement = await this.disableAnimeEnforcementIfNoAnimeFolders();
 
 		return { folder: updated, autoDisabledAnimeEnforcement };
@@ -281,6 +286,8 @@ export class RootFolderService {
 
 		await db.delete(rootFoldersTable).where(eq(rootFoldersTable.id, id));
 		logger.info({ id }, 'Root folder deleted');
+
+		await this.syncSystemLibraries();
 
 		const autoDisabledAnimeEnforcement = await this.disableAnimeEnforcementIfNoAnimeFolders();
 
@@ -307,6 +314,19 @@ export class RootFolderService {
 		}
 
 		return false;
+	}
+
+	private async syncSystemLibraries(): Promise<void> {
+		try {
+			await getLibraryEntityService().syncSystemLibrariesFromRootFolders();
+		} catch (error) {
+			logger.warn(
+				{
+					error: error instanceof Error ? error.message : String(error)
+				},
+				'Failed to synchronize system libraries after root folder update'
+			);
+		}
 	}
 
 	/**
@@ -461,6 +481,18 @@ export class RootFolderService {
 	}
 
 	/**
+	 * Get total filesystem capacity for a path in bytes.
+	 */
+	async getTotalSpace(folderPath: string): Promise<number> {
+		try {
+			const stats = await fs.statfs(folderPath);
+			return stats.blocks * stats.bsize;
+		} catch {
+			return 0;
+		}
+	}
+
+	/**
 	 * Refresh free space for all folders.
 	 */
 	async refreshFreeSpace(): Promise<void> {
@@ -544,6 +576,7 @@ export class RootFolderService {
 		// Check current accessibility
 		let accessible: boolean;
 		let freeSpaceBytes: number | null = null;
+		let totalSpaceBytes: number | null = null;
 		let freeSpaceFormatted: string | undefined;
 		const isReadOnly = !!row.readOnly;
 
@@ -567,6 +600,7 @@ export class RootFolderService {
 				} else {
 					freeSpaceBytes = row.freeSpaceBytes;
 				}
+				totalSpaceBytes = await this.getTotalSpace(row.path);
 
 				if (freeSpaceBytes) {
 					freeSpaceFormatted = this.formatBytes(freeSpaceBytes);
@@ -587,6 +621,7 @@ export class RootFolderService {
 			preserveSymlinks: !!row.preserveSymlinks,
 			defaultMonitored: row.defaultMonitored ?? true,
 			freeSpaceBytes,
+			totalSpaceBytes,
 			freeSpaceFormatted,
 			accessible,
 			lastCheckedAt: row.lastCheckedAt ?? undefined,

@@ -21,6 +21,7 @@ import { logger } from '$lib/logging';
 import { requireAuth } from '$lib/server/auth/authorization.js';
 import { NamingService, type MediaNamingInfo } from '$lib/server/library/naming/NamingService.js';
 import { namingSettingsService } from '$lib/server/library/naming/NamingSettingsService.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 
 /**
  * Schema for adding a series to the library
@@ -205,6 +206,10 @@ export const POST: RequestHandler = async (event) => {
 			isAnimeMedia,
 			mediaTitle: tvDetails.name
 		});
+		const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+			rootFolderId,
+			'tv'
+		);
 
 		// Extract external IDs (shared logic)
 		const { imdbId, tvdbId } = await fetchSeriesExternalIds(tmdbId);
@@ -244,6 +249,7 @@ export const POST: RequestHandler = async (event) => {
 				network: tvDetails.networks?.[0]?.name ?? null,
 				genres: tvDetails.genres?.map((g) => g.name) ?? [],
 				path: folderName,
+				libraryId: owningLibrary.id,
 				rootFolderId,
 				scoringProfileId: effectiveProfileId,
 				monitored,

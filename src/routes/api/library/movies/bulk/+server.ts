@@ -16,6 +16,7 @@ import {
 	triggerMovieSearch
 } from '$lib/server/library/LibraryAddService.js';
 import { isLikelyAnimeMedia } from '$lib/shared/anime-classification.js';
+import { getLibraryEntityService } from '$lib/server/library/LibraryEntityService.js';
 import { ValidationError } from '$lib/errors';
 import { logger } from '$lib/logging';
 
@@ -81,6 +82,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Verify root folder exists and is for movies
 		await validateRootFolder(rootFolderId, 'movie');
+		const owningLibrary = await getLibraryEntityService().resolveOwningLibraryForRootFolder(
+			rootFolderId,
+			'movie'
+		);
 		const enforceAnimeSubtype = await getAnimeSubtypeEnforcement();
 
 		// Check which movies already exist in library
@@ -153,6 +158,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						runtime: movieDetails.runtime,
 						genres: movieDetails.genres?.map((g) => g.name) ?? [],
 						path: folderName,
+						libraryId: owningLibrary.id,
 						rootFolderId,
 						scoringProfileId: effectiveProfileId,
 						monitored,

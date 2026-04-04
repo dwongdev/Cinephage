@@ -24,6 +24,7 @@
 		monitored: boolean;
 		collection: CollectionInfo | null;
 		addEntireCollection: boolean;
+		onMonitoredInput?: () => void;
 	}
 
 	let {
@@ -31,7 +32,8 @@
 		minimumAvailability = $bindable(),
 		monitored = $bindable(),
 		collection,
-		addEntireCollection = $bindable()
+		addEntireCollection = $bindable(),
+		onMonitoredInput
 	}: Props = $props();
 
 	const availabilityOptions: { value: MinimumAvailability; label: string; description: string }[] =
@@ -112,7 +114,12 @@
 
 <!-- Monitored Toggle -->
 <label class="flex cursor-pointer items-start gap-4 py-2">
-	<input type="checkbox" class="toggle mt-0.5 shrink-0 toggle-primary" bind:checked={monitored} />
+	<input
+		type="checkbox"
+		class="toggle mt-0.5 shrink-0 toggle-primary"
+		bind:checked={monitored}
+		onchange={() => onMonitoredInput?.()}
+	/>
 	<div class="min-w-0">
 		<span class="flex items-center gap-2 text-sm font-medium">
 			<Eye class="h-4 w-4 shrink-0" />

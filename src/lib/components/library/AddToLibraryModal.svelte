@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { X, Loader2, Search } from 'lucide-svelte';
 	import { toasts } from '$lib/stores/toast.svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
 	import CommonOptions from './add/CommonOptions.svelte';
 	import { sortRootFoldersForMediaType } from '$lib/utils/root-folders.js';
@@ -36,6 +36,15 @@
 		mediaSubType?: 'standard' | 'anime';
 		isDefault?: boolean;
 		freeSpaceBytes?: number | null;
+	}
+
+	interface LibraryEntity {
+		id: string;
+		mediaType: 'movie' | 'tv';
+		defaultMonitored: boolean;
+		defaultSearchOnAdd: boolean;
+		defaultWantsSubtitles: boolean;
+		rootFolders: Array<{ id: string }>;
 	}
 
 	interface ScoringProfile {
@@ -90,6 +99,7 @@
 
 	// State
 	let rootFolders = $state<RootFolder[]>([]);
+	let libraries = $state<LibraryEntity[]>([]);
 	let scoringProfiles = $state<ScoringProfile[]>([]);
 	let seasons = $state<Season[]>([]);
 	let isLoading = $state(false);
@@ -108,6 +118,9 @@
 	let selectedScoringProfile = $state('');
 	let searchOnAdd = $state(true);
 	let wantsSubtitles = $state(true);
+	let monitoredTouched = $state(false);
+	let searchOnAddTouched = $state(false);
+	let wantsSubtitlesTouched = $state(false);
 
 	// Form state - Movie specific
 	let minimumAvailability = $state<MinimumAvailability>('released');
@@ -127,6 +140,18 @@
 	);
 	const filteredRootFolders = $derived(
 		sortRootFoldersForMediaType(rootFolders, mediaType, requiredMediaSubType)
+	);
+	const rootFolderLibraryMap = $derived.by(() => {
+		const assignments = new SvelteMap<string, LibraryEntity>();
+		for (const library of libraries) {
+			for (const rootFolder of library.rootFolders ?? []) {
+				assignments.set(rootFolder.id, library);
+			}
+		}
+		return assignments;
+	});
+	const selectedRootFolderLibrary = $derived(
+		selectedRootFolder ? rootFolderLibraryMap.get(selectedRootFolder) : undefined
 	);
 
 	function getRecommendedRootFolderId(folders: RootFolder[]): string | undefined {
@@ -198,6 +223,9 @@
 			addEntireCollection = false;
 			enforceAnimeSubtype = false;
 			detectedAnime = false;
+			monitoredTouched = false;
+			searchOnAddTouched = false;
+			wantsSubtitlesTouched = false;
 
 			loadData();
 		}
@@ -225,6 +253,36 @@
 			selectedRootFolder = getRecommendedRootFolderId(filteredRootFolders) ?? '';
 		}
 	});
+
+	$effect(() => {
+		if (!open || !selectedRootFolderLibrary) return;
+
+		if (!searchOnAddTouched) {
+			searchOnAdd = selectedRootFolderLibrary.defaultSearchOnAdd;
+		}
+		if (!wantsSubtitlesTouched) {
+			wantsSubtitles = selectedRootFolderLibrary.defaultWantsSubtitles;
+		}
+		if (!monitoredTouched) {
+			if (mediaType === 'movie') {
+				monitored = selectedRootFolderLibrary.defaultMonitored;
+			} else {
+				monitorType = selectedRootFolderLibrary.defaultMonitored ? 'all' : 'none';
+			}
+		}
+	});
+
+	function handleMonitoredInput() {
+		monitoredTouched = true;
+	}
+
+	function handleSearchOnAddInput() {
+		searchOnAddTouched = true;
+	}
+
+	function handleWantsSubtitlesInput() {
+		wantsSubtitlesTouched = true;
+	}
 
 	function updateMonitoredSeasonsFromType(type: MonitorType) {
 		monitoredSeasons.clear();
@@ -298,6 +356,7 @@
 		try {
 			const requests: Promise<Response>[] = [
 				fetch('/api/root-folders'),
+				fetch(`/api/libraries?mediaType=${mediaType}`),
 				fetch('/api/scoring-profiles'),
 				fetch('/api/settings/library/classification')
 			];
@@ -310,23 +369,25 @@
 			}
 
 			const responses = await Promise.all(requests);
-			const [foldersRes, profilesRes, classificationRes] = responses;
+			const [foldersRes, librariesRes, profilesRes, classificationRes] = responses;
 
-			if (!foldersRes.ok || !profilesRes.ok || !classificationRes.ok) {
+			if (!foldersRes.ok || !librariesRes.ok || !profilesRes.ok || !classificationRes.ok) {
 				throw new Error('Failed to load configuration');
 			}
 
 			const foldersData = await foldersRes.json();
+			const librariesData = await librariesRes.json();
 			const profilesData = await profilesRes.json();
 			const classificationData = await classificationRes.json();
 
 			rootFolders = Array.isArray(foldersData) ? foldersData : (foldersData.folders ?? []);
+			libraries = librariesData.libraries ?? [];
 			scoringProfiles = profilesData.profiles ?? [];
 			enforceAnimeSubtype = classificationData?.enforceAnimeSubtype === true;
 
 			// Handle TV seasons
-			if (mediaType === 'tv' && responses[3]) {
-				const tvRes = responses[3];
+			if (mediaType === 'tv' && responses[4]) {
+				const tvRes = responses[4];
 				if (tvRes.ok) {
 					const tvData: TmdbTvDetails = await tvRes.json();
 					seasons = tvData.seasons?.filter((s: Season) => s.episode_count > 0) ?? [];
@@ -341,7 +402,7 @@
 
 			// Fetch collection data for movies (non-blocking, don't fail if it errors)
 			if (mediaType === 'movie') {
-				const movieRes = responses[3];
+				const movieRes = responses[4];
 				if (movieRes?.ok) {
 					const movieData: TmdbMovieDetails = await movieRes.json();
 					updateAnimeDetectionFromMovie(movieData);
@@ -624,6 +685,8 @@
 				{rootFolders}
 				{scoringProfiles}
 				{requiredMediaSubType}
+				onSearchOnAddInput={handleSearchOnAddInput}
+				onWantsSubtitlesInput={handleWantsSubtitlesInput}
 				bind:selectedRootFolder
 				bind:selectedScoringProfile
 				bind:searchOnAdd
@@ -634,6 +697,7 @@
 			{#if mediaType === 'movie'}
 				<MovieAddOptions
 					{tmdbId}
+					onMonitoredInput={handleMonitoredInput}
 					bind:minimumAvailability
 					bind:monitored
 					{collection}
@@ -645,6 +709,7 @@
 			{#if mediaType === 'tv'}
 				<SeriesAddOptions
 					{seasons}
+					onMonitoredInput={handleMonitoredInput}
 					bind:monitorType
 					bind:monitorNewItems
 					bind:monitorSpecials

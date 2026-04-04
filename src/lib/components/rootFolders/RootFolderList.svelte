@@ -1,6 +1,20 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages.js';
-	import { Folder, Settings, Trash2, Film, Tv, AlertCircle, Star, Eye } from 'lucide-svelte';
+	import {
+		Folder,
+		Settings,
+		Trash2,
+		Film,
+		Tv,
+		Star,
+		Eye,
+		EyeOff,
+		HardDrive,
+		ShieldCheck,
+		ShieldX,
+		GitBranchMinus,
+		GitBranchPlus
+	} from 'lucide-svelte';
 	import type { RootFolder } from '$lib/types/downloadClient';
 	import { sortRootFoldersForMediaType } from '$lib/utils/root-folders.js';
 
@@ -18,7 +32,6 @@
 	type FolderSection = {
 		id: 'movie' | 'tv';
 		title: string;
-		description: string;
 		icon: typeof Film;
 		folders: RootFolder[];
 	};
@@ -28,14 +41,12 @@
 			{
 				id: 'movie',
 				title: m.rootFolders_movieFoldersTitle(),
-				description: m.rootFolders_movieFoldersDesc(),
 				icon: Film,
 				folders: movieFolders
 			},
 			{
 				id: 'tv',
 				title: m.rootFolders_tvFoldersTitle(),
-				description: m.rootFolders_tvFoldersDesc(),
 				icon: Tv,
 				folders: tvFolders
 			}
@@ -63,11 +74,10 @@
 					</div>
 					<div class="min-w-0">
 						<h3 class="font-semibold">{section.title}</h3>
-						<p class="text-sm text-base-content/60">{section.description}</p>
 					</div>
 				</div>
 
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{#each section.folders as folder (folder.id)}
 						<div class="card bg-base-200 shadow-sm">
 							<div class="card-body p-4">
@@ -85,8 +95,8 @@
 											{/if}
 										</div>
 										<div class="min-w-0">
-											<h3 class="flex items-center gap-2 font-semibold">
-												{folder.name}
+											<h3 class="flex items-center gap-2">
+												<span class="font-semibold">{folder.name}</span>
 												{#if folder.isDefault}
 													<span class="badge gap-1 badge-primary">
 														<Star class="h-3 w-3" />
@@ -103,7 +113,9 @@
 													</span>
 												{/if}
 												{#if (folder.mediaSubType ?? 'standard') === 'anime'}
-													<span class="badge badge-sm badge-accent">Anime</span>
+													<span class="badge badge-sm badge-accent"
+														>{m.settings_general_badgeAnime()}</span
+													>
 												{/if}
 											</h3>
 											<p class="max-w-full font-mono text-sm break-all text-base-content/60">
@@ -116,38 +128,105 @@
 										<button
 											class="btn btn-square btn-ghost btn-sm"
 											onclick={() => onEdit(folder)}
-											title="Edit"
+											title={m.action_edit()}
 										>
 											<Settings class="h-4 w-4" />
 										</button>
 										<button
 											class="btn btn-square text-error btn-ghost btn-sm"
 											onclick={() => onDelete(folder)}
-											title="Delete"
+											title={m.action_delete()}
 										>
 											<Trash2 class="h-4 w-4" />
 										</button>
 									</div>
 								</div>
 
-								<div class="mt-3 border-t border-base-300 pt-3">
-									{#if !folder.accessible}
-										<div class="flex items-center gap-2 text-sm text-error">
-											<AlertCircle class="h-4 w-4" />
-											<span>{m.rootFolders_pathNotAccessible()}</span>
-										</div>
-									{:else}
-										<div class="flex items-center justify-between text-sm">
-											<span class="text-base-content/60">{m.rootFolders_freeSpaceLabel()}</span>
-											{#if folder.readOnly}
-												<span class="text-base-content/60">{m.common_na()}</span>
-											{:else if folder.freeSpaceFormatted}
-												<span class="font-medium">{folder.freeSpaceFormatted}</span>
+								<div class="mt-3 grid grid-cols-4 gap-2 border-t border-base-300 pt-3">
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={m.settings_general_statusTooltip({
+											label: m.rootFolders_preserveSymlinksLabel(),
+											status: folder.preserveSymlinks ? m.common_enabled() : m.common_disabled()
+										})}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+												folder.preserveSymlinks
+													? 'border-success/30 bg-success/10 text-success'
+													: 'border-error/30 bg-error/10 text-error'
+											}`}
+										>
+											{#if folder.preserveSymlinks}
+												<GitBranchPlus class="h-3.5 w-3.5" />
 											{:else}
-												<span class="text-base-content/60">{m.rootFolders_unknown()}</span>
+												<GitBranchMinus class="h-3.5 w-3.5" />
 											{/if}
-										</div>
-									{/if}
+										</span>
+									</div>
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={m.settings_general_statusTooltip({
+											label: m.rootFolders_monitorNewContent(),
+											status: folder.defaultMonitored ? m.common_enabled() : m.common_disabled()
+										})}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+												folder.defaultMonitored
+													? 'border-success/30 bg-success/10 text-success'
+													: 'border-error/30 bg-error/10 text-error'
+											}`}
+										>
+											{#if folder.defaultMonitored}
+												<Eye class="h-3.5 w-3.5" />
+											{:else}
+												<EyeOff class="h-3.5 w-3.5" />
+											{/if}
+										</span>
+									</div>
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={m.settings_general_statusTooltip({
+											label: m.settings_general_pathAccessible(),
+											status: folder.accessible ? m.settings_general_yes() : m.settings_general_no()
+										})}
+									>
+										<span
+											class={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+												folder.accessible
+													? 'border-success/30 bg-success/10 text-success'
+													: 'border-error/30 bg-error/10 text-error'
+											}`}
+										>
+											{#if folder.accessible}
+												<ShieldCheck class="h-3.5 w-3.5" />
+											{:else}
+												<ShieldX class="h-3.5 w-3.5" />
+											{/if}
+										</span>
+									</div>
+									<div
+										class="flex flex-col items-center gap-1 rounded-lg"
+										title={folder.readOnly
+											? 'Free Space: N/A'
+											: folder.freeSpaceFormatted
+												? `Free Space: ${folder.freeSpaceFormatted}`
+												: 'Free Space: Unknown'}
+									>
+										<span
+											class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-base-content/80"
+										>
+											<HardDrive class="h-3.5 w-3.5 shrink-0" />
+											{#if folder.readOnly}
+												{m.common_na()}
+											{:else if folder.freeSpaceFormatted}
+												<span class="whitespace-nowrap">{folder.freeSpaceFormatted}</span>
+											{:else}
+												{m.rootFolders_unknown()}
+											{/if}
+										</span>
+									</div>
 								</div>
 							</div>
 						</div>

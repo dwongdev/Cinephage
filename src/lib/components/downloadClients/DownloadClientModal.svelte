@@ -371,6 +371,28 @@
 		browsingField = field;
 		showFolderBrowser = true;
 	}
+
+	function getProtocolLabel(protocol: 'torrent' | 'usenet' | 'nntp'): string {
+		switch (protocol) {
+			case 'torrent':
+				return m.downloadClient_protocol_torrent();
+			case 'usenet':
+				return m.downloadClient_protocol_usenet();
+			case 'nntp':
+				return m.downloadClient_protocol_nntp();
+		}
+	}
+
+	function getClientDescription(def: (typeof clientDefinitions)[number]): string {
+		switch (def.id) {
+			case 'qbittorrent':
+				return m.downloadClient_desc_qbittorrent();
+			case 'nntp':
+				return m.downloadClient_desc_nntp();
+			default:
+				return def.description;
+		}
+	}
 </script>
 
 <ModalWrapper {open} {onClose} maxWidth="3xl" labelledBy="download-client-modal-title">
@@ -404,11 +426,11 @@
 												? 'badge-secondary'
 												: 'badge-primary'}"
 										>
-											{m[`downloadClient_protocol_${def.protocol}`]?.() ?? def.protocol}
+											{getProtocolLabel(def.protocol)}
 										</span>
 									</div>
 									<p class="mt-1 text-sm text-base-content/60">
-										{m[`downloadClient_desc_${def.id}`]?.() ?? def.description}
+										{getClientDescription(def)}
 									</p>
 								</div>
 								<div class="badge badge-outline badge-sm">:{def.defaultPort}</div>
