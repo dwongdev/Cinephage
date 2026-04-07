@@ -36,6 +36,7 @@ import {
 	type QueueStats,
 	type QueueEvent
 } from '$lib/types/queue';
+import { parseEpisodePointerFromTitle } from '$lib/server/downloads/episode-pointer.js';
 
 // Import service is loaded lazily to avoid circular dependencies
 let importServiceInstance: import('../import').ImportService | null = null;
@@ -201,6 +202,20 @@ function mapDownloadStatusToQueueStatus(
 			);
 			return 'queued';
 	}
+}
+
+function shouldPreservePointerSize(
+	queueItem: typeof downloadQueue.$inferSelect,
+	download: DownloadInfo
+): boolean {
+	const pointerTarget = parseEpisodePointerFromTitle(queueItem.title);
+	if (!pointerTarget) {
+		return false;
+	}
+
+	const existingSize = queueItem.size ?? 0;
+	const clientSize = download.size ?? 0;
+	return existingSize > 0 && clientSize > existingSize;
 }
 
 /**
@@ -1226,7 +1241,7 @@ export class DownloadMonitorService extends EventEmitter implements BackgroundSe
 		// Build update object
 		const updates: Partial<typeof downloadQueue.$inferInsert> = {
 			progress: download.progress.toString(),
-			size: download.size,
+			size: shouldPreservePointerSize(queueItem, download) ? queueItem.size : download.size,
 			downloadSpeed: download.downloadSpeed,
 			uploadSpeed: download.uploadSpeed,
 			eta: download.eta,

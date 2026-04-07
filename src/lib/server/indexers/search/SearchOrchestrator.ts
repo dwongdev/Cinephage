@@ -119,6 +119,17 @@ const DEFAULT_OPTIONS: Required<
 	useCache: true
 };
 
+const CYRILLIC_REGEX = /\p{Script=Cyrillic}/u;
+
+function containsCyrillic(value: string): boolean {
+	return CYRILLIC_REGEX.test(value);
+}
+
+function prefersNativeCyrillicTitles(indexer: IIndexer): boolean {
+	const name = indexer.name.toLowerCase();
+	return name.includes('rutracker') || name.includes('kinozal');
+}
+
 const NON_VIDEO_ARTIFACT_TITLE_PATTERNS: RegExp[] = [
 	/\boriginal\s+soundtrack\b/i,
 	/\bsoundtrack\b/i,
@@ -1141,7 +1152,15 @@ export class SearchOrchestrator {
 					? [criteria.query]
 					: [];
 
-		const titlesToSearch = [...new Set(rawTitles.map((title) => title.trim()).filter(Boolean))];
+		let titlesToSearch = [...new Set(rawTitles.map((title) => title.trim()).filter(Boolean))];
+
+		if (prefersNativeCyrillicTitles(indexer)) {
+			titlesToSearch = [...titlesToSearch].sort((a, b) => {
+				const aCyrillic = containsCyrillic(a) ? 1 : 0;
+				const bCyrillic = containsCyrillic(b) ? 1 : 0;
+				return bCyrillic - aCyrillic;
+			});
+		}
 
 		if (titlesToSearch.length === 0) {
 			return [];
@@ -1174,8 +1193,10 @@ export class SearchOrchestrator {
 		let successfulVariants = 0;
 		const variantErrors: string[] = [];
 
-		// Search with each title variant (limit to 3 titles to avoid excessive queries)
-		for (const title of titlesToSearch.slice(0, 3)) {
+		// Search with each title variant. Russian trackers benefit from a slightly
+		// larger budget because native-script titles may appear after English variants.
+		const titleBudget = prefersNativeCyrillicTitles(indexer) ? 5 : 3;
+		for (const title of titlesToSearch.slice(0, titleBudget)) {
 			if (episodeFormats.length > 0) {
 				const shouldTryInteractiveTvTitleOnlyFallback =
 					isTvSearch(criteria) &&
@@ -2305,6 +2326,10 @@ export class SearchOrchestrator {
 		}
 
 		const beforeCount = releases.length;
+		const isInteractiveSearch = criteria.searchSource === 'interactive';
+		const allowInteractiveFallback =
+			isInteractiveSearch &&
+			(isMovieSearch(criteria) || (isTvSearch(criteria) && !criteria.season && !criteria.episode));
 
 		const filtered = releases.filter((release) => {
 			let parsed: ReturnType<typeof parseRelease> | undefined;
@@ -2399,7 +2424,6 @@ export class SearchOrchestrator {
 
 			// PRIORITY 2: Title + Year Fallback (if no ID match possible)
 			if (hasSearchTitles && hasSearchYear) {
-				const isInteractiveSearch = criteria.searchSource === 'interactive';
 				const isEpisodeTarget = isTvSearch(criteria) && criteria.episode !== undefined;
 				const isSeasonTarget = isTvSearch(criteria) && criteria.season !== undefined;
 				const releaseHasAnyId = !!(release.tmdbId || release.imdbId || release.tvdbId);
@@ -2522,6 +2546,43 @@ export class SearchOrchestrator {
 				},
 				'[SearchOrchestrator] ID/Title filter removed mismatched releases'
 			);
+		}
+
+		// Interactive localized searches should not hard-fail here when the
+		// tracker returns relevant releases in a different script/transliteration
+		// and none of them expose authoritative IDs. Keep explicit ID mismatches
+		// strict, but fall back to the pre-filtered set when everything else
+		// would be removed.
+		if (allowInteractiveFallback && beforeCount > 0 && filtered.length === 0) {
+			const releasesWithoutIdConflicts = releases.filter((release) => {
+				if (searchTmdbId && release.tmdbId && release.tmdbId !== searchTmdbId) {
+					return false;
+				}
+				if (searchImdbId && release.imdbId && release.imdbId !== searchImdbId) {
+					return false;
+				}
+				if (searchTvdbId && release.tvdbId && release.tvdbId !== searchTvdbId) {
+					return false;
+				}
+				return true;
+			});
+
+			if (releasesWithoutIdConflicts.length > 0) {
+				logger.info(
+					{
+						before: beforeCount,
+						kept: releasesWithoutIdConflicts.length,
+						searchType: criteria.searchType,
+						searchSource: criteria.searchSource,
+						criteriaTmdbId: searchTmdbId,
+						criteriaImdbId: searchImdbId,
+						criteriaTvdbId: searchTvdbId,
+						criteriaYear: searchYear
+					},
+					'[SearchOrchestrator] ID/title fallback applied for interactive search'
+				);
+				return releasesWithoutIdConflicts;
+			}
 		}
 
 		return filtered;

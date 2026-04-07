@@ -796,6 +796,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			episodeIds: data.episodeIds,
 			seasonNumber: data.seasonNumber,
 			quality,
+			size: data.size,
 			isAutomatic: data.isAutomatic ?? false,
 			isUpgrade: isUpgrade
 		});

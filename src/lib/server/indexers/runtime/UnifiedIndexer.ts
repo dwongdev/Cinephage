@@ -588,7 +588,7 @@ export class UnifiedIndexer implements IIndexer {
 		if (this.authManager.checkLoginNeeded(mockResponse, response.body)) {
 			this.log.info('Login needed, re-authenticating');
 			this.isLoggedIn = false;
-			await this.ensureLoggedIn();
+			await this.ensureLoggedIn(true);
 
 			this.http.setCookies(this.cookies);
 
@@ -691,12 +691,12 @@ export class UnifiedIndexer implements IIndexer {
 	/**
 	 * Ensure we're logged in (if required)
 	 */
-	private async ensureLoggedIn(): Promise<void> {
+	private async ensureLoggedIn(forceFreshLogin = false): Promise<void> {
 		if (!this.authManager.requiresAuth()) {
 			return;
 		}
 
-		if (this.isLoggedIn && Object.keys(this.cookies).length > 0) {
+		if (!forceFreshLogin && this.isLoggedIn && Object.keys(this.cookies).length > 0) {
 			return;
 		}
 
@@ -707,7 +707,12 @@ export class UnifiedIndexer implements IIndexer {
 			encoding: this.definition.encoding
 		};
 
-		const hasStoredCookies = await this.authManager.loadCookies(context);
+		if (forceFreshLogin) {
+			await this.authManager.clearCookies(context);
+			this.cookies = {};
+		}
+
+		const hasStoredCookies = !forceFreshLogin && (await this.authManager.loadCookies(context));
 		if (hasStoredCookies) {
 			this.cookies = this.authManager.getCookies();
 			this.isLoggedIn = true;
@@ -1187,7 +1192,7 @@ export class UnifiedIndexer implements IIndexer {
 
 			const headers: Record<string, string> = {
 				Accept: 'application/x-bittorrent, application/x-nzb, */*',
-				Referer: this.requestBuilder.getBaseUrl()
+				Referer: options?.releaseDetailsUrl ?? url
 			};
 
 			if (Object.keys(this.cookies).length > 0) {
