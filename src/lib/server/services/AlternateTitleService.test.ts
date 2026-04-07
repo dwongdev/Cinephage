@@ -39,6 +39,18 @@ describe('cleanTitle', () => {
 		});
 	});
 
+	describe('non-Latin scripts', () => {
+		it('should preserve Cyrillic titles for regional tracker searching', () => {
+			expect(cleanTitle('Как Деревянко Чехова играл')).toBe('как деревянко чехова играл');
+		});
+
+		it('should preserve mixed Latin and Cyrillic titles', () => {
+			expect(cleanTitle('How Derevyanko Played / Как Деревянко играл')).toBe(
+				'how derevyanko played как деревянко играл'
+			);
+		});
+	});
+
 	describe('basic normalization', () => {
 		it('should convert to lowercase', () => {
 			expect(cleanTitle('DUNE')).toBe('dune');

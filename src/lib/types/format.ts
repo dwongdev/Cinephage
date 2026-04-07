@@ -33,6 +33,7 @@ export type {
  */
 export const FORMAT_CATEGORY_LABELS: Record<FormatCategory, string> = {
 	resolution: 'Resolution & Source',
+	source: 'Source Only',
 	release_group_tier: 'Release Groups',
 	audio: 'Audio',
 	hdr: 'HDR',
@@ -50,6 +51,7 @@ export const FORMAT_CATEGORY_LABELS: Record<FormatCategory, string> = {
  */
 export const FORMAT_CATEGORY_DESCRIPTIONS: Record<FormatCategory, string> = {
 	resolution: 'Resolution and source quality combinations (e.g., 2160p Remux, 1080p WEB-DL)',
+	source: 'Source-only fallback formats when resolution cannot be detected',
 	release_group_tier: 'Quality tiers for known release groups',
 	audio: 'Audio codec formats (TrueHD, DTS-HD MA, Atmos, etc.)',
 	hdr: 'HDR formats (Dolby Vision, HDR10+, HDR10, HLG)',
@@ -67,6 +69,7 @@ export const FORMAT_CATEGORY_DESCRIPTIONS: Record<FormatCategory, string> = {
  */
 export const FORMAT_CATEGORY_ORDER: FormatCategory[] = [
 	'resolution',
+	'source',
 	'audio',
 	'hdr',
 	'release_group_tier',
@@ -84,6 +87,7 @@ export const FORMAT_CATEGORY_ORDER: FormatCategory[] = [
  */
 export const FORMAT_CATEGORY_ICONS: Record<FormatCategory, string> = {
 	resolution: 'Monitor',
+	source: 'Film',
 	release_group_tier: 'Users',
 	audio: 'Volume2',
 	hdr: 'Sun',

@@ -181,6 +181,41 @@ describe('SearchOrchestrator.executeMultiTitleTextSearch', () => {
 		).toBe(true);
 	});
 
+	it('prioritizes Cyrillic title variants for RuTracker and expands the title budget', async () => {
+		const orchestrator = new SearchOrchestrator();
+		const captured: any[] = [];
+
+		const fakeIndexer = {
+			name: 'RuTracker.org',
+			capabilities: mockCapabilities,
+			search: async (criteria: any) => {
+				captured.push(criteria);
+				return [];
+			}
+		} as any;
+
+		const criteria = {
+			searchType: 'tv',
+			searchSource: 'interactive',
+			query: 'How Derevyanko Chekhov Played',
+			searchTitles: [
+				'How Derevyanko Chekhov Played',
+				'How Derevyanko Played',
+				'Как Деревянко Чехова играл',
+				'Как Деревянко играл',
+				'Kak Derevyanko Chekhova igral'
+			],
+			season: 1
+		} as any;
+
+		await (orchestrator as any).executeMultiTitleTextSearch(fakeIndexer, criteria);
+
+		expect(captured.length).toBeGreaterThan(0);
+		expect(captured[0].query).toBe('Как Деревянко Чехова играл');
+		expect(captured.some((c: any) => c.query === 'Как Деревянко играл')).toBe(true);
+		expect(captured.some((c: any) => c.query === 'How Derevyanko Chekhov Played')).toBe(true);
+	});
+
 	it('reuses cached RuTracker season search results across automatic episode variants', async () => {
 		const orchestrator = new SearchOrchestrator();
 		const captured: any[] = [];
@@ -1056,5 +1091,44 @@ describe('SearchOrchestrator.filterByTitleRelevance', () => {
 
 		const filtered = (orchestrator as any).filterByTitleRelevance(releases, criteria);
 		expect(filtered).toHaveLength(0);
+	});
+
+	it('falls back to pre-filtered releases for interactive movie ID/title checks when localized titles remove all', () => {
+		const releases = [
+			{ title: 'Сталкер / Stalker [1979, BDRip 1080p]' },
+			{ title: 'Пикник на обочине [1979, WEB-DL 1080p]' }
+		] as any[];
+
+		const criteria = {
+			searchType: 'movie',
+			searchSource: 'interactive',
+			query: 'Stalker',
+			searchTitles: ['Stalker'],
+			year: 1979
+		} as any;
+
+		const filtered = (orchestrator as any).filterByIdOrTitleMatch(releases, criteria);
+		expect(filtered).toHaveLength(2);
+		expect(filtered).toEqual(releases);
+	});
+
+	it('keeps explicit ID mismatches strict during interactive ID/title fallback', () => {
+		const releases = [
+			{ title: 'Сталкер / Stalker [1979, BDRip 1080p]', tmdbId: 999999 },
+			{ title: 'Пикник на обочине [1979, WEB-DL 1080p]' }
+		] as any[];
+
+		const criteria = {
+			searchType: 'movie',
+			searchSource: 'interactive',
+			query: 'Stalker',
+			searchTitles: ['Stalker'],
+			year: 1979,
+			tmdbId: 1398
+		} as any;
+
+		const filtered = (orchestrator as any).filterByIdOrTitleMatch(releases, criteria);
+		expect(filtered).toHaveLength(1);
+		expect(filtered[0].title).toContain('Пикник');
 	});
 });

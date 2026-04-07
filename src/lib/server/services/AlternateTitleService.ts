@@ -39,8 +39,8 @@ export function cleanTitle(title: string): string {
 	// This ensures Unicode letters like ű are properly handled
 	clean = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-	// Replace non-alphanumeric with space (now that diacritics are stripped)
-	clean = clean.replace(/[^\w\s]/g, ' ');
+	// Replace non-letter/number with space while preserving non-Latin scripts
+	clean = clean.replace(/[^\p{L}\p{N}\s]/gu, ' ');
 
 	// Collapse multiple spaces and trim
 	clean = clean.replace(/\s+/g, ' ').trim();
