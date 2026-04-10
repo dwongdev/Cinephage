@@ -92,7 +92,7 @@ export async function getBaseUrlAsync(request: Request): Promise<string> {
 			logger.warn(
 				{
 					configuredUrl: baseUrl,
-					hint: 'Configure External Host in Settings -> Integrations -> Indexers -> Cinephage Stream',
+					hint: 'Configure Cinephage Server Address in Settings -> Integrations -> Indexers -> Cinephage Stream',
 					...streamLog
 				},
 				'Streaming base URL is set to localhost - this will not work for external clients'
@@ -121,10 +121,10 @@ export async function getBaseUrlAsync(request: Request): Promise<string> {
 		logger.warn(
 			{
 				requestUrl: request.url,
-				hint: 'Settings -> Integrations -> Indexers -> Cinephage Stream',
+				hint: 'Settings -> Integrations -> Indexers -> Cinephage Stream -> Cinephage Server Address',
 				...streamLog
 			},
-			'Using localhost URL for streaming - configure External Host for external access'
+			'Using localhost URL for streaming - configure Cinephage Server Address for external access'
 		);
 	}
 

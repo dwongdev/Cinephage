@@ -4,7 +4,7 @@ import { getStreamingIndexerSettings } from '$lib/server/streaming/settings';
 
 const streamLog = { logDomain: 'streams' as const };
 
-const DEFAULT_API_BASE_URL = 'https://api.cinephage.net';
+const CINEPHAGE_API_BASE_URL = 'https://api.cinephage.net';
 
 interface CinephageBackendConfig {
 	baseUrl: string;
@@ -56,10 +56,6 @@ export interface CinephageBackendHealth {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function normalizeBaseUrl(value: string | undefined): string {
-	return (value ?? DEFAULT_API_BASE_URL).replace(/\/$/, '');
 }
 
 function getFirstString(...values: unknown[]): string | undefined {
@@ -199,34 +195,17 @@ function normalizeSource(entry: unknown, apiBaseUrl: string): StreamSource | nul
 async function loadConfig(): Promise<CinephageBackendConfig> {
 	const settings = await getStreamingIndexerSettings();
 
-	const baseUrl = normalizeBaseUrl(
-		getFirstString(
-			settings?.cinephageApiBaseUrl,
-			process.env.CINEPHAGE_API_BASE_URL,
-			process.env.CINEPHAGE_UPSTREAM_API_BASE_URL
-		)
-	);
-	const commit = getFirstString(
-		settings?.cinephageCommit,
-		process.env.CINEPHAGE_API_COMMIT,
-		process.env.CINEPHAGE_UPSTREAM_COMMIT,
-		process.env.VITE_CINEPHAGE_COMMIT,
-		process.env.CINEPHAGE_COMMIT
-	);
-	const version = getFirstString(
-		settings?.cinephageVersion,
-		process.env.CINEPHAGE_API_VERSION,
-		process.env.CINEPHAGE_UPSTREAM_VERSION,
-		process.env.VITE_CINEPHAGE_VERSION,
-		process.env.CINEPHAGE_VERSION
-	);
+	const commit = getFirstString(settings?.cinephageCommit);
+	const version = getFirstString(settings?.cinephageVersion);
 
-	const missing = [commit ? null : 'cinephageCommit', version ? null : 'cinephageVersion'].filter(
-		(entry): entry is string => entry !== null
-	);
+	const missing = [
+		settings ? null : 'cinephage-stream indexer',
+		commit ? null : 'cinephageCommit',
+		version ? null : 'cinephageVersion'
+	].filter((entry): entry is string => entry !== null);
 
 	return {
-		baseUrl,
+		baseUrl: CINEPHAGE_API_BASE_URL,
 		commit,
 		version,
 		missing,
@@ -275,11 +254,9 @@ export class CinephageBackendClient {
 			return {
 				success: false,
 				sources: [],
-				error: `Cinephage backend is not configured: missing ${config.missing.join(', ')}`
+				error: `Cinephage backend is not configured: missing ${config.missing.join(', ')}. Enter the current published Cinephage API version and commit in the streaming indexer settings.`
 			};
 		}
-
-		const timestamp = Math.floor(Date.now() / 1000);
 
 		const url = new URL(`${config.baseUrl}/api/v1/stream/${params.tmdbId}`);
 		url.searchParams.set('type', params.type);
@@ -298,8 +275,7 @@ export class CinephageBackendClient {
 				headers: {
 					Accept: 'application/json',
 					'X-Cinephage-Version': config.version,
-					'X-Cinephage-Commit': config.commit,
-					'X-Cinephage-Timestamp': String(timestamp)
+					'X-Cinephage-Commit': config.commit
 				}
 			});
 
@@ -307,7 +283,8 @@ export class CinephageBackendClient {
 				return {
 					success: false,
 					sources: [],
-					error: 'Cinephage backend rejected authentication'
+					error:
+						'Cinephage backend rejected authentication. Verify the manually entered Cinephage API version and commit match the current published build.'
 				};
 			}
 

@@ -39,6 +39,7 @@ import { getPersistentStatusTracker } from './status';
 import { getRateLimitRegistry } from './ratelimit';
 import { cleanupIndexerCookies } from './http/IndexerHttp';
 import { CINEPHAGE_STREAM_DEFINITION_ID } from './types';
+import { sanitizeStreamingIndexerSettings } from '$lib/server/streaming/settings';
 
 /** Manager options */
 export interface IndexerManagerOptions {
@@ -147,6 +148,23 @@ export class IndexerManager {
 			.where(eq(indexersTable.definitionId, CINEPHAGE_STREAM_DEFINITION_ID));
 
 		if (existing.length > 0) {
+			const current = existing[0];
+			const sanitizedSettings = sanitizeStreamingIndexerSettings(
+				current.settings as Record<string, unknown> | null | undefined
+			);
+			const currentSettings =
+				(current.settings as Record<string, unknown> | null | undefined) ?? {};
+
+			if (JSON.stringify(currentSettings) !== JSON.stringify(sanitizedSettings)) {
+				await db
+					.update(indexersTable)
+					.set({
+						settings: sanitizedSettings,
+						updatedAt: new Date().toISOString()
+					})
+					.where(eq(indexersTable.id, current.id));
+			}
+
 			logger.debug('Streaming indexer already exists in database');
 			return;
 		}
@@ -567,7 +585,12 @@ export class IndexerManager {
 			alternateUrls: row.alternateUrls ?? [],
 			priority: row.priority ?? 25,
 			protocol,
-			settings: (row.settings as Record<string, string>) ?? {},
+			settings:
+				row.definitionId === CINEPHAGE_STREAM_DEFINITION_ID
+					? sanitizeStreamingIndexerSettings(
+							row.settings as Record<string, unknown> | null | undefined
+						)
+					: ((row.settings as Record<string, string>) ?? {}),
 
 			// Search capability toggles
 			enableAutomaticSearch: row.enableAutomaticSearch ?? true,

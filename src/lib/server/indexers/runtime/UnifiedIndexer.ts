@@ -820,7 +820,7 @@ export class UnifiedIndexer implements IIndexer {
 
 	/**
 	 * Validate settings used by the internal streaming indexer.
-	 * Ensures malformed External Host values fail the connection test.
+	 * Ensures malformed Cinephage Server Address values fail the connection test.
 	 */
 	private async validateInternalStreamingSettings(): Promise<void> {
 		const rawExternalHost = this.settings.externalHost;
@@ -845,27 +845,37 @@ export class UnifiedIndexer implements IIndexer {
 			parsed = new URL(candidate);
 		} catch {
 			throw new Error(
-				'Invalid External Host format. Use hostname[:port] (example: 192.168.1.100:3000).'
+				'Invalid Cinephage Server Address format. Use a hostname or IP address with an optional port, for example 192.168.1.100:3000 or media.example.com.'
 			);
 		}
 
 		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-			throw new Error('Invalid External Host protocol. Only http and https are supported.');
+			throw new Error(
+				'Invalid Cinephage Server Address protocol. Only http and https are supported.'
+			);
 		}
 
 		if (!parsed.hostname) {
-			throw new Error('Invalid External Host. Hostname is required.');
+			throw new Error('Invalid Cinephage Server Address. A hostname or IP address is required.');
+		}
+
+		if (parsed.hostname.toLowerCase() === 'api.cinephage.net') {
+			throw new Error(
+				'Cinephage Server Address must be your own Cinephage server reachable by Jellyfin, not api.cinephage.net.'
+			);
 		}
 
 		if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
-			throw new Error('Invalid External Host. Do not include a path, query, or fragment.');
+			throw new Error(
+				'Invalid Cinephage Server Address. Do not include a path, query, or fragment.'
+			);
 		}
 
 		await this.probeInternalStreamingHost(parsed);
 	}
 
 	/**
-	 * Probe external host reachability for internal streaming indexer config.
+	 * Probe server address reachability for internal streaming indexer config.
 	 * Any HTTP response counts as reachable; network/TLS/DNS failures do not.
 	 */
 	private async probeInternalStreamingHost(baseUrl: URL): Promise<void> {
@@ -886,8 +896,11 @@ export class UnifiedIndexer implements IIndexer {
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			const customPortHint = !baseUrl.port
+				? ` If your Cinephage server is not using the default ${baseUrl.protocol === 'https:' ? 'HTTPS' : 'HTTP'} port, include it in Cinephage Server Address.`
+				: '';
 			throw new Error(
-				`External Host is unreachable (${baseUrl.host}). Check host, port, and protocol. (${message})`,
+				`Cinephage Server Address is unreachable (${baseUrl.host}). Check the address, port, and protocol.${customPortHint} (${message})`,
 				{ cause: error }
 			);
 		} finally {
