@@ -1,7 +1,7 @@
 # Create versioned releases by promoting existing CI Docker images
 #
 # Triggers:
-# - Manual workflow_dispatch from main or dev branches
+# - Manual workflow_dispatch from main, dev, or experimental branches
 #
 # This workflow:
 # 1. Promotes existing CI architecture tags into release tags
@@ -12,9 +12,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    branches:
-      - main
-      - dev
     inputs:
       release_type:
         description: 'Version bump type (dev branch remaps major to minor)'
@@ -32,7 +29,7 @@ on:
         type: string
         default: ''
       source_tag:
-        description: 'CI candidate tag to promote (without -amd64/-arm64), e.g. edge-20260306-123'
+        description: 'CI candidate tag to promote (without -amd64/-arm64), e.g. main-20260306-123'
         required: true
         type: string
       release_notes:
@@ -150,20 +147,40 @@ jobs:
               ;;
           esac
 
-          # Dev-branch releases are always tagged as dev variants.
+          branch_channel() {
+            local ref="$1"
+            if [ "$ref" = 'main' ]; then
+              echo 'main'
+            elif [ "$ref" = 'dev' ]; then
+              echo 'dev'
+            elif [[ "$ref" =~ ^experimental([/-].*)?$ ]]; then
+              printf '%s' "$ref" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed -E 's|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-+|-|g'
+            else
+              return 1
+            fi
+          }
+
+          CHANNEL="$(branch_channel "$REF_NAME")" || {
+            echo "❌ Releases are only allowed from main, dev, or experimental branches. Got: ${REF_NAME}"
+            exit 1
+          }
+
+          # Non-main releases are always prerelease variants tied to the branch channel.
           # For auto-bumps, skip existing tags while preserving the selected bump semantics.
-          if [ "$REF_NAME" = 'dev' ]; then
+          if [ "$CHANNEL" != 'main' ]; then
             if [ "$RELEASE_TYPE" = 'custom' ]; then
-              if [[ ! "$VERSION" =~ -dev([.-][0-9A-Za-z]+)?$ ]]; then
-                VERSION="${VERSION}-dev"
+              if [[ ! "$VERSION" =~ -${CHANNEL}([.-][0-9A-Za-z]+)?$ ]]; then
+                VERSION="${VERSION}-${CHANNEL}"
               fi
             else
               if ! read -r DEV_MAJOR DEV_MINOR DEV_PATCH < <(parse_core_semver "$VERSION"); then
-                echo "❌ Could not parse dev version base: ${VERSION}"
+                echo "❌ Could not parse prerelease version base: ${VERSION}"
                 exit 1
               fi
 
-              while git rev-parse "v${DEV_MAJOR}.${DEV_MINOR}.${DEV_PATCH}-dev" >/dev/null 2>&1; do
+              while git rev-parse "v${DEV_MAJOR}.${DEV_MINOR}.${DEV_PATCH}-${CHANNEL}" >/dev/null 2>&1; do
                 case "$BUMP_TYPE" in
                   patch)
                     DEV_PATCH=$((DEV_PATCH + 1))
@@ -171,11 +188,11 @@ jobs:
                   *)
                     DEV_MINOR=$((DEV_MINOR + 1))
                     DEV_PATCH=0
-                    ;;
+                  ;;
                 esac
               done
 
-              VERSION="v${DEV_MAJOR}.${DEV_MINOR}.${DEV_PATCH}-dev"
+              VERSION="v${DEV_MAJOR}.${DEV_MINOR}.${DEV_PATCH}-${CHANNEL}"
             fi
           fi
 
@@ -199,18 +216,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "$REF_NAME" != 'main' ] && [ "$REF_NAME" != 'dev' ]; then
-            echo "❌ Releases are only allowed from main or dev. Got: ${REF_NAME}"
+          branch_channel() {
+            local ref="$1"
+            if [ "$ref" = 'main' ]; then
+              echo 'main'
+            elif [ "$ref" = 'dev' ]; then
+              echo 'dev'
+            elif [[ "$ref" =~ ^experimental([/-].*)?$ ]]; then
+              printf '%s' "$ref" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed -E 's|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-+|-|g'
+            else
+              return 1
+            fi
+          }
+
+          CHANNEL="$(branch_channel "$REF_NAME")" || {
+            echo "❌ Releases are only allowed from main, dev, or experimental branches. Got: ${REF_NAME}"
             exit 1
-          fi
+          }
 
           IS_PRERELEASE='false'
           REASON='stable-main'
 
-          # All dev-branch releases are prereleases.
-          if [ "$REF_NAME" = 'dev' ]; then
+          # All non-main branch releases are prereleases.
+          if [ "$CHANNEL" != 'main' ]; then
             IS_PRERELEASE='true'
-            REASON='dev-branch'
+            REASON="branch-${CHANNEL}"
           # Main-branch prerelease tags (rc/beta/alpha/pre/preview) are also prereleases.
           elif [[ "$VERSION" =~ -([Rr][Cc]|[Bb]eta|[Aa]lpha|[Pp]re|[Pp]review)([.-]?[0-9A-Za-z]*)?$ ]]; then
             IS_PRERELEASE='true'
@@ -250,14 +282,34 @@ jobs:
             exit 1
           fi
 
-          if [ "$REF_NAME" = 'main' ] && [[ ! "$SOURCE_TAG" =~ ^edge-[0-9]{8}-[0-9]+$ ]]; then
-            echo "❌ main releases must promote an immutable edge tag (edge-YYYYMMDD-RUN)."
+          branch_channel() {
+            local ref="$1"
+            if [ "$ref" = 'main' ]; then
+              echo 'main'
+            elif [ "$ref" = 'dev' ]; then
+              echo 'dev'
+            elif [[ "$ref" =~ ^experimental([/-].*)?$ ]]; then
+              printf '%s' "$ref" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed -E 's|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-+|-|g'
+            else
+              return 1
+            fi
+          }
+
+          CHANNEL="$(branch_channel "$REF_NAME")" || {
+            echo "❌ Releases are only allowed from main, dev, or experimental branches. Got: ${REF_NAME}"
+            exit 1
+          }
+
+          if [ "$CHANNEL" = 'main' ] && [[ ! "$SOURCE_TAG" =~ ^main-[0-9]{8}-[0-9]+$ ]]; then
+            echo "❌ main releases must promote an immutable main tag (main-YYYYMMDD-RUN)."
             echo "Got: ${SOURCE_TAG}"
             exit 1
           fi
 
-          if [ "$REF_NAME" = 'dev' ] && [[ ! "$SOURCE_TAG" =~ ^dev-[0-9]{8}-[0-9]+$ ]]; then
-            echo "❌ dev releases must promote an immutable dev tag (dev-YYYYMMDD-RUN)."
+          if [ "$CHANNEL" != 'main' ] && [[ ! "$SOURCE_TAG" =~ ^${CHANNEL}-[0-9]{8}-[0-9]+$ ]]; then
+            echo "❌ ${CHANNEL} releases must promote an immutable ${CHANNEL} tag (${CHANNEL}-YYYYMMDD-RUN)."
             echo "Got: ${SOURCE_TAG}"
             exit 1
           fi
@@ -269,11 +321,11 @@ jobs:
     name: Create Multi-Arch Manifest
     runs-on: ubuntu-latest
     needs: [validate]
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
     permissions:
       contents: write
       packages: write
-      attestations: write
-      id-token: write
 
     steps:
       - name: Checkout repository
@@ -392,11 +444,26 @@ jobs:
           digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest.Digest}}' | xargs)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+  attest-manifest:
+    name: Attest Release Manifest
+    runs-on: ubuntu-latest
+    needs: [manifest]
+    if: needs.manifest.result == 'success'
+    continue-on-error: true
+    permissions:
+      attestations: write
+      id-token: write
+      packages: write
+
+    steps:
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME_LC=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecc0c4c32 # v4
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}
-          subject-digest: ${{ steps.digest.outputs.digest }}
+          subject-digest: ${{ needs.manifest.outputs.digest }}
           push-to-registry: true
 
   create-release:
