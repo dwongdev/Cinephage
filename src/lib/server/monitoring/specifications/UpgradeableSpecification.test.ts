@@ -15,7 +15,7 @@ import {
 import type { MovieContext, EpisodeContext, ReleaseCandidate } from './types.js';
 import { RejectionReason } from './types.js';
 
-// Test profiles for mocking
+// Test profiles for mocking — must use real format IDs from the registry
 const TEST_PROFILES: Record<string, any> = {
 	best: {
 		id: 'best',
@@ -25,17 +25,12 @@ const TEST_PROFILES: Record<string, any> = {
 		upgradeUntilScore: 50000,
 		minScoreIncrement: 100,
 		formatScores: {
-			'2160p-remux': 20000,
-			'2160p-bluray': 15000,
-			'2160p-webdl': 8000,
-			'1080p-remux': 12000,
-			'1080p-bluray': 8000,
-			'1080p-webdl': 4000,
-			'1080p-webrip': 2000,
-			'720p-webdl': 1500,
-			'audio-truehd-atmos': 3000,
-			'audio-truehd': 2500,
-			'audio-ddp': 500
+			'resolution-2160p': 500,
+			'resolution-1080p': 300,
+			'source-remux': 400,
+			'source-bluray': 300,
+			'source-webdl': 200,
+			'codec-x264': 50
 		}
 	},
 	'no-upgrades': {
@@ -55,9 +50,9 @@ const TEST_PROFILES: Record<string, any> = {
 		upgradeUntilScore: 50000,
 		minScoreIncrement: 5000,
 		formatScores: {
-			'2160p-remux': 20000,
-			'1080p-webdl': 4000,
-			'1080p-bluray': 8000
+			'resolution-2160p': 500,
+			'source-bluray': 300,
+			'source-webdl': 200
 		}
 	},
 	'low-cutoff': {
@@ -68,9 +63,11 @@ const TEST_PROFILES: Record<string, any> = {
 		upgradeUntilScore: 5000,
 		minScoreIncrement: 0,
 		formatScores: {
-			'2160p-remux': 20000,
-			'1080p-webdl': 4000,
-			'1080p-bluray': 8000
+			'resolution-2160p': 500,
+			'resolution-1080p': 300,
+			'source-bluray': 300,
+			'source-remux': 400,
+			'codec-x264': 50
 		}
 	},
 	'custom-profile': {
@@ -81,10 +78,9 @@ const TEST_PROFILES: Record<string, any> = {
 		upgradeUntilScore: 30000,
 		minScoreIncrement: 100,
 		formatScores: {
-			'2160p-remux': 25000,
-			'2160p-bluray': 18000,
-			'1080p-bluray': 10000,
-			'1080p-webdl': 5000
+			'resolution-2160p': 500,
+			'source-remux': 400,
+			'source-bluray': 300
 		}
 	}
 };
