@@ -2,7 +2,8 @@
 #
 # Triggers:
 # - Pull requests to main: Build only (validates Dockerfile)
-# - Push to main: Build and push with edge channel tags
+# - Push to main: Build and push with main channel tags
+# - Push to dev/experimental branches: Build and push branch-scoped prerelease tags
 # - Runs only when Docker-relevant files change (paths filter)
 #
 # Images are pushed to ghcr.io/<owner>/cinephage
@@ -13,7 +14,7 @@ name: Docker Build
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, experimental, 'experimental/**']
     paths:
       - '.github/workflows/docker-build.yml'
       - 'Dockerfile'
@@ -75,6 +76,19 @@ jobs:
       - name: Compute version and arch tags
         id: meta
         run: |
+          branch_channel() {
+            local ref="$1"
+            if [ "$ref" = 'dev' ]; then
+              echo 'dev'
+            elif [[ "$ref" =~ ^experimental([/-].*)?$ ]]; then
+              printf '%s' "$ref" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed -E 's|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-+|-|g'
+            else
+              return 1
+            fi
+          }
+
           RUN_DATE="$(date +%Y%m%d)"
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
@@ -82,7 +96,9 @@ jobs:
           elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
             APP_VERSION="dev-${RUN_DATE}-${{ github.run_number }}"
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            APP_VERSION="edge-${RUN_DATE}-${{ github.run_number }}"
+            APP_VERSION="main-${RUN_DATE}-${{ github.run_number }}"
+          elif CHANNEL="$(branch_channel "${{ github.ref_name }}")"; then
+            APP_VERSION="${CHANNEL}-${RUN_DATE}-${{ github.run_number }}"
           else
             APP_VERSION="sha-${GITHUB_SHA::7}"
           fi
@@ -240,10 +256,11 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}
           tags: |
             type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
-            type=raw,value=edge-${{ needs.prepare.outputs.run_date }}-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ needs.prepare.outputs.run_date }}-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=dev-${{ needs.prepare.outputs.run_date }}-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/dev' }}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=${{ needs.prepare.outputs.app_version }},enable=${{ startsWith(github.ref, 'refs/heads/experimental') }}
           labels: |
             org.opencontainers.image.title=Cinephage
             org.opencontainers.image.description=Self-hosted media management application
