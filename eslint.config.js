@@ -21,6 +21,13 @@ export default defineConfig(
 			'.svelte-kit/**'
 		]
 	},
+	{
+		// Disable the built-in unused-disable reporting globally — it's too coarse
+		// (can't suppress per-file). We re-enable specific checks for source files below.
+		linterOptions: {
+			reportUnusedDisableDirectives: 0
+		}
+	},
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,

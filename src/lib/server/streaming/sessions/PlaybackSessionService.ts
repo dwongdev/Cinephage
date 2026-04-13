@@ -91,15 +91,6 @@ async function getPreferredLanguages(tmdbId: number, type: PlaybackMediaType): P
 	}
 }
 
-async function fetchText(url: string, headers: Record<string, string>): Promise<Response> {
-	return await fetch(url, {
-		headers: {
-			Accept: '*/*',
-			...headers
-		}
-	});
-}
-
 function isAborted(signal?: AbortSignal): boolean {
 	return signal?.aborted === true;
 }

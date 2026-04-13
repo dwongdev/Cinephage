@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getIndexerManager } from '$lib/server/indexers/IndexerManager';
+import { CINEPHAGE_STREAM_DEFINITION_ID } from '$lib/server/indexers/types';
+import { sanitizeStreamingIndexerSettings } from '$lib/server/streaming/settings';
 import { indexerCreateSchema } from '$lib/validation/schemas';
 import { redactIndexer } from '$lib/server/utils/redaction.js';
 import { requireAdmin } from '$lib/server/auth/authorization.js';
@@ -42,6 +44,11 @@ export const POST: RequestHandler = async (event) => {
 		);
 	}
 
+	const settings =
+		validated.definitionId === CINEPHAGE_STREAM_DEFINITION_ID
+			? sanitizeStreamingIndexerSettings(validated.settings as Record<string, unknown> | null)
+			: ((validated.settings ?? {}) as Record<string, string>);
+
 	const created = await manager.createIndexer({
 		name: validated.name,
 		definitionId: validated.definitionId,
@@ -49,7 +56,7 @@ export const POST: RequestHandler = async (event) => {
 		alternateUrls: validated.alternateUrls,
 		enabled: validated.enabled,
 		priority: validated.priority,
-		settings: (validated.settings ?? {}) as Record<string, string>,
+		settings,
 
 		// Search capability toggles
 		enableAutomaticSearch: validated.enableAutomaticSearch,

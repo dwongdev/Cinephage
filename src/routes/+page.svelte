@@ -74,11 +74,14 @@
 		} | null;
 	}
 
+	interface RecentlyAddedData {
+		movies: RecentlyAddedMovie[];
+		series: RecentlyAddedSeries[];
+	}
+
 	// Resolve promises with initial empty state for smooth transitions
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let recentlyAddedResolved = $state<{ movies: any[]; series: any[] }>({ movies: [], series: [] });
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let missingEpisodesResolved = $state<any[]>([]);
+	let recentlyAddedResolved = $state<RecentlyAddedData>({ movies: [], series: [] });
+	let missingEpisodesResolved = $state<MissingEpisode[]>([]);
 	let recentActivityResolved = $state<UnifiedActivity[]>([]);
 	let isRecentlyAddedLoading = $state(true);
 	let isMissingEpisodesLoading = $state(true);
@@ -100,7 +103,7 @@
 		// Handle recently added promise
 		if (data.recentlyAdded instanceof Promise) {
 			data.recentlyAdded
-				.then((result) => {
+				.then((result: RecentlyAddedData) => {
 					recentlyAddedResolved = result;
 					isRecentlyAddedLoading = false;
 				})
@@ -115,7 +118,7 @@
 		// Handle missing episodes promise
 		if (data.missingEpisodes instanceof Promise) {
 			data.missingEpisodes
-				.then((result) => {
+				.then((result: MissingEpisode[]) => {
 					missingEpisodesResolved = result;
 					isMissingEpisodesLoading = false;
 				})
@@ -130,7 +133,7 @@
 		// Handle activity promise
 		if (data.recentActivity instanceof Promise) {
 			data.recentActivity
-				.then((result) => {
+				.then((result: UnifiedActivity[]) => {
 					recentActivityResolved = result;
 					isActivityLoading = false;
 				})
