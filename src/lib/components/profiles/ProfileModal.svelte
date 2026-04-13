@@ -21,6 +21,8 @@
 		error?: string | null;
 		onClose: () => void;
 		onSave: (data: ScoringProfileFormData) => void;
+		/** Called when resetting a built-in profile's scores to defaults */
+		onReset?: (profileId: string) => void;
 	}
 
 	let {
@@ -33,7 +35,8 @@
 		saving = false,
 		error = null,
 		onClose,
-		onSave
+		onSave,
+		onReset
 	}: Props = $props();
 
 	// Tab state
@@ -240,6 +243,23 @@
 		if (descriptionTooLong) {
 			return;
 		}
+
+		const filteredFormatScores = Object.fromEntries(
+			Object.entries(formatScores).filter(([, score]) => score !== 0)
+		);
+
+		if (profile?.isBuiltIn) {
+			onSave({
+				movieMinSizeGb: normalizeGbLimit(movieMinSizeGbValue),
+				movieMaxSizeGb: normalizeGbLimit(movieMaxSizeGbValue),
+				episodeMinSizeMb: normalizeMbLimit(episodeMinSizeMbValue),
+				episodeMaxSizeMb: normalizeMbLimit(episodeMaxSizeMbValue),
+				isDefault,
+				formatScores: filteredFormatScores
+			});
+			return;
+		}
+
 		onSave({
 			name,
 			description: description || undefined,
@@ -251,9 +271,7 @@
 			episodeMaxSizeMb: normalizeMbLimit(episodeMaxSizeMbValue),
 			isDefault,
 			// Include format scores (filter out zeros to keep payload lean)
-			formatScores: Object.fromEntries(
-				Object.entries(formatScores).filter(([, score]) => score !== 0)
-			)
+			formatScores: filteredFormatScores
 		});
 	}
 
@@ -262,8 +280,8 @@
 	const isNewProfile = $derived(mode === 'add');
 	const isStreamerProfile = $derived(profile?.id === 'streamer');
 
-	// Only show Format Scores tab for custom profiles (not built-in) or when creating new
-	const showFormatsTab = $derived(!profile?.isBuiltIn && allFormats.length > 0);
+	// Show Format Scores tab for all profiles except when in view mode
+	const showFormatsTab = $derived(mode !== 'view' && allFormats.length > 0);
 
 	// Separate built-in and custom profiles for the dropdown
 	const builtInProfiles = $derived(allProfiles.filter((p) => p.isBuiltIn));
@@ -581,6 +599,16 @@
 
 	<!-- Footer -->
 	<div class="modal-action mt-6 border-t border-base-300 pt-4">
+		{#if profile?.isBuiltIn && mode !== 'view' && onReset}
+			<button
+				class="btn text-error btn-ghost"
+				onclick={() => onReset(profile.id)}
+				disabled={saving}
+			>
+				Reset scores to defaults
+			</button>
+		{/if}
+		<div class="flex-1"></div>
 		<button class="btn btn-ghost" onclick={onClose}>
 			{isFullyReadonly ? m.action_close() : m.action_cancel()}
 		</button>

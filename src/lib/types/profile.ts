@@ -55,7 +55,7 @@ export interface ScoringProfile {
  */
 export interface ScoringProfileFormData {
 	id?: string;
-	name: string;
+	name?: string;
 	description?: string;
 	/** Copy format scores from this profile (built-in or custom ID) */
 	copyFromId?: string;

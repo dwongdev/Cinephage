@@ -13,14 +13,11 @@
 		ChevronDown,
 		ChevronUp,
 		Download,
-		Bug,
-		Check,
-		Play,
-		ExternalLink
+		Bug
 	} from 'lucide-svelte';
 	import SearchResultRow from './SearchResultRow.svelte';
 	import ModalWrapper from '$lib/components/ui/modal/ModalWrapper.svelte';
-	import { formatBytes } from '$lib/utils/format';
+	import type { ScoreComponents } from '$lib/server/quality/types.js';
 
 	interface Release {
 		guid: string;
@@ -62,6 +59,21 @@
 			meetsMinimum: boolean;
 		};
 		totalScore?: number;
+		scoreComponents?: ScoreComponents;
+		scoringResult?: {
+			totalScore?: number;
+			breakdown?: {
+				resolution?: { score: number; formats: string[] };
+				source?: { score: number; formats: string[] };
+				codec?: { score: number; formats: string[] };
+				releaseGroupTier?: { score: number; formats: string[] };
+				audio?: { score: number; formats: string[] };
+				hdr?: { score: number; formats: string[] };
+				streaming?: { score: number; formats: string[] };
+				enhancement?: { score: number; formats: string[] };
+				banned?: { score: number; formats: string[] };
+			};
+		};
 		rejected?: boolean;
 	}
 
@@ -511,27 +523,6 @@
 			streamingIds.delete(key);
 		}
 	}
-
-	function toggleSort(field: typeof sortBy) {
-		if (sortBy === field) {
-			sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-		} else {
-			sortBy = field;
-			sortDir = 'desc';
-		}
-	}
-
-	function getTorrentAvailabilityText(
-		release: Release
-	): { seeders: string; leechers: string } | null {
-		if (release.protocol !== 'torrent') return null;
-		const hasSeederData = release.seeders !== undefined || release.leechers !== undefined;
-		if (!hasSeederData) return null;
-		return {
-			seeders: release.seeders !== undefined ? String(release.seeders) : '—',
-			leechers: release.leechers !== undefined ? String(release.leechers) : '—'
-		};
-	}
 </script>
 
 <ModalWrapper
@@ -898,202 +889,20 @@
 				{/if}
 			</div>
 		{:else}
-			<!-- Desktop table -->
-			<div class="hidden overflow-x-auto sm:block">
-				<table class="table table-sm">
-					<thead class="sticky top-0 z-10 bg-base-100">
-						<tr>
-							<th class="w-1/3">
-								<button class="btn btn-ghost btn-xs" onclick={() => toggleSort('score')}>
-									Release
-								</button>
-							</th>
-							<th>Indexer</th>
-							<th>
-								<button class="btn btn-ghost btn-xs" onclick={() => toggleSort('size')}>
-									Size {sortBy === 'size' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-								</button>
-							</th>
-							<th>
-								<button class="btn btn-ghost btn-xs" onclick={() => toggleSort('seeders')}>
-									S/L {sortBy === 'seeders' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-								</button>
-							</th>
-							<th>
-								<button class="btn btn-ghost btn-xs" onclick={() => toggleSort('age')}>
-									Age {sortBy === 'age' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-								</button>
-							</th>
-							<th>
-								<button class="btn btn-ghost btn-xs" onclick={() => toggleSort('score')}>
-									Score {sortBy === 'score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-								</button>
-							</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each filteredReleases as release (releaseKey(release))}
-							<SearchResultRow
-								{release}
-								onGrab={handleGrab}
-								grabbing={grabbingIds.has(releaseKey(release))}
-								grabbed={grabbedIds.has(releaseKey(release))}
-								streaming={streamingIds.has(releaseKey(release))}
-								error={grabErrors.get(releaseKey(release))}
-								{showUsenetStreamButton}
-								{canUsenetStream}
-								{usenetStreamUnavailableReason}
-								onClick={showDebugPanel ? () => (selectedDebugRelease = release) : undefined}
-								clickable={showDebugPanel}
-							/>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-
-			<!-- Mobile card list -->
-			<div class="space-y-2 sm:hidden">
+			<!-- Results list - unified card layout (works on all screen sizes) -->
+			<div class="space-y-3">
 				{#each filteredReleases as release (releaseKey(release))}
-					{@const key = releaseKey(release)}
-					{@const isGrabbing = grabbingIds.has(key)}
-					{@const isGrabbed = grabbedIds.has(key)}
-					{@const isStreaming = streamingIds.has(key)}
-					{@const grabError = grabErrors.get(key)}
-					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-					<div
-						class="rounded-lg bg-base-200 p-3"
-						class:opacity-50={release.rejected}
-						class:cursor-pointer={showDebugPanel}
-						onclick={showDebugPanel ? () => (selectedDebugRelease = release) : undefined}
-						role={showDebugPanel ? 'button' : undefined}
-						tabindex={showDebugPanel ? 0 : undefined}
-					>
-						<!-- Release title -->
-						<p class="text-sm leading-snug font-medium break-all">{release.title}</p>
-
-						<!-- Quality badges -->
-						<div class="mt-1.5 flex flex-wrap gap-1">
-							<span
-								class="badge badge-xs {release.protocol === 'torrent'
-									? 'badge-info'
-									: release.protocol === 'streaming'
-										? 'badge-success'
-										: 'badge-warning'}"
-							>
-								{release.protocol === 'torrent'
-									? 'Torrent'
-									: release.protocol === 'streaming'
-										? 'Stream'
-										: 'Usenet'}
-							</span>
-							{#if release.parsed?.resolution && release.parsed.resolution.toLowerCase() !== 'unknown'}
-								<span class="badge badge-xs badge-primary">{release.parsed.resolution}</span>
-							{/if}
-							{#if release.parsed?.source && release.parsed.source.toLowerCase() !== 'unknown'}
-								<span class="badge badge-xs badge-primary">{release.parsed.source}</span>
-							{/if}
-							{#if release.parsed?.codec && release.parsed.codec.toLowerCase() !== 'unknown'}
-								<span class="badge badge-xs badge-primary">{release.parsed.codec}</span>
-							{/if}
-							{#if release.parsed?.hdr && release.parsed.hdr.toLowerCase() !== 'unknown'}
-								<span class="badge badge-xs badge-primary">{release.parsed.hdr}</span>
-							{/if}
-							{#if release.parsed?.releaseGroup && release.parsed.releaseGroup.toLowerCase() !== 'unknown'}
-								<span class="badge badge-ghost badge-xs">{release.parsed.releaseGroup}</span>
-							{/if}
-						</div>
-
-						<!-- Meta row: indexer, size, seeders, age, score -->
-						<div
-							class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/70"
-						>
-							<span>{release.indexerName}</span>
-							{#if release.size > 0}
-								<span>{formatBytes(release.size)}</span>
-							{/if}
-							{#if release.protocol === 'torrent'}
-								{@const availability = getTorrentAvailabilityText(release)}
-								{#if availability}
-									<span>
-										<span class="text-success">{availability.seeders}</span>/<span
-											class="text-error">{availability.leechers}</span
-										>
-									</span>
-								{:else}
-									<span class="text-base-content/50">—</span>
-								{/if}
-							{/if}
-							{#if release.totalScore !== undefined}
-								<span
-									class="font-medium {release.totalScore >= 700
-										? 'text-success'
-										: release.totalScore >= 400
-											? 'text-warning'
-											: 'text-error'}"
-								>
-									Score: {release.totalScore}
-								</span>
-							{/if}
-						</div>
-
-						<!-- Actions -->
-						<div class="mt-2 flex items-center gap-1">
-							{#if isGrabbed}
-								<span class="badge gap-1 badge-sm badge-success">
-									<Check size={12} />
-									Grabbed
-								</span>
-							{:else if grabError}
-								<span class="badge gap-1 badge-sm badge-error" title={grabError}>
-									<X size={12} />
-									Failed
-								</span>
-							{:else}
-								{#if release.protocol === 'usenet' && showUsenetStreamButton}
-									<button
-										class="btn btn-xs btn-accent"
-										onclick={() => handleGrab(release, true)}
-										disabled={isGrabbing || isStreaming || !canUsenetStream}
-										title={canUsenetStream
-											? 'Stream (NNTP)'
-											: (usenetStreamUnavailableReason ?? 'NNTP streaming unavailable')}
-									>
-										{#if isStreaming}
-											<Loader2 size={12} class="animate-spin" />
-										{:else}
-											<Play size={12} />
-										{/if}
-										Stream
-									</button>
-								{/if}
-								<button
-									class="btn btn-xs btn-primary"
-									onclick={() => handleGrab(release, false)}
-									disabled={isGrabbing || isStreaming}
-								>
-									{#if isGrabbing}
-										<Loader2 size={12} class="animate-spin" />
-									{:else}
-										<Download size={12} />
-									{/if}
-									Grab
-								</button>
-							{/if}
-							{#if release.commentsUrl}
-								<!-- eslint-disable svelte/no-navigation-without-resolve -- External URL -->
-								<a
-									href={release.commentsUrl}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="btn btn-ghost btn-xs"
-								>
-									<ExternalLink size={12} />
-								</a>
-								<!-- eslint-enable svelte/no-navigation-without-resolve -->
-							{/if}
-						</div>
-					</div>
+					<SearchResultRow
+						{release}
+						onGrab={handleGrab}
+						grabbing={grabbingIds.has(releaseKey(release))}
+						grabbed={grabbedIds.has(releaseKey(release))}
+						streaming={streamingIds.has(releaseKey(release))}
+						error={grabErrors.get(releaseKey(release))}
+						{showUsenetStreamButton}
+						{canUsenetStream}
+						{usenetStreamUnavailableReason}
+					/>
 				{/each}
 			</div>
 		{/if}

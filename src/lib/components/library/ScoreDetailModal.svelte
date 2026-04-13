@@ -47,6 +47,24 @@
 		if (score < 0) return 'text-error';
 		return 'text-base-content/50';
 	}
+
+	function formatAudioAttributes(
+		attributes: NonNullable<Props['scoreData']>['attributes']
+	): string | null {
+		const parts: string[] = [];
+
+		if (attributes.audioCodec && attributes.audioCodec !== 'unknown') {
+			parts.push(attributes.audioCodec);
+		}
+		if (attributes.audioChannels && attributes.audioChannels !== 'unknown') {
+			parts.push(attributes.audioChannels);
+		}
+		if (attributes.hasAtmos) {
+			parts.push('atmos');
+		}
+
+		return parts.length > 0 ? parts.join(' ') : null;
+	}
 </script>
 
 <ModalWrapper {open} {onClose} maxWidth="2xl">
@@ -256,7 +274,9 @@
 							</div>
 							<div>
 								<span class="text-base-content/50">{m.library_scoreDetail_audioLabel()}</span>
-								<span class="ml-2">{scoreData.attributes.audio || m.common_unknown()}</span>
+								<span class="ml-2"
+									>{formatAudioAttributes(scoreData.attributes) || m.common_unknown()}</span
+								>
 							</div>
 							<div>
 								<span class="text-base-content/50">{m.library_scoreDetail_hdrLabel()}</span>

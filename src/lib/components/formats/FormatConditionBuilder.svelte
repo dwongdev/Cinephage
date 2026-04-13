@@ -11,8 +11,10 @@
 		SOURCE_LABELS,
 		AVAILABLE_CODECS,
 		CODEC_LABELS,
-		AVAILABLE_AUDIO,
-		AUDIO_LABELS,
+		AVAILABLE_AUDIO_CODECS,
+		AUDIO_CODEC_LABELS,
+		AVAILABLE_AUDIO_CHANNELS,
+		AUDIO_CHANNEL_LABELS,
 		AVAILABLE_HDR,
 		HDR_LABELS,
 		AVAILABLE_STREAMING_SERVICES,
@@ -36,10 +38,13 @@
 		'resolution',
 		'source',
 		'codec',
-		'audio',
+		'audio_codec',
+		'audio_channels',
+		'audio_atmos',
 		'hdr',
 		'streaming_service',
 		'flag',
+		'indexer',
 		'release_title',
 		'release_group'
 	];
@@ -72,10 +77,12 @@
 			delete condition.source;
 			delete condition.pattern;
 			delete condition.codec;
-			delete condition.audio;
+			delete condition.audioCodec;
+			delete condition.audioChannels;
 			delete condition.hdr;
 			delete condition.streamingService;
 			delete condition.flag;
+			delete condition.indexer;
 
 			// Set default for the new type
 			switch (updates.type) {
@@ -88,8 +95,13 @@
 				case 'codec':
 					condition.codec = 'h265';
 					break;
-				case 'audio':
-					condition.audio = 'truehd';
+				case 'audio_codec':
+					condition.audioCodec = 'truehd';
+					break;
+				case 'audio_channels':
+					condition.audioChannels = '5.1';
+					break;
+				case 'audio_atmos':
 					break;
 				case 'hdr':
 					condition.hdr = 'hdr10';
@@ -103,6 +115,9 @@
 				case 'release_title':
 				case 'release_group':
 					condition.pattern = '';
+					break;
+				case 'indexer':
+					condition.indexer = '';
 					break;
 			}
 		}
@@ -252,21 +267,42 @@
 										<option value={codec}>{CODEC_LABELS[codec]}</option>
 									{/each}
 								</select>
-							{:else if condition.type === 'audio'}
+							{:else if condition.type === 'audio_codec'}
 								<select
 									id="condition-value-{index}"
 									class="select-bordered select select-sm"
-									value={condition.audio}
+									value={condition.audioCodec}
 									disabled={readonly}
 									onchange={(e) =>
 										updateCondition(index, {
-											audio: e.currentTarget.value as typeof condition.audio
+											audioCodec: e.currentTarget.value as typeof condition.audioCodec
 										})}
 								>
-									{#each AVAILABLE_AUDIO as audio (audio)}
-										<option value={audio}>{AUDIO_LABELS[audio]}</option>
+									{#each AVAILABLE_AUDIO_CODECS as audioCodec (audioCodec)}
+										<option value={audioCodec}>{AUDIO_CODEC_LABELS[audioCodec]}</option>
 									{/each}
 								</select>
+							{:else if condition.type === 'audio_channels'}
+								<select
+									id="condition-value-{index}"
+									class="select-bordered select select-sm"
+									value={condition.audioChannels}
+									disabled={readonly}
+									onchange={(e) =>
+										updateCondition(index, {
+											audioChannels: e.currentTarget.value as typeof condition.audioChannels
+										})}
+								>
+									{#each AVAILABLE_AUDIO_CHANNELS as audioChannels (audioChannels)}
+										<option value={audioChannels}>{AUDIO_CHANNEL_LABELS[audioChannels]}</option>
+									{/each}
+								</select>
+							{:else if condition.type === 'audio_atmos'}
+								<div
+									class="flex h-9 items-center rounded-md border border-base-300 bg-base-200 px-3 text-sm text-base-content/70"
+								>
+									Matches releases where Atmos is detected
+								</div>
 							{:else if condition.type === 'hdr'}
 								<select
 									id="condition-value-{index}"
@@ -336,6 +372,16 @@
 										</div>
 									{/if}
 								</div>
+							{:else if condition.type === 'indexer'}
+								<input
+									id="condition-value-{index}"
+									type="text"
+									class="input-bordered input input-sm w-full"
+									value={condition.indexer ?? ''}
+									disabled={readonly}
+									placeholder="Indexer name"
+									oninput={(e) => updateCondition(index, { indexer: e.currentTarget.value })}
+								/>
 							{/if}
 						</div>
 					</div>

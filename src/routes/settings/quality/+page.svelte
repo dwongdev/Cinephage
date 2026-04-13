@@ -86,6 +86,31 @@
 		}
 	}
 
+	async function handleProfileReset(profileId: string) {
+		profileSaving = true;
+		profileError = null;
+
+		try {
+			// Reset built-in profile scores by saving with empty formatScores (server computes diff)
+			const response = await fetch('/api/scoring-profiles', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id: profileId, formatScores: {} })
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.error || 'Failed to reset profile');
+			}
+
+			await invalidateAll();
+		} catch (e) {
+			profileError = e instanceof Error ? e.message : 'An unexpected error occurred';
+		} finally {
+			profileSaving = false;
+		}
+	}
+
 	function confirmProfileDelete(profile: ScoringProfile) {
 		profileDeleteTarget = profile;
 		profileDeleteConfirmOpen = true;
@@ -300,6 +325,7 @@
 	error={profileError}
 	onClose={closeProfileModal}
 	onSave={handleProfileSave}
+	onReset={handleProfileReset}
 />
 
 <!-- Profile Delete Confirmation -->
