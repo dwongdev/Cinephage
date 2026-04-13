@@ -16,7 +16,7 @@ import type {
 	SizeValidationContext
 } from './types.js';
 import { matchFormats, extractAttributes } from './matcher.js';
-import { ALL_FORMATS } from './formats/index.js';
+import { getActiveFormats } from './formats/registry.js';
 import { ReleaseParser } from '../indexers/parser/ReleaseParser.js';
 import { createChildLogger } from '$lib/logging';
 
@@ -54,7 +54,7 @@ export function scoreRelease(
 	const attrs = attributes ?? parseRelease(releaseName);
 
 	// 2. Match all formats against the release
-	let matchedFormats = matchFormats(attrs, ALL_FORMATS);
+	let matchedFormats = matchFormats(attrs, getActiveFormats());
 
 	// 2.5 Apply mutual exclusivity rules (only count best format per category)
 	matchedFormats = applyMutualExclusivity(matchedFormats, profile);
@@ -182,15 +182,12 @@ export function scoreRelease(
 
 // HDR format priority order (most specific/best first)
 const HDR_PRIORITY = [
-	'hdr-dolby-vision', // DV with fallback is best
-	'hdr-dolby-vision-no-fallback', // DV without fallback
+	'hdr-dolby-vision', // Dolby Vision
 	'hdr-hdr10plus', // HDR10+ dynamic
 	'hdr-hdr10', // HDR10 static
-	'hdr10-missing', // Assumed HDR10
 	'hdr-generic', // Generic HDR
 	'hdr-hlg', // HLG
 	'hdr-pq', // PQ
-	'hdr-missing', // Assumed HDR
 	'hdr-sdr' // SDR (lowest)
 ];
 
@@ -487,7 +484,7 @@ export function explainScore(result: ScoringResult): string {
  */
 export function getMatchedFormatIds(releaseName: string, attributes?: ReleaseAttributes): string[] {
 	const attrs = attributes ?? parseRelease(releaseName);
-	const matched = matchFormats(attrs, ALL_FORMATS);
+	const matched = matchFormats(attrs, getActiveFormats());
 	return matched.map((m) => m.format.id);
 }
 
@@ -512,7 +509,7 @@ export function debugRelease(
 	}>;
 } {
 	const attrs = attributes ?? parseRelease(releaseName);
-	const matched = matchFormats(attrs, ALL_FORMATS);
+	const matched = matchFormats(attrs, getActiveFormats());
 
 	return {
 		releaseName,

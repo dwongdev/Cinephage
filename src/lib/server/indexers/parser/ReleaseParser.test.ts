@@ -3,8 +3,8 @@ import { parseRelease, extractExternalIds } from './ReleaseParser';
 import { isTvRelease } from './patterns/episode';
 import { extractResolution } from './patterns/resolution';
 import { extractSource } from './patterns/source';
-import { extractCodec } from './patterns/codec';
-import { extractAudio, extractHdr } from './patterns/audio';
+import { extractBitDepth, extractCodec } from './patterns/codec';
+import { extractEnhancedAudio, extractHdr } from './patterns/audio';
 import { extractReleaseGroup } from './patterns/releaseGroup';
 
 describe('ReleaseParser', () => {
@@ -30,7 +30,8 @@ describe('ReleaseParser', () => {
 			expect(result.source).toBe('remux');
 			expect(result.codec).toBe('h265');
 			expect(result.hdr).toBe('hdr'); // Generic HDR without specific version
-			expect(result.audio).toBe('atmos');
+			expect(result.audioCodec).toBe('unknown');
+			expect(result.hasAtmos).toBe(true);
 			expect(result.isRemux).toBe(true);
 			expect(result.releaseGroup).toBe('FGT');
 		});
@@ -43,15 +44,16 @@ describe('ReleaseParser', () => {
 			expect(result.resolution).toBe('1080p');
 			expect(result.source).toBe('webdl');
 			expect(result.codec).toBe('h264');
-			expect(result.audio).toBe('dd+');
+			expect(result.audioCodec).toBe('dd+');
 			expect(result.releaseGroup).toBe('RUMOUR');
 		});
 
 		it('should detect Dolby Vision', () => {
 			const result = parseRelease('Interstellar.2014.2160p.WEB-DL.DV.HDR.DDP.5.1.Atmos.H.265-FLUX');
 
-			expect(result.hdr).toBe('dolby-vision-hdr10'); // DV + HDR indicates HDR10 fallback layer
-			expect(result.audio).toBe('atmos');
+			expect(result.hdr).toBe('dolby-vision');
+			expect(result.audioCodec).toBe('dd+');
+			expect(result.hasAtmos).toBe(true);
 		});
 
 		it('should parse YTS-style releases', () => {
@@ -61,6 +63,62 @@ describe('ReleaseParser', () => {
 			expect(result.year).toBe(2023);
 			expect(result.resolution).toBe('1080p');
 			expect(result.source).toBe('webrip');
+			expect(result.releaseGroup).toBe('YTS');
+		});
+
+		it('should parse normalized H 265 codec markers', () => {
+			const result = parseRelease('Movie.2024.2160p.MA.WEB-DL.DDP.7.1.DoVi.HDR10.H.265-GROUP');
+
+			expect(result.codec).toBe('h265');
+		});
+
+		it('should parse WEBSCREENER as screener source', () => {
+			const result = parseRelease('Movie.2024.1080p.WEBSCREENER.x265.AAC-GROUP');
+
+			expect(result.source).toBe('screener');
+		});
+
+		it('should parse HDRip as a distinct source', () => {
+			const result = parseRelease('Movie.2024.HDRip.1080p.x264-GROUP');
+
+			expect(result.source).toBe('hdrip');
+			expect(result.resolution).toBe('1080p');
+			expect(result.codec).toBe('h264');
+		});
+
+		it('should parse BD25 releases as bluray source', () => {
+			const result = parseRelease('Movie.2024.CUSTOM.BD25.AVC.x264.DD.Plus.7.1-GROUP');
+
+			expect(result.source).toBe('bluray');
+			expect(result.codec).toBe('h264');
+			expect(result.audioCodec).toBe('dd+');
+			expect(result.audioChannels).toBe('7.1');
+		});
+
+		it('should parse DD Plus punctuation variants as ddplus', () => {
+			const dotted = parseRelease('Movie.2024.1080p.WEB-DL.DD.Plus.5.1.H264-GROUP');
+			const spaced = parseRelease('Movie.2024.1080p.WEB-DL.DD Plus.5.1.H264-GROUP');
+
+			expect(dotted.audioCodec).toBe('dd+');
+			expect(spaced.audioCodec).toBe('dd+');
+		});
+
+		it('should parse bit depth as a canonical fact', () => {
+			const result = parseRelease('Movie.2024.1080p.10bit.WEBRip.x265.AAC-GROUP');
+
+			expect(result.bitDepth).toBe('10');
+			expect(result.codec).toBe('h265');
+		});
+
+		it('should detect streaming service and richer HDR combinations', () => {
+			const result = parseRelease(
+				'Avatar.Fire.and.Ash.2025.Hybrid.1080p.MA.WEBRIP.DDP7.1.DoVi.HDR10P.x265.HuN-TRiNiTY'
+			);
+
+			expect(result.streamingService).toBe('MA');
+			expect(result.audioCodec).toBe('dd+');
+			expect(result.audioChannels).toBe('7.1');
+			expect(result.hdr).toBe('dolby-vision');
 		});
 
 		it('should detect PROPER releases', () => {
@@ -100,6 +158,20 @@ describe('ReleaseParser', () => {
 			const result = parseRelease('Movie (2024) [WEB-DL-1080p][AC3 5.1][x265].mkv');
 
 			expect(result.releaseGroup).toBeUndefined();
+		});
+
+		it('should not invent release groups from subtitle and language suffixes', () => {
+			const subResult = parseRelease('Avatar: Fire and Ash / 2025 / DUB, Sub / HEVC / WEBDL 1080p');
+			const engResult = parseRelease(
+				'Avatar: Fire and Ash (James Cameron) [2025, WEB-DL-AVC] MVO (HDRezka Studio) + Sub + Original Eng'
+			);
+			const telResult = parseRelease(
+				'Avatar Fire and Ash (2025) Telesync TS HD 1080p - x264 - [Tam.Tel.Hin]'
+			);
+
+			expect(subResult.releaseGroup).toBeUndefined();
+			expect(engResult.releaseGroup).toBeUndefined();
+			expect(telResult.releaseGroup).toBeUndefined();
 		});
 
 		it('should detect 3D releases', () => {
@@ -395,19 +467,25 @@ describe('ReleaseParser', () => {
 			expect(extractCodec('XviD')?.codec).toBe('xvid');
 		});
 
-		it('should detect all audio formats', () => {
-			expect(extractAudio('Atmos')?.audio).toBe('atmos');
-			expect(extractAudio('TrueHD')?.audio).toBe('truehd');
-			expect(extractAudio('DTS-X')?.audio).toBe('dts-x');
-			expect(extractAudio('DTS-HD.MA')?.audio).toBe('dts-hdma');
-			expect(extractAudio('DTS-HDMA')?.audio).toBe('dts-hdma');
-			expect(extractAudio('DTS-HD')?.audio).toBe('dts-hd');
-			expect(extractAudio('DTS')?.audio).toBe('dts');
-			expect(extractAudio('DD+')?.audio).toBe('dd+');
-			expect(extractAudio('EAC3')?.audio).toBe('dd+');
-			expect(extractAudio('AC3')?.audio).toBe('dd');
-			expect(extractAudio('AAC')?.audio).toBe('aac');
-			expect(extractAudio('FLAC')?.audio).toBe('flac');
+		it('should detect bit depth variants', () => {
+			expect(extractBitDepth('10bit')?.bitDepth).toBe('10');
+			expect(extractBitDepth('12-bit')?.bitDepth).toBe('12');
+			expect(extractBitDepth('8 bit')?.bitDepth).toBe('8');
+		});
+
+		it('should detect canonical audio attributes', () => {
+			expect(extractEnhancedAudio('Atmos').hasAtmos).toBe(true);
+			expect(extractEnhancedAudio('TrueHD').codec).toBe('truehd');
+			expect(extractEnhancedAudio('DTS-X').codec).toBe('dts-x');
+			expect(extractEnhancedAudio('DTS-HD.MA').codec).toBe('dts-hdma');
+			expect(extractEnhancedAudio('DTS-HDMA').codec).toBe('dts-hdma');
+			expect(extractEnhancedAudio('DTS-HD').codec).toBe('dts-hd');
+			expect(extractEnhancedAudio('DTS').codec).toBe('dts');
+			expect(extractEnhancedAudio('DD+').codec).toBe('dd+');
+			expect(extractEnhancedAudio('EAC3').codec).toBe('dd+');
+			expect(extractEnhancedAudio('AC3').codec).toBe('dd');
+			expect(extractEnhancedAudio('AAC').codec).toBe('aac');
+			expect(extractEnhancedAudio('FLAC').codec).toBe('flac');
 		});
 
 		it('should detect HDR formats', () => {
@@ -509,7 +587,9 @@ describe('ReleaseParser', () => {
 			expect(result.episode?.season).toBe(1);
 			expect(result.episode?.episodes).toEqual([1]);
 			expect(result.source).toBe('webdl');
-			expect(result.audio).toBe('atmos');
+			expect(result.audioCodec).toBe('dd+');
+			expect(result.audioChannels).toBe('5.1');
+			expect(result.hasAtmos).toBe(true);
 		});
 
 		it('should parse anime batch releases', () => {

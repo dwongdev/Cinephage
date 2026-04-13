@@ -2,7 +2,7 @@
  * Release Parser
  *
  * Parses release titles to extract structured metadata including:
- * - Quality attributes (resolution, source, codec, audio, HDR)
+ * - Quality attributes (resolution, source, codec, canonical audio, HDR)
  * - TV episode information (season, episode, packs)
  * - Language information
  * - Release group
@@ -12,8 +12,8 @@
 import type { ParsedRelease } from './types.js';
 import { extractResolution } from './patterns/resolution.js';
 import { extractSource } from './patterns/source.js';
-import { extractCodec } from './patterns/codec.js';
-import { extractAudio, extractEnhancedAudio, extractHdr } from './patterns/audio.js';
+import { extractBitDepth, extractCodec } from './patterns/codec.js';
+import { extractEnhancedAudio, extractHdr } from './patterns/audio.js';
 import { extractLanguages } from './patterns/language.js';
 import { extractEpisode, extractTitleBeforeEpisode } from './patterns/episode.js';
 import { extractReleaseGroup } from './patterns/releaseGroup.js';
@@ -55,6 +55,37 @@ const FLAG_PATTERNS = {
 	hardcodedSubs: /\bhc\b|\bhardcoded\b|\bkorsub\b/i
 };
 
+const STREAMING_SERVICE_PATTERNS: Array<{ service: string; pattern: RegExp }> = [
+	{ service: 'AMZN', pattern: /\b(AMZN|Amazon)\b/i },
+	{ service: 'NF', pattern: /\b(NF|Netflix)\b/i },
+	{ service: 'ATVP', pattern: /\b(ATVP|AppleTV\+?|Apple[ .]?TV)\b/i },
+	{ service: 'DSNP', pattern: /\b(DSNP|Disney\+?|DisneyPlus)\b/i },
+	{ service: 'HMAX', pattern: /\b(HMAX|HBO[ .]?Max)\b/i },
+	{ service: 'MAX', pattern: /\bMAX\b/i },
+	{ service: 'PCOK', pattern: /\b(PCOK|Peacock)\b/i },
+	{ service: 'PMTP', pattern: /\b(PMTP|Paramount\+?)\b/i },
+	{ service: 'HULU', pattern: /\bHULU\b/i },
+	{ service: 'iT', pattern: /\b(iT|iTunes)\b/i },
+	{ service: 'STAN', pattern: /\bSTAN\b/i },
+	{ service: 'CRAV', pattern: /\b(CRAV|Crave)\b/i },
+	{ service: 'NOW', pattern: /\bNOW\b/i },
+	{ service: 'SHO', pattern: /\b(SHO|Showtime)\b/i },
+	{ service: 'ROKU', pattern: /\bROKU\b/i },
+	{ service: 'MUBI', pattern: /\bMUBI\b/i },
+	{ service: 'CRIT', pattern: /\b(CRIT|Criterion)\b/i },
+	{ service: 'DS4K', pattern: /\bDS4K\b/i },
+	{ service: 'iQIYI', pattern: /\b(iQIYI|IQIYI)\b/i },
+	{ service: 'TVING', pattern: /\bTVING\b/i },
+	{ service: 'VIKI', pattern: /\bVIKI\b/i },
+	{ service: 'VIU', pattern: /\bVIU\b/i },
+	{ service: 'WAVVE', pattern: /\bWAVVE\b/i },
+	{ service: 'WeTV', pattern: /\bWeTV\b/i },
+	{ service: 'KOCOWA', pattern: /\b(KOCOWA|KCW)\b/i },
+	{ service: 'BCORE', pattern: /\b(BCORE|Bravia[. ]?Core)\b/i },
+	// Keep MA strict so DTS-HD MA is not misclassified as Movies Anywhere.
+	{ service: 'MA', pattern: /\bMA(?=[ ._-]WEB(?:[ ._-]?(DL|Rip))?\b)/i }
+];
+
 export interface ParseOptions {
 	/** Source indexer language (ISO 639-1 code) - used for language tagging */
 	sourceLanguage?: string;
@@ -81,9 +112,10 @@ export class ReleaseParser {
 		const resolutionMatch = extractResolution(normalized);
 		const sourceMatch = extractSource(normalized);
 		const codecMatch = extractCodec(normalized);
-		const audioMatch = extractAudio(normalized);
+		const bitDepthMatch = extractBitDepth(normalized);
 		const enhancedAudio = extractEnhancedAudio(normalized);
 		const hdrMatch = extractHdr(normalized);
+		const streamingService = this.extractStreamingService(normalized);
 
 		// Extract episode info (determines if TV release)
 		const episodeMatch = extractEpisode(normalized);
@@ -130,14 +162,14 @@ export class ReleaseParser {
 			source: sourceMatch?.source ?? 'unknown',
 			codec: codecMatch?.codec ?? 'unknown',
 			hdr: hdrMatch?.hdr ?? null,
-			audio: audioMatch?.audio ?? 'unknown',
-			// Enhanced audio info with separated codec, channels, and Atmos
+			bitDepth: bitDepthMatch?.bitDepth ?? 'unknown',
 			audioCodec: enhancedAudio.codec,
-			audioChannels: enhancedAudio.channels !== 'unknown' ? enhancedAudio.channels : undefined,
+			audioChannels: enhancedAudio.channels,
 			hasAtmos: enhancedAudio.hasAtmos,
 			episode: episodeMatch?.info,
 			languages,
 			sourceLanguage: options?.sourceLanguage,
+			streamingService,
 			releaseGroup: groupMatch?.group,
 			edition,
 			isProper,
@@ -147,6 +179,16 @@ export class ReleaseParser {
 			hasHardcodedSubs,
 			confidence
 		};
+	}
+
+	private extractStreamingService(title: string): string | undefined {
+		for (const { service, pattern } of STREAMING_SERVICE_PATTERNS) {
+			if (pattern.test(title)) {
+				return service;
+			}
+		}
+
+		return undefined;
 	}
 
 	/**
@@ -269,6 +311,8 @@ export class ReleaseParser {
 
 		// Clean up common artifacts
 		title = title
+			// Remove trailing bracketed metadata that can survive before quality cutoff
+			.replace(/\s*[[(]][^\])]*(?:$)/g, '')
 			// Remove trailing/leading separators and spaces
 			.replace(/^[\s\-._]+|[\s\-._]+$/g, '')
 			// Remove common prefix artifacts

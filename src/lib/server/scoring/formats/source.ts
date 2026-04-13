@@ -28,6 +28,14 @@ export const SOURCE_FORMATS: CustomFormat[] = [
 		]
 	},
 	{
+		id: 'source-hdrip',
+		name: 'HDRip (Any Resolution)',
+		description: 'HDRip source without detected resolution',
+		category: 'source',
+		tags: ['HDRip', 'Source'],
+		conditions: [{ name: 'HDRip', type: 'source', source: 'hdrip', required: true, negate: false }]
+	},
+	{
 		id: 'source-webdl',
 		name: 'WEB-DL (Any Resolution)',
 		description: 'WEB-DL source without detected resolution',
