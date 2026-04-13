@@ -1,7 +1,7 @@
 /**
  * HLS Playlist Parser & Validator
  *
- * Parses HLS master playlists, selects best quality variants,
+ * Parses HLS master playlists, selects quality variants,
  * and validates/sanitizes playlist content.
  */
 
@@ -247,24 +247,29 @@ export function parseHLSMaster(playlist: string, baseUrl: string): HLSVariant[] 
 }
 
 /**
- * Select the best quality variant from a list
- * Prioritizes by resolution height, then bandwidth
+ * Select a conservative fallback variant from a list.
+ *
+ * Prefer the lowest bitrate stream when we must collapse a master playlist
+ * to a single variant. This reduces playback stalls on constrained networks.
  */
 export function selectBestVariant(variants: HLSVariant[]): HLSVariant | null {
 	if (variants.length === 0) return null;
 	if (variants.length === 1) return variants[0];
 
-	// Sort by resolution height (descending), then bandwidth (descending)
+	// Sort by bandwidth first so we keep the most forgiving stream when adaptive
+	// selection is unavailable.
 	const sorted = [...variants].sort((a, b) => {
-		// First compare by resolution height
-		const aHeight = a.resolution?.height ?? 0;
-		const bHeight = b.resolution?.height ?? 0;
-		if (aHeight !== bHeight) {
-			return bHeight - aHeight; // Higher resolution first
+		if (a.bandwidth !== b.bandwidth) {
+			return a.bandwidth - b.bandwidth;
 		}
 
-		// Then by bandwidth
-		return b.bandwidth - a.bandwidth; // Higher bandwidth first
+		const aHeight = a.resolution?.height ?? Number.MAX_SAFE_INTEGER;
+		const bHeight = b.resolution?.height ?? Number.MAX_SAFE_INTEGER;
+		if (aHeight !== bHeight) {
+			return aHeight - bHeight;
+		}
+
+		return a.url.localeCompare(b.url);
 	});
 
 	return sorted[0];
@@ -274,22 +279,22 @@ export function selectBestVariant(variants: HLSVariant[]): HLSVariant | null {
  * Result of getBestQualityStreamUrl containing both raw and proxied URLs.
  */
 export interface BestQualityResult {
-	/** The raw URL of the best quality variant (or master URL if no variants) */
+	/** The raw URL to use for playback */
 	rawUrl: string;
-	/** Whether this is the master URL (couldn't find variants) or a specific variant */
+	/** Whether this is the original master URL */
 	isMasterUrl: boolean;
 }
 
 /**
- * Fetch HLS master playlist, parse it, and return the best quality variant URL.
+ * Fetch HLS master playlist and return the original master URL when adaptive
+ * playback is available.
  *
- * This fetches the playlist DIRECTLY (not through our proxy) to avoid
- * server-to-server loopback issues. Returns the raw URL for use with
- * fetchAndRewritePlaylist.
+ * This fetches the playlist directly to confirm the URL is a valid adaptive
+ * HLS source and preserves the original master URL for playback.
  *
  * @param masterUrl - The master playlist URL
  * @param referer - Referer header for requests
- * @returns The raw URL of the best quality variant
+ * @returns The raw URL to use for playback
  */
 export async function getBestQualityStreamUrl(
 	masterUrl: string,
@@ -297,7 +302,7 @@ export async function getBestQualityStreamUrl(
 	useCloudflareBypass: boolean = true
 ): Promise<BestQualityResult> {
 	try {
-		// Fetch the master playlist DIRECTLY (not through proxy - avoids loopback issues)
+		// Fetch the master playlist directly.
 		// Note: Don't send Origin header - some CDNs reject it
 		// Use Cloudflare bypass for streaming URLs that may be protected
 		const fetchFn = useCloudflareBypass ? fetchWithCloudflareBypass : fetchWithTimeout;
@@ -333,31 +338,16 @@ export async function getBestQualityStreamUrl(
 			return { rawUrl: masterUrl, isMasterUrl: true };
 		}
 
-		// Log available qualities
 		const qualities = variants.map((v) => ({
 			resolution: v.resolution ? `${v.resolution.width}x${v.resolution.height}` : 'unknown',
 			bandwidth: Math.round(v.bandwidth / 1000)
 		}));
 		logger.debug({ qualities, ...streamLog }, 'HLS available qualities');
 
-		// Select best variant
-		const best = selectBestVariant(variants);
-		if (!best) {
-			return { rawUrl: masterUrl, isMasterUrl: true };
-		}
-
-		const bestRes = best.resolution ? `${best.resolution.width}x${best.resolution.height}` : 'auto';
-		logger.debug(
-			{
-				resolution: bestRes,
-				bandwidth: Math.round(best.bandwidth / 1000),
-				...streamLog
-			},
-			'HLS selected best quality'
-		);
-
-		// Return the raw best variant URL
-		return { rawUrl: best.url, isMasterUrl: false };
+		// Preserve the original master playlist so clients can adapt bitrate as
+		// conditions change during playback.
+		logger.debug({ ...streamLog }, 'HLS preserving master playlist for adaptive playback');
+		return { rawUrl: masterUrl, isMasterUrl: true };
 	} catch (error) {
 		logger.warn(
 			{

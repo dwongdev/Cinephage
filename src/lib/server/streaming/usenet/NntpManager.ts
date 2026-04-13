@@ -12,7 +12,7 @@ import type { BackgroundService, ServiceStatus } from '$lib/server/services/back
 import { createChildLogger } from '$lib/logging';
 import { getNntpServerService } from '../nzb/NntpServerService';
 
-const logger = createChildLogger({ logDomain: 'streams' as const });
+const logger = createChildLogger({ logDomain: 'streams' as const, component: 'NntpManager' });
 import { NntpPool } from './NntpPool';
 import { decodeYenc, extractYencHeader } from './YencDecoder';
 import type { NntpServerConfig, YencDecodeResult, YencHeader, ProviderHealth } from './types';
@@ -109,14 +109,15 @@ export class NntpManager implements BackgroundService {
 			try {
 				await this.initialize();
 				this._status = 'ready';
-				logger.info({ providers: this.providerOrder.length }, '[NntpManager] Service ready');
+				logger.info({ providers: this.providerOrder.length }, 'NNTP manager is ready');
 			} catch (error) {
 				this._status = 'error';
 				logger.error(
 					{
+						err: error,
 						error: error instanceof Error ? error.message : 'Unknown error'
 					},
-					'[NntpManager] Failed to start'
+					'Failed to start NNTP manager'
 				);
 			}
 		});
@@ -140,7 +141,7 @@ export class NntpManager implements BackgroundService {
 		this.inFlightRequests.clear();
 		this._status = 'pending';
 
-		logger.info('[NntpManager] Service stopped');
+		logger.info('NNTP manager stopped');
 	}
 
 	/**
@@ -171,11 +172,11 @@ export class NntpManager implements BackgroundService {
 
 			logger.debug(
 				{
-					id: server.id,
+					providerId: server.id,
 					host: server.host,
 					priority: server.priority
 				},
-				'[NntpManager] Added provider pool'
+				'Added NNTP provider pool'
 			);
 		}
 
@@ -189,7 +190,7 @@ export class NntpManager implements BackgroundService {
 	 * Reload providers from database.
 	 */
 	async reload(): Promise<void> {
-		logger.info('[NntpManager] Reloading providers');
+		logger.info('Reloading NNTP providers');
 
 		for (const pool of this.pools.values()) {
 			await pool.close();
@@ -215,10 +216,11 @@ export class NntpManager implements BackgroundService {
 			cached.accessCount++;
 			logger.debug(
 				{
-					messageId: messageId.slice(0, 20),
-					size: cached.result.data.length
+					messageIdPrefix: messageId.slice(0, 20),
+					sizeBytes: cached.result.data.length,
+					accessCount: cached.accessCount
 				},
-				'[NntpManager] Article cache hit'
+				'NNTP article cache hit'
 			);
 			return cached.result;
 		}
@@ -226,7 +228,10 @@ export class NntpManager implements BackgroundService {
 		// Check for in-flight request (deduplication)
 		const inFlight = this.inFlightRequests.get(messageId);
 		if (inFlight) {
-			logger.debug({ messageId: messageId.slice(0, 20) }, '[NntpManager] Deduplicating request');
+			logger.debug(
+				{ messageIdPrefix: messageId.slice(0, 20) },
+				'Deduplicating in-flight NNTP article request'
+			);
 			return inFlight.promise;
 		}
 
@@ -368,10 +373,12 @@ export class NntpManager implements BackgroundService {
 				errors.push(`${pool.host}: ${message}`);
 				logger.debug(
 					{
-						provider: pool.host,
+						providerHost: pool.host,
+						messageIdPrefix: messageId.slice(0, 20),
+						err: error,
 						error: message
 					},
-					`[NntpManager] Provider failed for ${messageId.slice(0, 20)}`
+					'NNTP provider failed to fetch article'
 				);
 				continue;
 			}
@@ -419,7 +426,7 @@ export class NntpManager implements BackgroundService {
 			this.articleCache.delete(entries[i][0]);
 		}
 
-		logger.debug({ evicted: toEvict }, '[NntpManager] Evicted article cache entries');
+		logger.debug({ evictedCount: toEvict }, 'Evicted NNTP article cache entries');
 	}
 
 	/**
@@ -438,7 +445,7 @@ export class NntpManager implements BackgroundService {
 		}
 
 		if (cleaned > 0) {
-			logger.debug({ cleaned }, '[NntpManager] Cleaned expired article cache');
+			logger.debug({ cleanedCount: cleaned }, 'Cleaned expired NNTP article cache entries');
 		}
 
 		// Clean up stale in-flight requests (shouldn't happen normally)
@@ -447,9 +454,9 @@ export class NntpManager implements BackgroundService {
 				this.inFlightRequests.delete(messageId);
 				logger.warn(
 					{
-						messageId: messageId.slice(0, 20)
+						messageIdPrefix: messageId.slice(0, 20)
 					},
-					'[NntpManager] Cleaned stale in-flight request'
+					'Cleaned stale in-flight NNTP article request'
 				);
 			}
 		}

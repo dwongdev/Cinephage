@@ -118,7 +118,10 @@ export class AdaptivePrefetcher {
 	 */
 	pause(): void {
 		this.paused = true;
-		logger.debug('[AdaptivePrefetcher] Paused');
+		logger.debug(
+			{ mountId: this.mountId, fileIndex: this.fileIndex },
+			'Paused adaptive prefetching'
+		);
 	}
 
 	/**
@@ -126,7 +129,10 @@ export class AdaptivePrefetcher {
 	 */
 	resume(): void {
 		this.paused = false;
-		logger.debug('[AdaptivePrefetcher] Resumed');
+		logger.debug(
+			{ mountId: this.mountId, fileIndex: this.fileIndex },
+			'Resumed adaptive prefetching'
+		);
 	}
 
 	/**
@@ -160,9 +166,9 @@ export class AdaptivePrefetcher {
 							mountId: this.mountId,
 							fileIndex: this.fileIndex,
 							segmentIndex: index,
-							size: dbCached.length
+							sizeBytes: dbCached.length
 						},
-						'[AdaptivePrefetcher] DB cache hit'
+						'Loaded segment from persistent cache'
 					);
 					// Also cache in memory for faster subsequent access
 					this.store.cacheSegment(index, dbCached);
@@ -173,10 +179,13 @@ export class AdaptivePrefetcher {
 				// DB cache miss or error - fall through to NNTP fetch
 				logger.debug(
 					{
+						mountId: this.mountId,
+						fileIndex: this.fileIndex,
 						segmentIndex: index,
+						err: error,
 						error: error instanceof Error ? error.message : 'Unknown'
 					},
-					'[AdaptivePrefetcher] DB cache check failed'
+					'Persistent segment cache lookup failed'
 				);
 			}
 		}
@@ -223,12 +232,14 @@ export class AdaptivePrefetcher {
 
 		logger.debug(
 			{
+				mountId: this.mountId,
+				fileIndex: this.fileIndex,
 				from: this.lastAccessIndex,
 				to: newIndex,
 				pattern: this.currentPattern,
 				cancelledPrefetches: this.pendingFetches.size
 			},
-			'[AdaptivePrefetcher] Seek detected'
+			'Detected seek and adjusted adaptive prefetch window'
 		);
 
 		this.lastAccessIndex = newIndex;
@@ -339,10 +350,13 @@ export class AdaptivePrefetcher {
 			.catch((error) => {
 				logger.debug(
 					{
-						index,
+						mountId: this.mountId,
+						fileIndex: this.fileIndex,
+						segmentIndex: index,
+						err: error,
 						error: error instanceof Error ? error.message : 'Unknown'
 					},
-					'[AdaptivePrefetcher] Prefetch failed'
+					'Background segment prefetch failed'
 				);
 				throw error;
 			})

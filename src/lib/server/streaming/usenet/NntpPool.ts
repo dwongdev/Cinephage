@@ -261,7 +261,7 @@ export class NntpPool {
 				host: this.host,
 				poolSize: this.connections.length + 1
 			},
-			'[NntpPool] Created new connection'
+			'Created NNTP pool connection'
 		);
 
 		return connection;
@@ -306,10 +306,10 @@ export class NntpPool {
 				logger.warn(
 					{
 						host: this.host,
-						failures: this.health.consecutiveFailures,
+						consecutiveFailures: this.health.consecutiveFailures,
 						backoffMs
 					},
-					'[NntpPool] Provider entering backoff'
+					'NNTP provider entered backoff'
 				);
 			}
 		}
@@ -340,10 +340,10 @@ export class NntpPool {
 			logger.debug(
 				{
 					host: this.host,
-					cleaned: toRemove.length,
+					cleanedCount: toRemove.length,
 					remaining: this.connections.length
 				},
-				'[NntpPool] Cleaned up idle connections'
+				'Cleaned idle NNTP pool connections'
 			);
 		}
 	}
@@ -387,6 +387,6 @@ export class NntpPool {
 		await Promise.allSettled(closes);
 		this.connections = [];
 
-		logger.debug({ host: this.host }, '[NntpPool] Pool closed');
+		logger.debug({ host: this.host }, 'Closed NNTP pool');
 	}
 }

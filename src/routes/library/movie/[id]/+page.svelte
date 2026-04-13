@@ -149,7 +149,7 @@
 		if (prefetchedStreamKey === key) return;
 		prefetchedStreamKey = key;
 
-		fetch(`/api/streaming/resolve/movie/${movie.tmdbId}?prefetch=1`, {
+		fetch(`/api/streaming/session/movie/${movie.tmdbId}/master.m3u8?prefetch=1`, {
 			signal: AbortSignal.timeout(5000),
 			headers: { 'X-Prefetch': 'true' }
 		}).catch(() => {});

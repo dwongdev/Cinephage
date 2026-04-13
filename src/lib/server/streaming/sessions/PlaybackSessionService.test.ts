@@ -99,4 +99,22 @@ describe('PlaybackSessionService', () => {
 				'/subtitle/sub-0.vtt?api_key=api-key'
 		);
 	});
+
+	it('does not start stream lookup when session creation is already aborted', async () => {
+		const { getPlaybackSessionService } = await import('./PlaybackSessionService');
+		const service = getPlaybackSessionService();
+
+		const controller = new AbortController();
+		controller.abort();
+
+		const result = await service.createOrReuseSession({
+			tmdbId: 550,
+			type: 'movie',
+			signal: controller.signal
+		});
+
+		expect(result.session).toBeNull();
+		expect(result.error).toBe('Aborted');
+		expect(getStreamsMock).not.toHaveBeenCalled();
+	});
 });

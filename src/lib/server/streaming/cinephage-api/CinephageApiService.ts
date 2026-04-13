@@ -45,6 +45,7 @@ export interface CinephageStreamLookupParams {
 	type: PlaybackMediaType;
 	season?: number;
 	episode?: number;
+	signal?: AbortSignal;
 }
 
 export interface CinephageStreamLookupResult {
@@ -300,7 +301,8 @@ export class CinephageApiService {
 					Accept: 'application/json',
 					'X-Cinephage-Version': config.version,
 					'X-Cinephage-Commit': config.commit
-				}
+				},
+				signal: params.signal
 			});
 
 			if (response.status === 401) {

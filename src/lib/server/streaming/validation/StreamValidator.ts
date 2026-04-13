@@ -19,7 +19,7 @@ import type {
 	PlaylistValidationResult
 } from '../types';
 
-const streamLog = { logDomain: 'streams' as const };
+const streamLog = { logDomain: 'streams' as const, component: 'StreamValidator' };
 
 // ============================================================================
 // Configuration
@@ -153,13 +153,15 @@ export class StreamValidator {
 			result.error = errorMessage;
 			result.errors = [errorMessage];
 
-			logger.debug(
+			logger.warn(
 				{
 					url,
+					referer: effectiveReferer,
+					err: error,
 					error: errorMessage,
 					...streamLog
 				},
-				'Playlist validation failed'
+				'Playlist validation request failed'
 			);
 
 			return result;
@@ -413,11 +415,13 @@ export class StreamValidator {
 			logger.debug(
 				{
 					url: source.url,
-					responseTime: result.responseTime,
+					referer: source.referer,
+					provider: source.provider,
+					responseTimeMs: result.responseTime,
 					variantCount: result.variantCount,
 					...streamLog
 				},
-				'Stream validation successful'
+				'Stream validation completed successfully'
 			);
 
 			return result;
@@ -425,9 +429,12 @@ export class StreamValidator {
 			result.error = error instanceof Error ? error.message : String(error);
 			result.responseTime = Date.now() - startTime;
 
-			logger.debug(
+			logger.warn(
 				{
 					url: source.url,
+					referer: source.referer,
+					provider: source.provider,
+					err: error,
 					error: result.error,
 					...streamLog
 				},

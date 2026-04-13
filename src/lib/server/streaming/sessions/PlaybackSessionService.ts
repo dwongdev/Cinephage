@@ -19,6 +19,7 @@ interface PlaybackLaunchParams {
 	season?: number;
 	episode?: number;
 	forceRefresh?: boolean;
+	signal?: AbortSignal;
 }
 
 interface ProbeResult {
@@ -99,11 +100,38 @@ async function fetchText(url: string, headers: Record<string, string>): Promise<
 	});
 }
 
-async function probeSource(source: StreamSource): Promise<ProbeResult> {
+function isAborted(signal?: AbortSignal): boolean {
+	return signal?.aborted === true;
+}
+
+async function fetchTextWithSignal(
+	url: string,
+	headers: Record<string, string>,
+	signal?: AbortSignal
+): Promise<Response> {
+	return await fetch(url, {
+		headers: {
+			Accept: '*/*',
+			...headers
+		},
+		signal
+	});
+}
+
+async function probeSource(source: StreamSource, signal?: AbortSignal): Promise<ProbeResult> {
 	const headers = buildSourceHeaders(source);
 
 	try {
-		const response = await fetchText(source.url, headers);
+		if (isAborted(signal)) {
+			return {
+				success: false,
+				entryUrl: source.url,
+				sourceType: source.type,
+				error: 'Aborted'
+			};
+		}
+
+		const response = await fetchTextWithSignal(source.url, headers, signal);
 		if (!response.ok) {
 			return {
 				success: false,
@@ -154,7 +182,16 @@ async function probeSource(source: StreamSource): Promise<ProbeResult> {
 			);
 		}
 
-		const mediaResponse = await fetchText(mediaPlaylistUrl, headers);
+		if (isAborted(signal)) {
+			return {
+				success: false,
+				entryUrl: response.url,
+				sourceType: source.type,
+				error: 'Aborted'
+			};
+		}
+
+		const mediaResponse = await fetchTextWithSignal(mediaPlaylistUrl, headers, signal);
 		if (!mediaResponse.ok) {
 			return {
 				success: false,
@@ -179,7 +216,16 @@ async function probeSource(source: StreamSource): Promise<ProbeResult> {
 		const mediaBase = new URL(mediaResponse.url);
 		const mediaBasePath = mediaBase.pathname.substring(0, mediaBase.pathname.lastIndexOf('/') + 1);
 		const assetUrl = resolveHlsUrl(firstAsset, mediaBase, mediaBasePath);
-		const assetResponse = await fetchText(assetUrl, headers);
+		if (isAborted(signal)) {
+			return {
+				success: false,
+				entryUrl: response.url,
+				sourceType: source.type,
+				error: 'Aborted'
+			};
+		}
+
+		const assetResponse = await fetchTextWithSignal(assetUrl, headers, signal);
 		if (!assetResponse.ok) {
 			return {
 				success: false,
@@ -212,8 +258,18 @@ export class PlaybackSessionService {
 
 	async createOrReuseSession(params: PlaybackLaunchParams): Promise<{
 		session: PlaybackSession | null;
+		extractionResult?: {
+			success: boolean;
+			sources: StreamSource[];
+			error?: string;
+			meta?: Record<string, unknown>;
+		};
 		error?: string;
 	}> {
+		if (isAborted(params.signal)) {
+			return { session: null, error: 'Aborted' };
+		}
+
 		if (!params.forceRefresh) {
 			const existing = this.store.findReusableSession(
 				params.type,
@@ -227,12 +283,21 @@ export class PlaybackSessionService {
 		}
 
 		const preferredLanguages = await getPreferredLanguages(params.tmdbId, params.type);
+		if (isAborted(params.signal)) {
+			return { session: null, error: 'Aborted' };
+		}
+
 		const lookup = await this.api.getStreams({
 			tmdbId: params.tmdbId,
 			type: params.type,
 			season: params.season,
-			episode: params.episode
+			episode: params.episode,
+			signal: params.signal
 		});
+
+		if (isAborted(params.signal)) {
+			return { session: null, error: 'Aborted' };
+		}
 
 		if (!lookup.success || !lookup.sources.length) {
 			return {
@@ -246,7 +311,15 @@ export class PlaybackSessionService {
 		const attempts: PlaybackSessionAttempt[] = [];
 
 		for (const source of orderedSources) {
-			const probe = await probeSource(source);
+			if (isAborted(params.signal)) {
+				return { session: null, error: 'Aborted' };
+			}
+
+			const probe = await probeSource(source, params.signal);
+			if (probe.error === 'Aborted') {
+				return { session: null, error: 'Aborted' };
+			}
+
 			attempts.push({
 				provider: source.provider,
 				url: source.url,
@@ -290,12 +363,22 @@ export class PlaybackSessionService {
 				'Playback session created'
 			);
 
-			return { session };
+			return {
+				session,
+				extractionResult: {
+					success: lookup.success,
+					sources: lookup.sources,
+					error: lookup.error,
+					meta: lookup.meta
+				}
+			};
 		}
 
 		return {
 			session: null,
-			error: attempts[attempts.length - 1]?.error || 'All stream sources failed'
+			error: isAborted(params.signal)
+				? 'Aborted'
+				: attempts[attempts.length - 1]?.error || 'All stream sources failed'
 		};
 	}
 }

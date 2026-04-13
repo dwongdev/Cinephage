@@ -104,9 +104,12 @@ class UsenetStreamService {
 			logger.info(
 				{
 					mountId,
-					extractedFilePath
+					extractedFilePath,
+					rangeRequest: rangeHeader,
+					component: 'UsenetStreamService',
+					logDomain: 'streams' as const
 				},
-				'[UsenetStreamService] Streaming from extracted file'
+				'Streaming usenet content from extracted file'
 			);
 			return this.createExtractedFileStream(mountId, extractedFilePath, rangeHeader);
 		}
@@ -155,11 +158,15 @@ class UsenetStreamService {
 			{
 				mountId,
 				fileIndex,
+				mountStatus: mount.status,
 				fileName: file.name,
-				range: range ? `${range.start}-${range.end}` : 'full',
-				contentType
+				rangeRequest: rangeHeader,
+				contentRange: range ? `${range.start}-${range.end}` : 'full',
+				contentType,
+				component: 'UsenetStreamService',
+				logDomain: 'streams' as const
 			},
-			'[UsenetStreamService] Created stream'
+			'Created usenet stream'
 		);
 
 		return {
@@ -188,7 +195,10 @@ class UsenetStreamService {
 			};
 		}
 
-		logger.info({ mountId }, '[UsenetStreamService] Starting checkStreamability');
+		logger.info(
+			{ mountId, component: 'UsenetStreamService', logDomain: 'streams' as const },
+			'Checking usenet streamability'
+		);
 
 		try {
 			const parsed = await this.getParsedNzb(mount);
@@ -198,14 +208,19 @@ class UsenetStreamService {
 					mountId,
 					filesCount: parsed.files.length,
 					mediaFilesCount: parsed.mediaFiles.length,
-					rarFilesCount: parsed.files.filter((f) => f.isRar).length
+					rarFilesCount: parsed.files.filter((f) => f.isRar).length,
+					component: 'UsenetStreamService',
+					logDomain: 'streams' as const
 				},
-				'[UsenetStreamService] checkStreamability parsed NZB'
+				'Parsed NZB while checking streamability'
 			);
 
 			// Check for RAR-only content
 			if (isRarOnlyNzb(parsed)) {
-				logger.info({ mountId }, '[UsenetStreamService] Detected RAR-only content');
+				logger.info(
+					{ mountId, component: 'UsenetStreamService', logDomain: 'streams' as const },
+					'Usenet release is RAR-only and cannot be streamed'
+				);
 				return this.checkRarStreamability(parsed);
 			}
 
@@ -218,9 +233,11 @@ class UsenetStreamService {
 					{
 						mountId,
 						hasRarFiles,
-						totalFiles: parsed.files.length
+						totalFiles: parsed.files.length,
+						component: 'UsenetStreamService',
+						logDomain: 'streams' as const
 					},
-					'[UsenetStreamService] No streamable file found'
+					'No streamable file found in usenet release'
 				);
 
 				if (hasRarFiles) {
@@ -245,6 +262,15 @@ class UsenetStreamService {
 				estimatedSize: bestFile.size
 			};
 		} catch (error) {
+			logger.error(
+				{
+					mountId,
+					err: error,
+					component: 'UsenetStreamService',
+					logDomain: 'streams' as const
+				},
+				'Failed to determine usenet streamability'
+			);
 			return {
 				canStream: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -258,7 +284,10 @@ class UsenetStreamService {
 	 * RAR archives are not supported for streaming - return error.
 	 */
 	private checkRarStreamability(_parsed: ParsedNzb): StreamabilityResult {
-		logger.info('[UsenetStreamService] RAR content detected - not streamable');
+		logger.info(
+			{ component: 'UsenetStreamService', logDomain: 'streams' as const },
+			'RAR content detected and marked as not streamable'
+		);
 
 		return {
 			canStream: false,
