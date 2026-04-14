@@ -1027,7 +1027,8 @@ describe('RenamePreviewService', () => {
 
 	describe('Anime Rename Fallbacks', () => {
 		it('builds fallback absolute numbering from episode order when DB values are missing', () => {
-			const service = new RenamePreviewService() as any;
+			const service = new RenamePreviewService();
+			// @ts-expect-error accessing private method for testing
 			const absoluteEpisodeMap = service.buildAbsoluteEpisodeFallbackMap([
 				{
 					id: 'special',
