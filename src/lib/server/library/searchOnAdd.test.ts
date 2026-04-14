@@ -70,7 +70,7 @@ vi.mock('$lib/logging/index.js', () => ({
 import { searchOnAdd } from './searchOnAdd';
 
 function resetAlternateTitleRefreshCache(): void {
-	(searchOnAdd as any).resetAlternateTitleRefreshAttemptCacheForTests?.();
+	searchOnAdd.resetAlternateTitleRefreshAttemptCacheForTests();
 }
 
 const TEST_INDEXER_CONFIG = {
