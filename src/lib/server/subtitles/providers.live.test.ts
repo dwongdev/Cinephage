@@ -30,14 +30,14 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import {
 	getSubtitleProviderFactory,
 	initializeProviderFactory
-} from '../providers/SubtitleProviderFactory';
-import type { ISubtitleProvider } from '../providers/interfaces';
+} from './providers/SubtitleProviderFactory';
+import type { ISubtitleProvider } from './providers/interfaces';
 import type {
 	SubtitleSearchCriteria,
 	SubtitleSearchResult,
 	SubtitleProviderConfig,
 	ProviderImplementation
-} from '../types';
+} from './types';
 import {
 	TEST_MOVIES,
 	TEST_TV_SHOWS,
@@ -46,7 +46,7 @@ import {
 	getPrimaryTestTvShow,
 	type MovieTestContent,
 	type TvTestContent
-} from '../../streaming/__tests__/fixtures/testContent';
+} from '../streaming/__tests__/fixtures/testContent';
 
 // ============================================================================
 // Test Configuration
