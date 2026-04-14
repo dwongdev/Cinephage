@@ -61,6 +61,23 @@ export default defineConfig({
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		exclude: ['src/**/*.svelte.{test,spec}.{js,ts}'],
 		setupFiles: ['src/test/setup.ts'],
-		fileParallelism: false // Server tests share singleton database
+		fileParallelism: false, // Server tests share singleton database
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'text-summary', 'lcov'],
+			include: ['src/lib/**/*.ts'],
+			exclude: [
+				'src/lib/**/*.test.ts',
+				'src/lib/**/*.spec.ts',
+				'src/lib/**/types.ts',
+				'src/lib/paraglide/**'
+			],
+			thresholds: {
+				statements: 21,
+				branches: 15,
+				functions: 22,
+				lines: 21
+			}
+		}
 	}
 });

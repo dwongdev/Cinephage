@@ -213,7 +213,9 @@ function createProviderSafe(implementation: ProviderImplementation): ISubtitlePr
 // Test Setup
 // ============================================================================
 
-describe('Live Subtitle Provider Tests', () => {
+const LIVE_TESTS_ENABLED = process.env.LIVE_TESTS === 'true';
+
+describe.skipIf(!LIVE_TESTS_ENABLED)('Live Subtitle Provider Tests', () => {
 	let factory: ReturnType<typeof getSubtitleProviderFactory>;
 	let testMovie: MovieTestContent;
 	let testTvShow: TvTestContent;
@@ -796,7 +798,7 @@ describe('Live Subtitle Provider Tests', () => {
 // Individual Provider Deep Tests (Non-blocking - warnings only)
 // ============================================================================
 
-describe('Individual Provider Deep Tests', () => {
+describe.skipIf(!LIVE_TESTS_ENABLED)('Individual Provider Deep Tests', () => {
 	const _factory = getSubtitleProviderFactory();
 
 	// Test each provider with appropriate content

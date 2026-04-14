@@ -78,6 +78,7 @@ temp/
 
 # Build artifacts
 dist/
+coverage/
 *.tsbuildinfo
 
 # Local environment overrides
