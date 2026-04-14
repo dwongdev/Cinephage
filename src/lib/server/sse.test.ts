@@ -201,7 +201,10 @@ describe('createSSEHandler', () => {
 			return () => {};
 		});
 
-		const response = await handler({} as any);
+		const response = await handler(
+			// @ts-expect-error handler ignores the request parameter in this test
+			{}
+		);
 
 		expect(response).toBeInstanceOf(Response);
 		expect(response.headers.get('Content-Type')).toBe('text/event-stream');
@@ -215,7 +218,10 @@ describe('createSSEHandler', () => {
 			{ heartbeatInterval: 5000 }
 		);
 
-		const response = await handler({} as any);
+		const response = await handler(
+			// @ts-expect-error handler ignores the request parameter in this test
+			{}
+		);
 		expect(response).toBeInstanceOf(Response);
 	});
 });
