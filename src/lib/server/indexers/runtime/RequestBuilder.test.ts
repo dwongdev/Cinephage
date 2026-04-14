@@ -3,6 +3,7 @@ import { createFilterEngine } from '../engine/FilterEngine';
 import { createTemplateEngine } from '../engine/TemplateEngine';
 import { RequestBuilder } from './RequestBuilder';
 import type { SearchCriteria } from '../types';
+import type { CardigannDefinition } from '../schema/yamlDefinition';
 
 function createTestRequestBuilder(): RequestBuilder {
 	const definition = {
@@ -59,7 +60,7 @@ function createTestRequestBuilder(): RequestBuilder {
 				title: { selector: 'title' }
 			}
 		}
-	} as any;
+	} as CardigannDefinition;
 
 	return new RequestBuilder(definition, createTemplateEngine(), createFilterEngine());
 }
@@ -99,7 +100,7 @@ function createRutrackerLikeTvBuilder(): RequestBuilder {
 				title: { selector: 'a.tLink' }
 			}
 		}
-	} as any;
+	} as CardigannDefinition;
 
 	return new RequestBuilder(definition, createTemplateEngine(), createFilterEngine());
 }
@@ -251,7 +252,7 @@ describe('RequestBuilder supported param filtering', () => {
 					title: { selector: 'title' }
 				}
 			}
-		} as any;
+		} as CardigannDefinition;
 
 		return new RequestBuilder(definition, createTemplateEngine(), createFilterEngine());
 	}
@@ -320,7 +321,7 @@ describe('RequestBuilder newznab base path handling', () => {
 					title: { selector: 'title' }
 				}
 			}
-		} as any;
+		} as CardigannDefinition;
 
 		return new RequestBuilder(definition, createTemplateEngine(), createFilterEngine());
 	}
