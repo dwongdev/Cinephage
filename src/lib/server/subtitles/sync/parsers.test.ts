@@ -16,6 +16,7 @@ import {
 	parseSubtitleToSpans,
 	applyDeltas
 } from './parsers.js';
+import type { SubtitleFormat } from '../types.js';
 
 describe('parsers', () => {
 	// =========================================================================
@@ -201,7 +202,7 @@ describe('parsers', () => {
 		});
 
 		it('should throw for unsupported format', () => {
-			expect(() => parseSubtitleToSpans('gibberish', 'unknown' as any)).toThrow();
+			expect(() => parseSubtitleToSpans('gibberish', 'unknown' as SubtitleFormat)).toThrow();
 		});
 	});
 
