@@ -1,54 +1,54 @@
 changelog:
   exclude:
     labels:
-      - Duplicate
-      - Out of Scope
-      - Wontfix
-      - Good First Issue
-      - Help Wanted
+      - 'Duplicate'
+      - 'Out of Scope'
+      - 'Wontfix'
+      - 'Good First Issue'
+      - 'Help Wanted'
   categories:
     - title: 'Breaking Changes'
       labels:
-        - Type: Breaking
+        - 'Type: Breaking'
     - title: 'Features'
       labels:
-        - Type: Feature
-        - Type: Enhancement
+        - 'Type: Feature'
+        - 'Type: Enhancement'
     - title: 'Bug Fixes'
       labels:
-        - Type: Bug
+        - 'Type: Bug'
     - title: 'Indexers & Search'
       labels:
-        - Type: Indexer
-        - Area: Indexers
+        - 'Type: Indexer'
+        - 'Area: Indexers'
     - title: 'Downloads & Imports'
       labels:
-        - Area: Downloads
+        - 'Area: Downloads'
     - title: 'Subtitles'
       labels:
-        - Area: Subtitles
+        - 'Area: Subtitles'
     - title: 'UI'
       labels:
-        - Area: UI
+        - 'Area: UI'
     - title: 'Monitoring & Automation'
       labels:
-        - Area: Monitoring
+        - 'Area: Monitoring'
     - title: 'Library'
       labels:
-        - Area: Library
+        - 'Area: Library'
     - title: 'Documentation'
       labels:
-        - Type: Docs
+        - 'Type: Docs'
     - title: 'Dependencies'
       labels:
-        - Dependencies
+        - 'Dependencies'
     - title: 'Performance'
       labels:
-        - Area: Quality
+        - 'Area: Quality'
     - title: 'Maintenance & Refactoring'
       labels:
-        - Type: Chore
-        - Type: Refactor
+        - 'Type: Chore'
+        - 'Type: Refactor'
     - title: 'Other Changes'
       labels:
         - '*'
