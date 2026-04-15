@@ -414,6 +414,11 @@ export const scoringProfiles = sqliteTable('scoring_profiles', {
 	// Episode limits in MB (for per-episode validation, season packs use average)
 	episodeMinSizeMb: real('episode_min_size_mb'),
 	episodeMaxSizeMb: real('episode_max_size_mb'),
+	isBuiltIn: integer('is_built_in', { mode: 'boolean' }).default(false),
+	minResolution: text('min_resolution'),
+	maxResolution: text('max_resolution'),
+	allowedSources: text('allowed_sources', { mode: 'json' }).$type<string[] | null>(),
+	excludedSources: text('excluded_sources', { mode: 'json' }).$type<string[] | null>(),
 	createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString())
 });
