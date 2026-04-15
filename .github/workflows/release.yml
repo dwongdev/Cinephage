@@ -5,7 +5,7 @@
 #
 # This workflow:
 # 1. Promotes existing CI architecture tags into release tags
-# 2. Creates GitHub release with generated notes and custom notes
+# 2. Creates GitHub release with auto-generated categorized notes
 # 3. Cleans up old untagged images from GHCR
 
 name: Release
@@ -29,11 +29,7 @@ on:
         type: string
         default: ''
       source_tag:
-        description: 'CI candidate tag to promote (without -amd64/-arm64), e.g. main-20260306-123'
-        required: true
-        type: string
-      release_notes:
-        description: 'Additional release notes (optional)'
+        description: 'CI candidate tag to promote (leave empty to auto-detect latest)'
         required: false
         type: string
         default: ''
@@ -51,10 +47,13 @@ jobs:
   validate:
     name: Validate Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     outputs:
       version: ${{ steps.resolve-version.outputs.version }}
       is_prerelease: ${{ steps.release-mode.outputs.is_prerelease }}
-      source_tag: ${{ steps.validate-source-tag.outputs.source_tag }}
+      source_tag: ${{ steps.auto-detect-source.outputs.source_tag || steps.validate-source-tag.outputs.source_tag }}
 
     steps:
       - name: Checkout repository
@@ -262,8 +261,70 @@ jobs:
           fi
           echo "✅ Tag $VERSION is available"
 
+      - name: Auto-detect latest CI candidate
+        id: auto-detect-source
+        if: github.event.inputs.source_tag == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          IMAGE_NAME_LC="${GITHUB_REPOSITORY,,}"
+
+          branch_channel() {
+            local ref="$1"
+            if [ "$ref" = 'main' ]; then
+              echo 'main'
+            elif [ "$ref" = 'dev' ]; then
+              echo 'dev'
+            elif [[ "$ref" =~ ^experimental([/-].*)?$ ]]; then
+              printf '%s' "$ref" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed -E 's|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-+|-|g'
+            else
+              return 1
+            fi
+          }
+
+          CHANNEL="$(branch_channel "$REF_NAME")" || {
+            echo "❌ Releases are only allowed from main, dev, or experimental branches. Got: ${REF_NAME}"
+            exit 1
+          }
+
+          echo "Auto-detecting latest ${CHANNEL} CI candidate..."
+
+          RESPONSE=$(curl -sf \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/user/packages/container/${IMAGE_NAME_LC}/versions?per_page=100")
+
+          if [ -z "$RESPONSE" ] || echo "$RESPONSE" | jq -e '.message' >/dev/null 2>&1; then
+            echo "❌ Failed to query GHCR for package versions"
+            echo "$RESPONSE" | jq -r '.message // "Unknown error"'
+            exit 1
+          fi
+
+          LATEST_TAG=$(echo "$RESPONSE" | jq -r '
+            [.[] | {tags: .metadata.container.tags, created: .created_at}]
+            | sort_by(.created) | reverse
+            | .[]
+            | .tags[]
+            | select(test("^'"$CHANNEL"'-[0-9]{8}-[0-9]+$"))
+          ' | head -n1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "❌ No CI candidate tags found for channel: ${CHANNEL}"
+            echo "Make sure a Docker build has completed for this branch first."
+            exit 1
+          fi
+
+          echo "✅ Auto-detected latest ${CHANNEL} candidate: ${LATEST_TAG}"
+          echo "source_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Validate source candidate tag
         id: validate-source-tag
+        if: github.event.inputs.source_tag != ''
         env:
           SOURCE_TAG_INPUT: ${{ github.event.inputs.source_tag }}
           REF_NAME: ${{ github.ref_name }}
@@ -520,12 +581,10 @@ jobs:
         env:
           VERSION: ${{ needs.validate.outputs.version }}
           SOURCE_TAG: ${{ needs.validate.outputs.source_tag }}
-          EXTRA_NOTES: ${{ github.event.inputs.release_notes }}
         with:
           script: |
             const version = process.env.VERSION;
             const sourceTag = process.env.SOURCE_TAG;
-            const extraNotes = (process.env.EXTRA_NOTES || '').trim();
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const imageRef = `ghcr.io/${owner.toLowerCase()}/${repo.toLowerCase()}:${version}`;
@@ -575,12 +634,6 @@ jobs:
               preface.push('- First official Cinephage release.');
               preface.push('- Multi-arch images published for `linux/amd64` and `linux/arm64`.');
               preface.push('- Pin deployments to this version tag for stable rollouts.');
-            }
-
-            if (extraNotes.length > 0) {
-              preface.push('');
-              preface.push('## Maintainer Notes');
-              preface.push(extraNotes);
             }
 
             const body = `${preface.join('\n')}\n\n---\n\n${generatedBody}`.trim();
