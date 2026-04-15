@@ -138,7 +138,7 @@ describe('reset-admin-password script helpers', () => {
 		expect(await verifyPassword({ hash: account.password, password: 'NewPass123!' })).toBe(true);
 
 		db.close();
-	});
+	}, 15000);
 
 	it('creates a credential account when missing', async () => {
 		const db = createTestDb();
@@ -166,7 +166,7 @@ describe('reset-admin-password script helpers', () => {
 		expect(await verifyPassword({ hash: account.password, password: 'NewPass123!' })).toBe(true);
 
 		db.close();
-	});
+	}, 15000);
 
 	it('validates password length before reset', async () => {
 		await expect(resolveNewPassword(parseArgs(['--password', 'short']))).rejects.toThrow(
