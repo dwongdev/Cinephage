@@ -8,14 +8,12 @@
 		Library,
 		FolderOpen,
 		ShieldAlert,
-		RefreshCw,
 		Eye,
 		EyeOff,
 		Captions,
 		CaptionsOff,
 		Search,
-		SearchSlash,
-		HardDrive
+		SearchSlash
 	} from 'lucide-svelte';
 
 	type StorageSummary = {
@@ -191,24 +189,9 @@
 		}
 	]);
 
-	const topLibraries = $derived(
-		[...storage.libraryBreakdown].sort((a, b) => b.usedBytes - a.usedBytes).slice(0, 5)
-	);
-
-	const topRootFolders = $derived(
-		[...storage.rootFolderBreakdown].sort((a, b) => b.usedBytes - a.usedBytes).slice(0, 5)
-	);
-
 	function formatTimestamp(timestamp: string | null): string {
 		if (!timestamp) return m.settings_general_never();
 		return new Date(timestamp).toLocaleString();
-	}
-
-	function getScanTone(status: string | null | undefined): string {
-		if (status === 'completed') return 'text-success';
-		if (status === 'failed') return 'text-error';
-		if (status === 'running') return 'text-warning';
-		return 'text-base-content/70';
 	}
 
 	function ratioWidth(value: number, total: number): string {
@@ -411,139 +394,25 @@
 {/if}
 
 <div class="mt-4 rounded-lg border border-base-300 bg-base-100 p-4">
-	<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-		<div>
-			<div class="flex items-center gap-2">
-				<RefreshCw class="h-4 w-4" />
-				<h3 class="font-semibold">{m.settings_general_scanDetails()}</h3>
-			</div>
-			<div class="mt-1 text-sm text-base-content/60">
-				{m.settings_general_scanDetailsDescription()}
-			</div>
-		</div>
-		{#if storage.health.lastScan}
-			<div
-				class={`badge border-none badge-lg ${getScanTone(storage.health.lastScan.status).includes('success') ? 'bg-success/15 text-success' : getScanTone(storage.health.lastScan.status).includes('error') ? 'bg-error/15 text-error' : getScanTone(storage.health.lastScan.status).includes('warning') ? 'bg-warning/20 text-warning-content' : 'bg-base-200 text-base-content/70'}`}
-			>
-				{storage.health.lastScan.status}
-			</div>
-		{/if}
+	<div class="mb-3 flex items-center gap-2">
+		<Film class="h-4 w-4" />
+		<h3 class="font-semibold">{m.settings_general_diskUsageByType()}</h3>
 	</div>
-	<div class="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
-		<div class="rounded-lg bg-base-200 p-3">
-			<div class="text-[11px] tracking-wide text-base-content/50 uppercase">
-				{m.settings_general_filesScanned()}
-			</div>
-			<div class="mt-1 text-lg font-semibold">{storage.health.lastScan?.filesScanned ?? 0}</div>
-		</div>
-		<div class="rounded-lg bg-base-200 p-3">
-			<div class="text-[11px] tracking-wide text-base-content/50 uppercase">
-				{m.settings_general_scanAdded()}
-			</div>
-			<div class="mt-1 text-lg font-semibold">{storage.health.lastScan?.filesAdded ?? 0}</div>
-		</div>
-		<div class="rounded-lg bg-base-200 p-3">
-			<div class="text-[11px] tracking-wide text-base-content/50 uppercase">
-				{m.settings_general_scanUpdated()}
-			</div>
-			<div class="mt-1 text-lg font-semibold">{storage.health.lastScan?.filesUpdated ?? 0}</div>
-		</div>
-		<div class="rounded-lg bg-base-200 p-3">
-			<div class="text-[11px] tracking-wide text-base-content/50 uppercase">
-				{m.settings_general_scanRemoved()}
-			</div>
-			<div class="mt-1 text-lg font-semibold">{storage.health.lastScan?.filesRemoved ?? 0}</div>
-		</div>
-		<div class="col-span-2 rounded-lg bg-base-200 p-3 xl:col-span-1">
-			<div class="text-[11px] tracking-wide text-base-content/50 uppercase">
-				{m.settings_general_scanUnmatched()}
-			</div>
-			<div class="mt-1 text-lg font-semibold">{storage.health.lastScan?.unmatchedFiles ?? 0}</div>
-		</div>
-	</div>
-	{#if storage.health.lastScan?.errorMessage}
-		<div class="mt-3 rounded-lg bg-error/10 p-3 text-sm text-error">
-			{storage.health.lastScan.errorMessage}
-		</div>
-	{/if}
-</div>
-
-<div class="mt-4 grid gap-4 xl:grid-cols-3">
-	<div class="rounded-lg border border-base-300 bg-base-100 p-4 xl:col-span-1">
-		<div class="mb-3 flex items-center gap-2">
-			<Film class="h-4 w-4" />
-			<h3 class="font-semibold">{m.settings_general_diskUsageByType()}</h3>
-		</div>
-		<div class="space-y-3">
-			{#each mediaDistribution as item (item.label)}
-				<div>
-					<div class="mb-1 flex items-center justify-between text-sm">
-						<span>{item.label}</span>
-						<span class="text-base-content/60">{formatBytes(item.value)}</span>
-					</div>
-					<div class="h-2 rounded-full bg-base-200">
-						<div
-							class={`h-2 rounded-full ${item.tone}`}
-							style={`width: ${ratioWidth(item.value, storage.totalUsedBytes)}`}
-						></div>
-					</div>
+	<div class="space-y-3">
+		{#each mediaDistribution as item (item.label)}
+			<div>
+				<div class="mb-1 flex items-center justify-between text-sm">
+					<span>{item.label}</span>
+					<span class="text-base-content/60">{formatBytes(item.value)}</span>
 				</div>
-			{/each}
-		</div>
-	</div>
-	<div class="rounded-lg border border-base-300 bg-base-100 p-4 xl:col-span-1">
-		<div class="mb-3 flex items-center gap-2">
-			<Library class="h-4 w-4" />
-			<h3 class="font-semibold">{m.settings_general_topLibrariesByUsage()}</h3>
-		</div>
-		<div class="space-y-3">
-			{#if topLibraries.length === 0}
-				<div class="text-sm text-base-content/60">{m.settings_general_noLibraryUsageDataYet()}</div>
-			{:else}
-				{#each topLibraries as item (item.id)}
-					<div>
-						<div class="mb-1 flex items-center justify-between gap-3 text-sm">
-							<span class="truncate">{item.name}</span>
-							<span class="text-base-content/60">{formatBytes(item.usedBytes)}</span>
-						</div>
-						<div class="h-2 rounded-full bg-base-200">
-							<div
-								class="h-2 rounded-full bg-primary"
-								style={`width: ${ratioWidth(item.usedBytes, storage.totalUsedBytes)}`}
-							></div>
-						</div>
-					</div>
-				{/each}
-			{/if}
-		</div>
-	</div>
-	<div class="rounded-lg border border-base-300 bg-base-100 p-4 xl:col-span-1">
-		<div class="mb-3 flex items-center gap-2">
-			<HardDrive class="h-4 w-4" />
-			<h3 class="font-semibold">{m.settings_general_topRootFoldersByUsage()}</h3>
-		</div>
-		<div class="space-y-3">
-			{#if topRootFolders.length === 0}
-				<div class="text-sm text-base-content/60">
-					{m.settings_general_noRootFolderUsageDataYet()}
+				<div class="h-2 rounded-full bg-base-200">
+					<div
+						class={`h-2 rounded-full ${item.tone}`}
+						style={`width: ${ratioWidth(item.value, storage.totalUsedBytes)}`}
+					></div>
 				</div>
-			{:else}
-				{#each topRootFolders as item (item.id)}
-					<div>
-						<div class="mb-1 flex items-center justify-between gap-3 text-sm">
-							<span class="truncate">{item.name}</span>
-							<span class="text-base-content/60">{formatBytes(item.usedBytes)}</span>
-						</div>
-						<div class="h-2 rounded-full bg-base-200">
-							<div
-								class="h-2 rounded-full bg-secondary"
-								style={`width: ${ratioWidth(item.usedBytes, storage.totalUsedBytes)}`}
-							></div>
-						</div>
-					</div>
-				{/each}
-			{/if}
-		</div>
+			</div>
+		{/each}
 	</div>
 </div>
 

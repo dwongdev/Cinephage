@@ -1,16 +1,6 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages.js';
-	import {
-		HardDrive,
-		RefreshCw,
-		AlertCircle,
-		Database,
-		Play,
-		FolderOpen,
-		Link2Off,
-		Server,
-		Clock3
-	} from 'lucide-svelte';
+	import { HardDrive, RefreshCw, AlertCircle, Database, Play, Server, Clock3 } from 'lucide-svelte';
 	import { SettingsPage } from '$lib/components/ui/settings';
 	import type { PageData } from './$types';
 	import { StorageMaintenanceSection } from '$lib/components/libraries';
@@ -429,7 +419,7 @@
 		</div>
 	{/snippet}
 
-	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 		<div class="card bg-base-200">
 			<div class="card-body flex-row items-center gap-4 p-4">
 				<div class="rounded-lg bg-primary/10 p-3">
@@ -469,28 +459,6 @@
 				</div>
 			</div>
 		</div>
-		<div class="card bg-base-200">
-			<div class="card-body flex-row items-center gap-4 p-4">
-				<div class="rounded-lg bg-warning/10 p-3">
-					<FolderOpen class="h-5 w-5 text-warning" />
-				</div>
-				<div>
-					<div class="text-2xl font-bold">{data.storage.health.unmatchedFiles}</div>
-					<div class="text-xs text-base-content/70">Unmatched Files</div>
-				</div>
-			</div>
-		</div>
-		<div class="card bg-base-200">
-			<div class="card-body flex-row items-center gap-4 p-4">
-				<div class="rounded-lg bg-error/10 p-3">
-					<Link2Off class="h-5 w-5 text-error" />
-				</div>
-				<div>
-					<div class="text-2xl font-bold">{data.storage.health.totalDetachedItems}</div>
-					<div class="text-xs text-base-content/70">Detached Items</div>
-				</div>
-			</div>
-		</div>
 	</div>
 
 	<div class="mt-4 rounded-lg border border-base-300 bg-base-100 p-4">
@@ -518,9 +486,12 @@
 							: m.settings_general_noScanHistory()}
 					</div>
 					{#if data.storage.health.lastScan}
-						<div class="mt-1 text-xs text-base-content/50">
-							{formatDuration(data.storage.health.lastScan.durationMs ?? null)}
-							· {data.storage.health.lastScan.filesScanned} files scanned
+						<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/50">
+							<span>{data.storage.health.lastScan.filesScanned} scanned</span>
+							<span>{data.storage.health.lastScan.filesAdded} added</span>
+							<span>{data.storage.health.lastScan.filesUpdated} updated</span>
+							<span>{data.storage.health.lastScan.filesRemoved} removed</span>
+							<span>{data.storage.health.lastScan.unmatchedFiles} unmatched</span>
 						</div>
 					{/if}
 				</div>
