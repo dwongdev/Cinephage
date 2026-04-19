@@ -1,0 +1,25 @@
+services:
+  cinephage:
+    build: .
+    image: cinephage:devcontainer
+    container_name: cinephage
+    restart: unless-stopped
+    volumes:
+      - ./media:/media
+      - ./downloads:/downloads
+    ports:
+      - '3000:3000'
+      - '5173:5173'
+
+  transmission:
+    image: linuxserver/transmission:4.1.1
+    container_name: transmission
+    restart: unless-stopped
+    volumes:
+      - ./config/transmission:/config
+      - ./downloads:/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
+    ports:
+      - '9091:9091'

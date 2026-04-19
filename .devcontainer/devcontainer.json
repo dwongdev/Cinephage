@@ -1,0 +1,9 @@
+{
+	"name": "Cinephage",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "cinephage",
+	"remoteUser": "node",
+	"mounts": ["source=workspace-scripts,target=/workspace-scripts/,type=bind,consistency=cached"],
+	"postCreateCommand": "/workspace-scripts/init.sh",
+	"initializeCommand": "mkdir -p .devcontainer/downloads .devcontainer/media .devcontainer/config/transmission"
+}
