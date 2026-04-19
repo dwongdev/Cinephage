@@ -1,9 +1,9 @@
 ---
 id: milkie
 name: milkie.cc
-description: 'milkie is a HUNGARIAN Private Scene Torrent Tracker for MOVIES / TV / GENERAL run by the nCore team.'
+description: 'Milkie.cc (ME) is a private torrent tracker for 0day / general.'
 type: private
-language: hu-HU
+language: en-US
 encoding: UTF-8
 protocol: torrent
 links:
@@ -23,14 +23,27 @@ caps:
   categories:
     '1': Movies
     '2': TV
+    '3': Audio
+    '4': Console
+    '5': Books
+    '6': PC
+    '7': XXX
 
   categorymappings:
     - { id: 1, cat: Movies, desc: 'Movies' }
-    - { id: 2, cat: TV, desc: 'TV shows' }
+    - { id: 2, cat: TV, desc: 'TV' }
     - { id: 3, cat: Audio, desc: 'Music' }
-    - { id: 4, cat: Games, desc: 'Games' }
+    - { id: 4, cat: PC/Games, desc: 'Game' }
+    - { id: 4, cat: Console, desc: 'Game' }
     - { id: 5, cat: Books, desc: 'Ebooks' }
-    - { id: 6, cat: Apps, desc: 'Apps' }
+    - { id: 6, cat: PC/0day, desc: 'App' }
+    - { id: 6, cat: PC/ISO, desc: 'App' }
+    - { id: 6, cat: PC/Mac, desc: 'App' }
+    - { id: 6, cat: PC/Mobile-Android, desc: 'App' }
+    - { id: 6, cat: PC/Mobile-iOS, desc: 'App' }
+    - { id: 6, cat: PC/Mobile-Other, desc: 'App' }
+    - { id: 6, cat: Other, desc: 'App' }
+    - { id: 7, cat: XXX, desc: 'Adult' }
 
   modes:
     search: [q]
@@ -55,9 +68,8 @@ search:
       - '{{ .Config.apikey }}'
   inputs:
     query: '{{ .Keywords }}'
-    pi: '0' # Page index
     ps: '100' # Page size
-    'categories[]': '{{ join .Categories "," }}'
+    categories: '{{ join .Categories "," }}'
 
   response:
     type: json
@@ -74,6 +86,35 @@ search:
       selector: releaseName
     category:
       selector: category
+      filters:
+        - name: re_replace
+          args: ['^2000$', '1']
+        - name: re_replace
+          args: ['^3000$', '3']
+        - name: re_replace
+          args: ['^4000$', '6']
+        - name: re_replace
+          args: ['^4050$', '4']
+        - name: re_replace
+          args: ['^5000$', '2']
+        - name: re_replace
+          args: ['^6000$', '7']
+        - name: re_replace
+          args: ['^7000$', '5']
+        - name: re_replace
+          args: ['^100001$', '1']
+        - name: re_replace
+          args: ['^100002$', '2']
+        - name: re_replace
+          args: ['^100003$', '3']
+        - name: re_replace
+          args: ['^100004$', '4']
+        - name: re_replace
+          args: ['^100005$', '5']
+        - name: re_replace
+          args: ['^100006$', '6']
+        - name: re_replace
+          args: ['^100007$', '7']
     download:
       selector: id
       filters:
@@ -107,6 +148,14 @@ search:
       selector: groupId
     comments:
       selector: comments
+    downloadvolumefactor:
+      text: 0
+    uploadvolumefactor:
+      text: 1
+    minimumratio:
+      text: 1
+    minimumseedtime:
+      text: 172800
     imdbid:
       selector: externals.imdb
       optional: true
