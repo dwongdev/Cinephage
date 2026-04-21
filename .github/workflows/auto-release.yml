@@ -292,7 +292,7 @@ jobs:
 
   docker-release:
     name: Docker Release
-    needs: [lint, typecheck, test, build]
+    needs: [bump-version, lint, typecheck, test, build]
     uses: ./.github/workflows/docker-build.yml
     with:
       release_tag: ${{ needs.bump-version.outputs.tag }}
@@ -304,7 +304,7 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: [docker-release]
+    needs: [bump-version, docker-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
