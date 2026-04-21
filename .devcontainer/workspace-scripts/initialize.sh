@@ -8,14 +8,14 @@ PGID=$(id -g)
 
 touch .env
 
-if ! grep -qE '^[[:space:]]*PUID=' .env; then
+if grep -qE '^[[:space:]]*PUID=' .env; then
+  sed -i "s|^[[:space:]]*PUID=.*$|PUID=$PUID|" .env
+else
   echo "PUID=$PUID" >> .env
-elif ! grep -qE '^[[:space:]]*PUID=[[:space:]]*[^[:space:]]' .env; then
-  sed -i "s|PUID=.*$|PUID=$PUID|" .env
 fi
 
-if ! grep -qE '^[[:space:]]*PGID=' .env; then
+if grep -qE '^[[:space:]]*PGID=' .env; then
+  sed -i "s|^[[:space:]]*PGID=.*$|PGID=$PGID|" .env
+else
   echo "PGID=$PGID" >> .env
-elif ! grep -qE '^[[:space:]]*PGID=[[:space:]]*[^[:space:]]' .env; then
-  sed -i "s|PGID=.*$|PGID=$PGID|" .env
 fi

@@ -2,6 +2,7 @@ services:
   cinephage:
     build: .
     image: cinephage:devcontainer
+    entrypoint: /usr/local/bin/devcontainer-entrypoint.sh
     command: sleep infinity
     restart: 'no'
     working_dir: /workspace
