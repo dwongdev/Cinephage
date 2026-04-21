@@ -186,6 +186,9 @@ jobs:
         run: |
           git-cliff --tag "v${{ steps.version.outputs.next }}" -o CHANGELOG.md
 
+      - name: Format CHANGELOG
+        run: npx prettier --write CHANGELOG.md
+
       - name: Commit version bump and changelog
         run: |
           git add package.json package-lock.json CHANGELOG.md
