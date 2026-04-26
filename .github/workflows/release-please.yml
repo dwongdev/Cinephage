@@ -37,3 +37,48 @@ jobs:
                 checkout_ref: '${{ steps.release.outputs.tag_name }}'
               }
             });
+
+      - name: Trigger publish to API
+        if: steps.release.outputs.release_created
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-release.yml',
+              ref: 'main',
+              inputs: {
+                tag_name: '${{ steps.release.outputs.tag_name }}'
+              }
+            });
+
+      - name: Trigger Discord announcement
+        if: steps.release.outputs.release_created
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-discord.yml',
+              ref: 'main',
+              inputs: {
+                tag_name: '${{ steps.release.outputs.tag_name }}'
+              }
+            });
+
+      - name: Trigger sync main to tag
+        if: steps.release.outputs.release_created
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'sync-main-to-tag.yml',
+              ref: 'main',
+              inputs: {
+                tag_name: '${{ steps.release.outputs.tag_name }}'
+              }
+            });
