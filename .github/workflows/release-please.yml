@@ -47,7 +47,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'publish-release.yml',
-              ref: 'main',
+              ref: 'dev',
               inputs: {
                 tag_name: '${{ steps.release.outputs.tag_name }}'
               }
@@ -62,7 +62,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'release-discord.yml',
-              ref: 'main',
+              ref: 'dev',
               inputs: {
                 tag_name: '${{ steps.release.outputs.tag_name }}'
               }
@@ -77,7 +77,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'sync-main-to-tag.yml',
-              ref: 'main',
+              ref: 'dev',
               inputs: {
                 tag_name: '${{ steps.release.outputs.tag_name }}'
               }
