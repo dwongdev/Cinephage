@@ -7,7 +7,7 @@
  * - M3U Playlists
  */
 
-export type LiveTvProviderType = 'stalker' | 'xstream' | 'm3u';
+export type LiveTvProviderType = 'stalker' | 'xstream' | 'm3u' | 'cinephage-iptv';
 
 // ============================================================================
 // PROVIDER INTERFACE TYPES (for provider implementations)
@@ -173,6 +173,7 @@ export interface LiveTvAccount {
 	stalkerConfig?: StalkerConfig;
 	xstreamConfig?: XstreamConfig;
 	m3uConfig?: M3uConfig;
+	cinephageIptvConfig?: CinephageIptvConfig;
 
 	// Common metadata
 	playbackLimit: number | null;
@@ -213,6 +214,7 @@ export interface LiveTvAccountInput {
 	stalkerConfig?: StalkerConfig;
 	xstreamConfig?: XstreamConfig;
 	m3uConfig?: M3uConfig;
+	cinephageIptvConfig?: CinephageIptvConfig;
 }
 
 /**
@@ -226,6 +228,7 @@ export interface LiveTvAccountUpdate {
 	stalkerConfig?: Partial<StalkerConfig>;
 	xstreamConfig?: Partial<XstreamConfig>;
 	m3uConfig?: Partial<M3uConfig>;
+	cinephageIptvConfig?: Partial<CinephageIptvConfig>;
 }
 
 /**
@@ -274,6 +277,16 @@ export interface XstreamChannelData {
 	containerExtension?: string;
 }
 
+/** Cinephage IPTV configuration */
+export interface CinephageIptvConfig {
+	countries?: string[];
+	categories?: string[];
+	languages?: string[];
+	lastSyncAt?: string;
+	autoSyncIntervalHours?: number;
+	preferredQuality?: string | null;
+}
+
 /**
  * M3U-specific channel data
  */
@@ -284,6 +297,8 @@ export interface M3uChannelData {
 	url: string;
 	tvgLogo?: string;
 	attributes?: Record<string, string>;
+	/** Backup stream URLs for automatic failover */
+	backupUrls?: string[];
 }
 
 // ============================================================================
