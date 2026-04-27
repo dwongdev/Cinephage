@@ -9,9 +9,13 @@ import { db } from '$lib/server/db';
 import { livetvAccounts, livetvChannels, livetvCategories } from '$lib/server/db/schema';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { createChildLogger } from '$lib/logging';
+import { getStreamingIndexerSettings } from '$lib/server/streaming/settings.js';
 import { randomUUID } from 'crypto';
 
 const logger = createChildLogger({ logDomain: 'livetv' as const });
+
+const CINEPHAGE_API_BASE = 'https://api.cinephage.net';
+
 import type {
 	LiveTvProvider,
 	AuthResult,
@@ -448,6 +452,21 @@ export class IptvOrgProvider implements LiveTvProvider {
 			return 'direct';
 		}
 		return 'unknown';
+	}
+
+	private async getAuthHeaders(): Promise<Record<string, string>> {
+		const settings = await getStreamingIndexerSettings();
+		const version = settings?.cinephageVersion;
+		const commit = settings?.cinephageCommit;
+
+		if (!version || !commit) {
+			throw new Error('Cinephage API not configured: missing cinephageVersion or cinephageCommit');
+		}
+
+		return {
+			'X-Cinephage-Version': version,
+			'X-Cinephage-Commit': commit
+		};
 	}
 }
 
