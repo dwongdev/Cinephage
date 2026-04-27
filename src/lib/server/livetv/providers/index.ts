@@ -9,11 +9,13 @@ export type { AuthResult, StreamResolutionResult, ProviderCapabilities } from '$
 export { StalkerProvider, getStalkerProvider } from './StalkerProvider';
 export { XstreamProvider, getXstreamProvider } from './XstreamProvider';
 export { M3uProvider, getM3uProvider } from './M3uProvider';
+export { CinephageIptvProvider, getCinephageIptvProvider } from './CinephageIptvProvider';
 
 import type { LiveTvProvider } from './LiveTvProvider';
 import { getStalkerProvider } from './StalkerProvider';
 import { getXstreamProvider } from './XstreamProvider';
 import { getM3uProvider } from './M3uProvider';
+import { getCinephageIptvProvider } from './CinephageIptvProvider';
 import type { LiveTvProviderType, LiveTvAccount } from '$lib/types/livetv';
 
 /**
@@ -27,6 +29,8 @@ export function getProvider(type: LiveTvProviderType): LiveTvProvider {
 			return getXstreamProvider();
 		case 'm3u':
 			return getM3uProvider();
+		case 'cinephage-iptv':
+			return getCinephageIptvProvider();
 		default:
 			throw new Error(`Unknown provider type: ${type}`);
 	}
@@ -43,5 +47,5 @@ export function getProviderForAccount(account: LiveTvAccount): LiveTvProvider {
  * Get all available providers
  */
 export function getAllProviders(): LiveTvProvider[] {
-	return [getStalkerProvider(), getXstreamProvider(), getM3uProvider()];
+	return [getStalkerProvider(), getXstreamProvider(), getM3uProvider(), getCinephageIptvProvider()];
 }

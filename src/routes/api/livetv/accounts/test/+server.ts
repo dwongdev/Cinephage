@@ -15,7 +15,7 @@ import type { LiveTvAccount } from '$lib/types/livetv';
 
 // Validation schema for testing Live TV accounts
 const liveTvAccountTestSchema = z.object({
-	providerType: z.enum(['stalker', 'xstream', 'm3u']),
+	providerType: z.enum(['stalker', 'xstream', 'm3u', 'cinephage-iptv']),
 	// Stalker-specific config
 	stalkerConfig: z
 		.object({
@@ -47,6 +47,14 @@ const liveTvAccountTestSchema = z.object({
 			epgUrl: z.string().url().optional()
 		})
 		.optional(),
+	// Cinephage IPTV config
+	cinephageIptvConfig: z
+		.object({
+			countries: z.array(z.string()).optional(),
+			categories: z.array(z.string()).optional(),
+			languages: z.array(z.string()).optional()
+		})
+		.optional()
 
 });
 
@@ -136,6 +144,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			stalkerConfig: parsed.data.stalkerConfig,
 			xstreamConfig: parsed.data.xstreamConfig,
 			m3uConfig: parsed.data.m3uConfig,
+			cinephageIptvConfig: parsed.data.cinephageIptvConfig,
 
 			playbackLimit: null,
 			channelCount: null,

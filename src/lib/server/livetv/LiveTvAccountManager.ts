@@ -23,7 +23,8 @@ import type {
 	LiveTvProviderType,
 	StalkerConfig,
 	XstreamConfig,
-	M3uConfig
+	M3uConfig,
+	CinephageIptvConfig
 } from '$lib/types/livetv';
 
 const logger = createChildLogger({ module: 'LiveTvAccountManager' });
@@ -66,6 +67,7 @@ export function recordToAccount(record: LivetvAccountRecord): LiveTvAccount {
 		stalkerConfig: record.stalkerConfig ?? undefined,
 		xstreamConfig: record.xstreamConfig ?? undefined,
 		m3uConfig: record.m3uConfig ?? undefined,
+		cinephageIptvConfig: record.iptvOrgConfig as CinephageIptvConfig | undefined,
 		// Metadata from provider
 		playbackLimit: record.playbackLimit ?? null,
 		channelCount: record.channelCount ?? null,
@@ -299,6 +301,7 @@ export class LiveTvAccountManager implements BackgroundService {
 		let stalkerConfig: StalkerConfig | undefined;
 		let xstreamConfig: XstreamConfig | undefined;
 		let m3uConfig: M3uConfig | undefined;
+		let iptvOrgConfig: Record<string, unknown> | undefined;
 
 		if (input.providerType === 'stalker' && input.stalkerConfig) {
 			stalkerConfig = {
@@ -329,6 +332,13 @@ export class LiveTvAccountManager implements BackgroundService {
 				headers: input.m3uConfig.headers,
 				userAgent: input.m3uConfig.userAgent
 			};
+		} else if (input.providerType === 'cinephage-iptv' && input.cinephageIptvConfig) {
+			iptvOrgConfig = {
+				countries: input.cinephageIptvConfig.countries || [],
+				categories: input.cinephageIptvConfig.categories || [],
+				languages: input.cinephageIptvConfig.languages || [],
+				autoSyncIntervalHours: input.cinephageIptvConfig.autoSyncIntervalHours || 24
+			};
 		}
 
 		// Test connection if requested
@@ -339,10 +349,11 @@ export class LiveTvAccountManager implements BackgroundService {
 				name: input.name,
 				providerType: input.providerType,
 				enabled: input.enabled ?? true,
-				stalkerConfig,
-				xstreamConfig,
-				m3uConfig,
-				playbackLimit: null,
+			stalkerConfig,
+			xstreamConfig,
+			m3uConfig,
+			cinephageIptvConfig: input.cinephageIptvConfig,
+			playbackLimit: null,
 				channelCount: null,
 				categoryCount: null,
 				expiresAt: null,
@@ -382,6 +393,7 @@ export class LiveTvAccountManager implements BackgroundService {
 			stalkerConfig,
 			xstreamConfig,
 			m3uConfig,
+			iptvOrgConfig,
 			createdAt: now,
 			updatedAt: now
 		};
@@ -479,6 +491,13 @@ export class LiveTvAccountManager implements BackgroundService {
 				updateData.lastEpgSyncAt = null;
 				updateData.lastEpgSyncError = null;
 			}
+		}
+
+		if (updates.cinephageIptvConfig && existing.providerType === 'cinephage-iptv') {
+			updateData.iptvOrgConfig = {
+				...existing.iptvOrgConfig,
+				...updates.cinephageIptvConfig
+			} as Record<string, unknown>;
 		}
 
 		const [record] = await db

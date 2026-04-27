@@ -77,6 +77,20 @@ export const providerDefinitions: LiveTvProviderDefinition[] = [
 			supportsCategories: true,
 			supportsAutoRefresh: true
 		}
+	},
+	{
+		id: 'cinephage-iptv',
+		name: 'Cinephage IPTV',
+		description: 'Free IPTV channels from the Cinephage network',
+		icon: 'Globe',
+		requiresAuth: false,
+		authDescription: 'Automatic (Cinephage account)',
+		features: {
+			supportsEpg: true,
+			supportsArchive: false,
+			supportsCategories: true,
+			supportsAutoRefresh: false
+		}
 	}
 ];
 
