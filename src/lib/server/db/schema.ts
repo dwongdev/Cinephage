@@ -3100,10 +3100,10 @@ export type EpgProgramRecord = typeof epgPrograms.$inferSelect;
 export type NewEpgProgramRecord = typeof epgPrograms.$inferInsert;
 
 // ============================================================================
-// LIVE TV - UNIFIED PROVIDER ACCOUNTS (Multi-provider support: Stalker, XStream, M3U)
+// LIVE TV - UNIFIED PROVIDER ACCOUNTS (Multi-provider support: Stalker, XStream, M3U, Cinephage)
 // ============================================================================
 
-export const livetvProviderTypeEnum = ['stalker', 'xstream', 'm3u'] as const;
+export const livetvProviderTypeEnum = ['stalker', 'xstream', 'm3u', 'cinephage-iptv'] as const;
 export type LiveTvProviderType = (typeof livetvProviderTypeEnum)[number];
 
 /**
