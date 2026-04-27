@@ -14,6 +14,7 @@
 import { getLiveTvStreamService } from './LiveTvStreamService.js';
 import type { StreamUrlResolution } from './LiveTvStreamService.js';
 import { createChildLogger } from '$lib/logging';
+import type { LiveTvProviderType } from '$lib/types/livetv';
 
 const logger = createChildLogger({ logDomain: 'livetv' as const });
 

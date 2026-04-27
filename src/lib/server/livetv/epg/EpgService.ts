@@ -29,7 +29,8 @@ import type {
 	EpgProgramWithProgress,
 	EpgSyncResult,
 	ChannelNowNext,
-	LiveTvAccount
+	LiveTvAccount,
+	LiveTvProviderType
 } from '$lib/types/livetv';
 
 const logger = createChildLogger({ module: 'EpgService' });

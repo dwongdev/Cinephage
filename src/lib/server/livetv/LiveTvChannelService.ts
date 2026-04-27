@@ -24,7 +24,8 @@ import type {
 	ChannelQueryOptions,
 	PaginatedChannelResponse,
 	AccountSyncStatus,
-	ChannelSyncResult
+	ChannelSyncResult,
+	LiveTvProviderType
 } from '$lib/types/livetv';
 
 const logger = createChildLogger({ module: 'LiveTvChannelService' });

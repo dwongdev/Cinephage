@@ -31,7 +31,8 @@ import type {
 	ChannelCategory,
 	CachedChannel,
 	AddToLineupRequest,
-	UpdateChannelRequest
+	UpdateChannelRequest,
+	LiveTvProviderType
 } from '$lib/types/livetv';
 
 /**
