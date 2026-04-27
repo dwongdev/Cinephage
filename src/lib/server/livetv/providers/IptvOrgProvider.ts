@@ -68,27 +68,44 @@ export class IptvOrgProvider implements LiveTvProvider {
 				};
 			}
 
-			// Test by fetching channels and streams
-			const channels = await this.fetchIptvOrgChannels(config);
-			const streams = await this.fetchIptvOrgStreams(config);
+			const headers = await this.getAuthHeaders();
 
-			// Match channels to streams
-			const matchedChannels = this.matchChannelsToStreams(channels, streams, config);
-
-			// Get unique categories
-			const categories = new Set<string>();
-			for (const channel of channels) {
-				if (channel.categories) {
-					channel.categories.forEach((c) => categories.add(c));
-				}
+			const params = new URLSearchParams();
+			params.set('limit', '1');
+			if (config.countries && config.countries.length > 0) {
+				params.set('country', config.countries[0]);
 			}
+
+			const response = await fetch(
+				`${CINEPHAGE_API_BASE}/api/v1/iptv/channels?${params.toString()}`,
+				{
+					headers: { ...headers, Accept: 'application/json' },
+					signal: AbortSignal.timeout(30000)
+				}
+			);
+
+			if (response.status === 401) {
+				return {
+					success: false,
+					error: 'Cinephage API rejected authentication. Verify version and commit.'
+				};
+			}
+
+			if (!response.ok) {
+				return {
+					success: false,
+					error: `Cinephage API returned HTTP ${response.status}`
+				};
+			}
+
+			const data = (await response.json()) as { channels?: unknown[]; total?: number };
 
 			return {
 				success: true,
 				profile: {
 					playbackLimit: 0,
-					channelCount: matchedChannels.length,
-					categoryCount: categories.size,
+					channelCount: typeof data.total === 'number' ? data.total : 0,
+					categoryCount: 0,
 					expiresAt: null,
 					serverTimezone: 'UTC',
 					streamVerified: false
